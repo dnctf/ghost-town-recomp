@@ -8,17 +8,6 @@ on:
       - 'docs/runtime-bundle-README.md'
       - 'docs/BOX64_ANDROID_RUNTIME.md'
   workflow_dispatch:
-    inputs:
-      wine_version:
-        description: Pinned Kron4ek Wine version
-        required: true
-        default: '11.19'
-        type: string
-      dxvk_version:
-        description: Pinned upstream DXVK version
-        required: true
-        default: '3.1.1'
-        type: string
 
 permissions:
   contents: read
@@ -32,58 +21,42 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y curl xz-utils tar file python3
 
       - name: Fetch pinned Wine and DXVK releases
-        env:
-          WINE_VERSION: ${{ inputs.wine_version || '11.19' }}
-          DXVK_VERSION: ${{ inputs.dxvk_version || '3.1.1' }}
         run: |
           set -euo pipefail
           mkdir -p downloads bundle/wine bundle/dxvk
-          WINE_FILE="wine-${WINE_VERSION}-amd64.tar.xz"
-          DXVK_FILE="dxvk-${DXVK_VERSION}.tar.gz"
-          curl -fL --retry 3 "https://github.com/Kron4ek/Wine-Builds/releases/download/${WINE_VERSION}/${WINE_FILE}" -o "downloads/$WINE_FILE"
-          curl -fL --retry 3 "https://github.com/doitsujin/DXVK/releases/download/v${DXVK_VERSION}/${DXVK_FILE}" -o "downloads/$DXVK_FILE"
-          echo "WINE_FILE=$WINE_FILE" >> "$GITHUB_ENV"
-          echo "DXVK_FILE=$DXVK_FILE" >> "$GITHUB_ENV"
+          WINE_FILE=wine-11.19-amd64.tar.xz
+          DXVK_FILE=dxvk-3.1.1.tar.gz
+          curl -fL --retry 3 "https://github.com/Kron4ek/Wine-Builds/releases/download/11.19/$WINE_FILE" -o "downloads/$WINE_FILE"
+          curl -fL --retry 3 "https://github.com/doitsujin/DXVK/releases/download/v3.1.1/$DXVK_FILE" -o "downloads/$DXVK_FILE"
 
-      - name: Verify release asset SHA-256
-        env:
-          WINE_VERSION: ${{ inputs.wine_version || '11.19' }}
-          DXVK_VERSION: ${{ inputs.dxvk_version || '3.1.1' }}
+      - name: Verify upstream release SHA-256
         run: |
           set -euo pipefail
-          WINE_FILE="downloads/wine-${WINE_VERSION}-amd64.tar.xz"
-          DXVK_FILE="downloads/dxvk-${DXVK_VERSION}.tar.gz"
-          if [ "$WINE_VERSION" = "11.19" ]; then
-            echo "40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e  $WINE_FILE" | sha256sum -c -
-          else
-            echo "Wine version is not in the verified baseline allowlist."; exit 1
-          fi
-          if [ "$DXVK_VERSION" = "3.1.1" ]; then
-            echo "40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608  $DXVK_FILE" | sha256sum -c -
-          else
-            echo "DXVK version is not in the verified baseline allowlist."; exit 1
-          fi
+          echo "40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e  downloads/wine-11.19-amd64.tar.xz" | sha256sum -c -
+          echo "40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608  downloads/dxvk-3.1.1.tar.gz" | sha256sum -c -
 
       - name: Extract and validate runtime components
-        env:
-          WINE_VERSION: ${{ inputs.wine_version || '11.19' }}
-          DXVK_VERSION: ${{ inputs.dxvk_version || '3.1.1' }}
         run: |
           set -euo pipefail
-          tar -xJf "downloads/$WINE_FILE" -C bundle/wine --strip-components=1
-          tar -xzf "downloads/$DXVK_FILE" -C bundle/dxvk --strip-components=1
-          test -x bundle/wine/bin/wine
+          tar -xJf downloads/wine-11.19-amd64.tar.xz -C bundle/wine --strip-components=1
+          tar -xzf downloads/dxvk-3.1.1.tar.gz -C bundle/dxvk --strip-components=1
+          find bundle/wine -maxdepth 3 -type f -name wine -print
           test -d bundle/dxvk/x64
           test -d bundle/dxvk/x32
+          WINE_BIN="$(find bundle/wine -type f -path '*/bin/wine' -print -quit)"
+          test -n "$WINE_BIN"
+          chmod +x "$WINE_BIN"
           mkdir -p bundle/provenance
           sha256sum downloads/* > bundle/provenance/SHA256SUMS
-          printf 'Wine=%s\nWine source=https://github.com/Kron4ek/Wine-Builds\nDXVK=%s\nDXVK source=https://github.com/doitsujin/DXVK\nWine target=Linux x86_64 (requires glibc userspace + Box64)\nDXVK target=Windows DLLs installed into Wine prefix\n' "${{ inputs.wine_version }}" "${{ inputs.dxvk_version }}" > bundle/provenance/COMPONENTS.txt
-          cp docs/runtime-bundle-README.md bundle/README.md
+          printf 'Wine=11.19 amd64\nDXVK=3.1.1\nWine target=Linux x86_64; requires Box64 + ARM64 glibc userspace\nDXVK target=Windows DLLs for Wine prefix; requires Vulkan bridge\n' > bundle/provenance/COMPONENTS.txt
+          cat > bundle/README.txt <<'EOF'
+Wine x86_64 requires Box64 plus an ARM64 glibc userspace and matching libraries. DXVK DLLs install into a Wine prefix and require a working Vulkan path. This bundle is not a standalone Android runtime or proof of game compatibility.
+EOF
 
       - name: Upload runtime component bundle
         uses: actions/upload-artifact@v4
         with:
-          name: ghost-town-wine-${{ inputs.wine_version }}-dxvk-${{ inputs.dxvk_version }}
+          name: ghost-town-wine-11.19-dxvk-3.1.1
           path: bundle/
           if-no-files-found: error
           retention-days: 30
