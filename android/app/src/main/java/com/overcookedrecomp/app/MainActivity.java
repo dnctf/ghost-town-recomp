@@ -76,6 +76,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private TextView importProgressText;
     private ProgressBar importProgressBar;
     private Button startGameBtn;
+    private View firstGameCard;
 
     private boolean engineInitialized = false;
     private GameStorageVerifier.GameTitle activeGameTitle = GameStorageVerifier.GameTitle.UNKNOWN;
@@ -96,6 +97,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
         // Deteksi spesifikasi layar ponsel / tablet HarmonyOS secara aman
         detectAndApplyDeviceDisplaySettings();
@@ -168,6 +176,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 }
             }
         });
+        virtualOverlay.setVisibility(View.GONE); // Gamepad sentuh hanya tampil saat runtime game, bukan di dashboard.
         rootLayout.addView(virtualOverlay);
 
         // Buat UI Importer & Setup
@@ -197,179 +206,196 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         ScrollView scrollView = new ScrollView(this);
         scrollView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        scrollView.setBackgroundColor(Color.parseColor("#E6121418"));
+        scrollView.setBackgroundColor(Color.parseColor("#080B12"));
         scrollView.setFillViewport(true);
+        scrollView.setClipToPadding(false);
 
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
-        container.setPadding(48, 36, 48, 48);
-        container.setGravity(Gravity.CENTER_HORIZONTAL);
+        container.setPadding(dp(34), dp(26), dp(34), dp(30));
+        container.setGravity(Gravity.TOP);
+        container.setFocusableInTouchMode(true);
 
-        // Header Title
+        // PS4-inspired system header.
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(0, 0, 0, dp(22));
+
+        LinearLayout brand = new LinearLayout(this);
+        brand.setOrientation(LinearLayout.VERTICAL);
         TextView titleView = new TextView(this);
-        titleView.setText("🎮 Ghost Town Recomp");
-        titleView.setTextSize(24);
-        titleView.setTextColor(Color.parseColor("#FF9F1C"));
-        titleView.setTypeface(null, Typeface.BOLD);
-        titleView.setGravity(Gravity.CENTER);
-        container.addView(titleView);
+        titleView.setText("GHOST TOWN");
+        titleView.setTextSize(25);
+        titleView.setTextColor(Color.WHITE);
+        titleView.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        brand.addView(titleView);
 
         TextView subTitle = new TextView(this);
-        subTitle.setText("Launcher & Compiler Game PC (Overcooked 1 & 2, Moving Out 1 & 2) — Ghost Town Games / Team17");
-        subTitle.setTextSize(13);
-        subTitle.setTextColor(Color.parseColor("#CCCCCC"));
-        subTitle.setGravity(Gravity.CENTER);
-        subTitle.setPadding(0, 8, 0, 24);
-        container.addView(subTitle);
+        subTitle.setText("RECOMP  /  CONSOLE LIBRARY");
+        subTitle.setTextSize(10);
+        subTitle.setLetterSpacing(0.16f);
+        subTitle.setTextColor(Color.parseColor("#66B9FF"));
+        subTitle.setPadding(1, dp(3), 0, 0);
+        brand.addView(subTitle);
+        header.addView(brand, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        // Developer Switcher & Icon Bar
-        LinearLayout devBar = new LinearLayout(this);
-        devBar.setOrientation(LinearLayout.HORIZONTAL);
-        devBar.setGravity(Gravity.CENTER);
-        devBar.setPadding(0, 0, 0, 20);
+        TextView systemStatus = new TextView(this);
+        systemStatus.setText("●  ARM64  •  EXPERIMENTAL");
+        systemStatus.setTextSize(11);
+        systemStatus.setTextColor(Color.parseColor("#9AA9BD"));
+        systemStatus.setPadding(dp(14), dp(9), dp(14), dp(9));
+        systemStatus.setBackground(createCardDrawable("#111B2A", "#233B58"));
+        header.addView(systemStatus);
+        container.addView(header);
 
-        // Badge Ghost Town Games / Team17
-        LinearLayout gtgBadge = new LinearLayout(this);
-        gtgBadge.setOrientation(LinearLayout.HORIZONTAL);
-        gtgBadge.setGravity(Gravity.CENTER_VERTICAL);
-        gtgBadge.setBackground(createCardDrawable("#1E2229", "#FF9F1C"));
-        gtgBadge.setPadding(18, 10, 22, 10);
-        ImageView gtgIcon = new ImageView(this);
-        gtgIcon.setImageResource(R.drawable.ic_overcooked);
-        gtgIcon.setLayoutParams(new LinearLayout.LayoutParams(40, 40));
-        gtgBadge.addView(gtgIcon);
-        ImageView moDevIcon = new ImageView(this);
-        moDevIcon.setImageResource(R.drawable.ic_moving_out);
-        LinearLayout.LayoutParams moIconParams = new LinearLayout.LayoutParams(40, 40);
-        moIconParams.setMarginStart(10);
-        moDevIcon.setLayoutParams(moIconParams);
-        gtgBadge.addView(moDevIcon);
-        TextView gtgText = new TextView(this);
-        gtgText.setText(" Ghost Town Games / Team17");
-        gtgText.setTextSize(12);
-        gtgText.setTextColor(Color.parseColor("#FF9F1C"));
-        gtgText.setTypeface(null, Typeface.BOLD);
-        gtgBadge.addView(gtgText);
-        devBar.addView(gtgBadge);
+        // Featured area, deliberately separate from game execution state.
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setPadding(dp(24), dp(20), dp(24), dp(20));
+        hero.setBackground(createCardDrawable("#101B2B", "#1C4772"));
+        TextView heroEyebrow = new TextView(this);
+        heroEyebrow.setText("YOUR GAME SPACE");
+        heroEyebrow.setTextSize(10);
+        heroEyebrow.setLetterSpacing(0.18f);
+        heroEyebrow.setTextColor(Color.parseColor("#5CB7FF"));
+        hero.addView(heroEyebrow);
 
-        container.addView(devBar);
+        TextView heroTitle = new TextView(this);
+        heroTitle.setText("Play your library.");
+        heroTitle.setTextSize(27);
+        heroTitle.setTextColor(Color.WHITE);
+        heroTitle.setTypeface(null, Typeface.BOLD);
+        heroTitle.setPadding(0, dp(5), 0, dp(4));
+        hero.addView(heroTitle);
 
-        // Kartu Overcooked 1
-        container.addView(createGameCard(
-                GameStorageVerifier.GameTitle.OVERCOOKED_1,
-                "Overcooked 1 (PC)",
-                "Salin/impor folder 'Overcooked_Data' dari PC",
-                text -> oc1StatusText = text
-        ));
-
-        View spacer1 = new View(this);
-        spacer1.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 20));
-        container.addView(spacer1);
-
-        // Kartu Overcooked 2
-        container.addView(createGameCard(
-                GameStorageVerifier.GameTitle.OVERCOOKED_2,
-                "Overcooked 2 (PC)",
-                "Salin/impor folder 'Overcooked2_Data' dari PC (Mendukung lempar bahan/Throw)",
-                text -> oc2StatusText = text
-        ));
-
-        View spacer2 = new View(this);
-        spacer2.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 20));
-        container.addView(spacer2);
-
-        // Kartu Moving Out
-        container.addView(createGameCard(
-                GameStorageVerifier.GameTitle.MOVING_OUT,
-                "Moving Out (PC)",
-                "Salin/impor folder 'MovingOut_Data' dari PC (Fisika pindahan rumah & sofa)",
-                text -> moStatusText = text
-        ));
-
-        View spacer3 = new View(this);
-        spacer3.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 20));
-        container.addView(spacer3);
-
-        // Kartu Moving Out 2
-        container.addView(createGameCard(
-                GameStorageVerifier.GameTitle.MOVING_OUT_2,
-                "Moving Out 2 (PC)",
-                "Salin/impor folder 'MovingOut2_Data' dari PC (Multiverse delivery, arcade physics & joint chaos)",
-                text -> mo2StatusText = text
-        ));
-
-        // Tombol Toggle Virtual On-Screen Controls
-        Button toggleVirtualBtn = new Button(this);
-        toggleVirtualBtn.setText(virtualControlsEnabled ? "🎮 Kontrol Virtual Layar Sentuh: AKTIF" : "🎮 Kontrol Virtual Layar Sentuh: NONAKTIF");
-        toggleVirtualBtn.setTextSize(13);
-        toggleVirtualBtn.setTextColor(Color.WHITE);
-        toggleVirtualBtn.setBackground(createButtonDrawable("#00A8E8"));
-        LinearLayout.LayoutParams vParams = new LinearLayout.LayoutParams(
+        TextView heroBody = new TextView(this);
+        heroBody.setText("Pilih game, impor data milikmu, lalu periksa kesiapan runtime. Dashboard ini adalah launcher eksperimental, bukan emulator Windows.");
+        heroBody.setTextSize(12);
+        heroBody.setTextColor(Color.parseColor("#B5C4D8"));
+        heroBody.setMaxWidth(dp(760));
+        hero.addView(heroBody);
+        LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        vParams.setMargins(0, 20, 0, 0);
-        toggleVirtualBtn.setLayoutParams(vParams);
+        heroParams.bottomMargin = dp(26);
+        container.addView(hero, heroParams);
+
+        TextView libraryTitle = new TextView(this);
+        libraryTitle.setText("GAME LIBRARY");
+        libraryTitle.setTextSize(13);
+        libraryTitle.setLetterSpacing(0.12f);
+        libraryTitle.setTextColor(Color.WHITE);
+        libraryTitle.setTypeface(null, Typeface.BOLD);
+        libraryTitle.setPadding(0, 0, 0, dp(12));
+        container.addView(libraryTitle);
+
+        HorizontalScrollView gameScroll = new HorizontalScrollView(this);
+        gameScroll.setHorizontalScrollBarEnabled(false);
+        gameScroll.setClipToPadding(false);
+        LinearLayout gameRow = new LinearLayout(this);
+        gameRow.setOrientation(LinearLayout.HORIZONTAL);
+        gameRow.setGravity(Gravity.TOP);
+        gameRow.addView(createGameCard(
+                GameStorageVerifier.GameTitle.OVERCOOKED_1,
+                "Overcooked!",
+                "PC  •  Unity",
+                text -> oc1StatusText = text));
+        gameRow.addView(createGameCard(
+                GameStorageVerifier.GameTitle.OVERCOOKED_2,
+                "Overcooked! 2",
+                "PC  •  Unity",
+                text -> oc2StatusText = text));
+        gameRow.addView(createGameCard(
+                GameStorageVerifier.GameTitle.MOVING_OUT,
+                "Moving Out",
+                "PC  •  SMG Studio",
+                text -> moStatusText = text));
+        gameRow.addView(createGameCard(
+                GameStorageVerifier.GameTitle.MOVING_OUT_2,
+                "Moving Out 2",
+                "PC  •  SMG Studio",
+                text -> mo2StatusText = text));
+        gameScroll.addView(gameRow);
+        container.addView(gameScroll);
+
+        TextView importTitle = new TextView(this);
+        importTitle.setText("LIBRARY TOOLS");
+        importTitle.setTextSize(11);
+        importTitle.setLetterSpacing(0.14f);
+        importTitle.setTextColor(Color.parseColor("#8FA2BA"));
+        importTitle.setTypeface(null, Typeface.BOLD);
+        importTitle.setPadding(0, dp(24), 0, dp(10));
+        container.addView(importTitle);
+
+        LinearLayout actionRow = new LinearLayout(this);
+        actionRow.setOrientation(LinearLayout.HORIZONTAL);
+        actionRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        startGameBtn = createDashboardButton("OPEN EXPERIMENTAL RUNTIME", "#0878D1");
+        startGameBtn.setTextSize(12);
+        startGameBtn.setOnClickListener(v -> onStartGameClicked());
+        LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        startParams.setMarginEnd(dp(10));
+        actionRow.addView(startGameBtn, startParams);
+
+        Button autoScanBtn = createDashboardButton("SCAN DOWNLOADS", "#1A2B40");
+        autoScanBtn.setOnClickListener(v -> scanDownloadFolder());
+        LinearLayout.LayoutParams scanParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        scanParams.setMarginEnd(dp(10));
+        actionRow.addView(autoScanBtn, scanParams);
+
+        Button importZipBtn = createDashboardButton("IMPORT GAME DATA", "#1A2B40");
+        importZipBtn.setOnClickListener(v -> {
+            pendingImportTitle = GameStorageVerifier.GameTitle.OVERCOOKED_1;
+            openZipLauncher.launch(new String[]{"application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*"});
+        });
+        actionRow.addView(importZipBtn, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        container.addView(actionRow);
+
+        LinearLayout settingsRow = new LinearLayout(this);
+        settingsRow.setOrientation(LinearLayout.HORIZONTAL);
+        settingsRow.setGravity(Gravity.CENTER_VERTICAL);
+        settingsRow.setPadding(0, dp(10), 0, 0);
+
+        Button toggleVirtualBtn = createDashboardButton("TOUCH CONTROLS: " + (virtualControlsEnabled ? "ON" : "OFF"), "#111B2A");
         toggleVirtualBtn.setOnClickListener(v -> {
             virtualControlsEnabled = !virtualControlsEnabled;
-            if (virtualOverlay != null) {
+            toggleVirtualBtn.setText("TOUCH CONTROLS: " + (virtualControlsEnabled ? "ON" : "OFF"));
+            if (virtualOverlay != null && engineInitialized) {
                 virtualOverlay.setVisibility(virtualControlsEnabled ? View.VISIBLE : View.GONE);
             }
-            toggleVirtualBtn.setText(virtualControlsEnabled ? "🎮 Kontrol Virtual Layar Sentuh: AKTIF" : "🎮 Kontrol Virtual Layar Sentuh: NONAKTIF");
         });
-        container.addView(toggleVirtualBtn);
+        LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+        toggleParams.setMarginEnd(dp(10));
+        settingsRow.addView(toggleVirtualBtn, toggleParams);
 
-        // Tombol Auto-Scan dari folder Download
-        Button autoScanBtn = new Button(this);
-        autoScanBtn.setText("⚡ Deteksi Otomatis dari Folder Download");
-        autoScanBtn.setTextSize(14);
-        autoScanBtn.setTextColor(Color.WHITE);
-        autoScanBtn.setBackground(createButtonDrawable("#2EC4B6"));
-        LinearLayout.LayoutParams scanParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        scanParams.setMargins(0, 24, 0, 16);
-        autoScanBtn.setLayoutParams(scanParams);
-        autoScanBtn.setOnClickListener(v -> scanDownloadFolder());
-        container.addView(autoScanBtn);
+        Button gfxBtn = createDashboardButton("GRAPHICS & DISPLAY", "#111B2A");
+        gfxBtn.setOnClickListener(v -> showGraphicsSettingsDialog());
+        settingsRow.addView(gfxBtn, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        container.addView(settingsRow);
 
-        // Progress Impor
         importProgressText = new TextView(this);
         importProgressText.setText("");
-        importProgressText.setTextSize(12);
-        importProgressText.setTextColor(Color.parseColor("#E71D36"));
-        importProgressText.setGravity(Gravity.CENTER);
+        importProgressText.setTextSize(11);
+        importProgressText.setTextColor(Color.parseColor("#70C4FF"));
+        importProgressText.setPadding(0, dp(12), 0, dp(4));
         importProgressText.setVisibility(View.GONE);
         container.addView(importProgressText);
 
         importProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         importProgressBar.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(3)));
         importProgressBar.setIndeterminate(true);
         importProgressBar.setVisibility(View.GONE);
         container.addView(importProgressBar);
 
-        // Tombol Mulai Permainan
-        startGameBtn = new Button(this);
-        startGameBtn.setText("🎮 Mulai Permainan");
-        startGameBtn.setTextSize(16);
-        startGameBtn.setTypeface(null, Typeface.BOLD);
-        startGameBtn.setTextColor(Color.WHITE);
-        startGameBtn.setBackground(createButtonDrawable("#FF9F1C"));
-        LinearLayout.LayoutParams playParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        playParams.setMargins(0, 16, 0, 16);
-        startGameBtn.setLayoutParams(playParams);
-        startGameBtn.setOnClickListener(v -> onStartGameClicked());
-        container.addView(startGameBtn);
-
-        // Tombol Pengaturan Grafik & Resolusi
-        Button gfxBtn = new Button(this);
-        gfxBtn.setText("⚙️ Pengaturan Grafik & Resolusi Layar");
-        gfxBtn.setTextSize(13);
-        gfxBtn.setTextColor(Color.WHITE);
-        gfxBtn.setBackground(createButtonDrawable("#495057"));
-        gfxBtn.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        gfxBtn.setOnClickListener(v -> showGraphicsSettingsDialog());
-        container.addView(gfxBtn);
+        TextView footer = new TextView(this);
+        footer.setText("GHOST TOWN RECOMP  •  BUILD 0.2.5  •  GAME DATA MUST BE PROVIDED BY THE USER");
+        footer.setTextSize(9);
+        footer.setTextColor(Color.parseColor("#63748B"));
+        footer.setLetterSpacing(0.08f);
+        footer.setPadding(0, dp(22), 0, 0);
+        container.addView(footer);
 
         scrollView.addView(container);
         return scrollView;
@@ -382,62 +408,101 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private View createGameCard(GameStorageVerifier.GameTitle title, String cardTitle, String desc, StatusTextHolder holder) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackground(createCardDrawable("#1E2229", "#343A40"));
-        card.setPadding(28, 20, 28, 20);
+        card.setFocusable(true);
+        card.setFocusableInTouchMode(true);
+        card.setClickable(true);
+        card.setPadding(dp(16), dp(16), dp(16), dp(16));
+        card.setBackground(createCardDrawable("#111A28", "#26364C"));
+        card.setMinimumHeight(dp(276));
+
+        LinearLayout art = new LinearLayout(this);
+        art.setGravity(Gravity.CENTER);
+        art.setBackground(createCardDrawable("#172A42", "#284C70"));
+        ImageView icon = new ImageView(this);
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        icon.setImageResource(title == GameStorageVerifier.GameTitle.MOVING_OUT
+                || title == GameStorageVerifier.GameTitle.MOVING_OUT_2
+                ? R.drawable.ic_moving_out : R.drawable.ic_overcooked);
+        art.addView(icon, new LinearLayout.LayoutParams(dp(76), dp(76)));
+        card.addView(art, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(112)));
 
         TextView name = new TextView(this);
         name.setText(cardTitle);
-        name.setTextSize(16);
-        name.setTextColor(Color.parseColor("#FFFFFF"));
+        name.setTextSize(17);
+        name.setTextColor(Color.WHITE);
         name.setTypeface(null, Typeface.BOLD);
+        name.setPadding(0, dp(14), 0, dp(3));
         card.addView(name);
 
         TextView descView = new TextView(this);
         descView.setText(desc);
-        descView.setTextSize(12);
-        descView.setTextColor(Color.parseColor("#ADB5BD"));
-        descView.setPadding(0, 4, 0, 8);
+        descView.setTextSize(10);
+        descView.setTextColor(Color.parseColor("#8FA2BA"));
         card.addView(descView);
 
         TextView status = new TextView(this);
-        status.setText("Status: Memeriksa...");
-        status.setTextSize(13);
+        status.setText("CHECKING LIBRARY...");
+        status.setTextSize(10);
         status.setTypeface(null, Typeface.BOLD);
+        status.setTextColor(Color.parseColor("#8FA2BA"));
+        status.setPadding(0, dp(12), 0, dp(10));
         card.addView(status);
         holder.hold(status);
 
-        LinearLayout btnRow = new LinearLayout(this);
-        btnRow.setOrientation(LinearLayout.HORIZONTAL);
-        btnRow.setPadding(0, 12, 0, 0);
-
-        Button zipBtn = new Button(this);
-        zipBtn.setText("📁 Impor .ZIP PC");
-        zipBtn.setTextSize(12);
-        zipBtn.setTextColor(Color.WHITE);
-        zipBtn.setBackground(createButtonDrawable("#011627"));
-        LinearLayout.LayoutParams btnP1 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
-        btnP1.setMarginEnd(8);
-        zipBtn.setLayoutParams(btnP1);
+        Button zipBtn = createDashboardButton("IMPORT ZIP", "#0878D1");
+        zipBtn.setTextSize(10);
         zipBtn.setOnClickListener(v -> {
             pendingImportTitle = title;
             openZipLauncher.launch(new String[]{"application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*"});
         });
-        btnRow.addView(zipBtn);
+        card.addView(zipBtn, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
 
-        Button folderBtn = new Button(this);
-        folderBtn.setText("📂 Pilih Folder");
-        folderBtn.setTextSize(12);
-        folderBtn.setTextColor(Color.WHITE);
-        folderBtn.setBackground(createButtonDrawable("#011627"));
-        folderBtn.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        Button folderBtn = createDashboardButton("CHOOSE FOLDER", "#1A2B40");
+        folderBtn.setTextSize(10);
+        LinearLayout.LayoutParams folderParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(38));
+        folderParams.topMargin = dp(7);
         folderBtn.setOnClickListener(v -> {
             pendingImportTitle = title;
             openFolderLauncher.launch(null);
         });
-        btnRow.addView(folderBtn);
+        card.addView(folderBtn, folderParams);
 
-        card.addView(btnRow);
+        card.setOnClickListener(v -> {
+            pendingImportTitle = title;
+            Toast.makeText(this, cardTitle + " selected", Toast.LENGTH_SHORT).show();
+        });
+        card.setOnFocusChangeListener((v, hasFocus) ->
+                card.setBackground(createCardDrawable(
+                        hasFocus ? "#14253A" : "#111A28",
+                        hasFocus ? "#20A0FF" : "#26364C")));
+        if (firstGameCard == null) firstGameCard = card;
+
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(dp(244), dp(300));
+        cardParams.setMarginEnd(dp(14));
+        card.setLayoutParams(cardParams);
         return card;
+    }
+
+    private Button createDashboardButton(String label, String backgroundColor) {
+        Button button = new Button(this);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setTextSize(11);
+        button.setTypeface(null, Typeface.BOLD);
+        button.setTextColor(Color.WHITE);
+        button.setGravity(Gravity.CENTER);
+        button.setPadding(dp(10), 0, dp(10), 0);
+        button.setMinHeight(dp(40));
+        button.setBackground(createButtonDrawable(backgroundColor));
+        button.setFocusable(true);
+        return button;
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private Button createFloatingMenuButton() {
@@ -465,7 +530,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private GradientDrawable createButtonDrawable(String hexColor) {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor(hexColor));
-        gd.setCornerRadius(14);
+        gd.setCornerRadius(dp(10));
         return gd;
     }
 
@@ -503,40 +568,40 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             runOnUiThread(() -> {
                 if (oc1StatusText != null) {
                     if (fHasOC1) {
-                        oc1StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                        oc1StatusText.setText("DATA DETECTED  •  RUNTIME UNVERIFIED");
                         oc1StatusText.setTextColor(Color.parseColor("#2EC4B6"));
                     } else {
-                        oc1StatusText.setText("Status: ❌ Belum Terpasang (Butuh Overcooked_Data)");
+                        oc1StatusText.setText("NOT INSTALLED  •  IMPORT DATA");
                         oc1StatusText.setTextColor(Color.parseColor("#E71D36"));
                     }
                 }
 
                 if (oc2StatusText != null) {
                     if (fHasOC2) {
-                        oc2StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                        oc2StatusText.setText("DATA DETECTED  •  RUNTIME UNVERIFIED");
                         oc2StatusText.setTextColor(Color.parseColor("#2EC4B6"));
                     } else {
-                        oc2StatusText.setText("Status: ❌ Belum Terpasang (Butuh Overcooked2_Data)");
+                        oc2StatusText.setText("NOT INSTALLED  •  IMPORT DATA");
                         oc2StatusText.setTextColor(Color.parseColor("#E71D36"));
                     }
                 }
 
                 if (moStatusText != null) {
                     if (fHasMO) {
-                        moStatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                        moStatusText.setText("DATA DETECTED  •  RUNTIME UNVERIFIED");
                         moStatusText.setTextColor(Color.parseColor("#06D6A0"));
                     } else {
-                        moStatusText.setText("Status: ❌ Belum Terpasang (Butuh MovingOut_Data)");
+                        moStatusText.setText("NOT INSTALLED  •  IMPORT DATA");
                         moStatusText.setTextColor(Color.parseColor("#E71D36"));
                     }
                 }
 
                 if (mo2StatusText != null) {
                     if (fHasMO2) {
-                        mo2StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                        mo2StatusText.setText("DATA DETECTED  •  RUNTIME UNVERIFIED");
                         mo2StatusText.setTextColor(Color.parseColor("#06D6A0"));
                     } else {
-                        mo2StatusText.setText("Status: ❌ Belum Terpasang (Butuh MovingOut2_Data)");
+                        mo2StatusText.setText("NOT INSTALLED  •  IMPORT DATA");
                         mo2StatusText.setTextColor(Color.parseColor("#E71D36"));
                     }
                 }
@@ -892,6 +957,23 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             return super.dispatchKeyEvent(event);
         }
 
+        if (setupOverlayView != null && setupOverlayView.getVisibility() == View.VISIBLE
+                && (event.getSource() & (InputDevice.SOURCE_GAMEPAD | InputDevice.SOURCE_DPAD)) != 0) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                        || keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    return super.dispatchKeyEvent(event);
+                }
+                if (keyCode == KeyEvent.KEYCODE_BUTTON_A || keyCode == KeyEvent.KEYCODE_DPAD_CENTER
+                        || keyCode == KeyEvent.KEYCODE_ENTER) {
+                    View focused = getCurrentFocus();
+                    if (focused != null && focused.isFocusable()) {
+                        focused.performClick();
+                        return true;
+                    }
+                }
+            }
+        }
         if ((event.getSource() & (InputDevice.SOURCE_GAMEPAD | InputDevice.SOURCE_JOYSTICK | InputDevice.SOURCE_DPAD)) != 0) {
             if (gamepadManager != null) {
                 gamepadManager.processKeyEvent(event);
