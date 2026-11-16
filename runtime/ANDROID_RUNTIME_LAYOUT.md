@@ -2,15 +2,15 @@
 
 ## Current integration
 
-The launcher exposes **WINE / BOX64 STATUS** and **INSTALL WINE RUNTIME BUNDLE (.TAR.GZ)**. A user-selected runtime archive is extracted into app-private storage at `Context.getFilesDir()/runtime/wine/`. Extraction stages the new runtime, rejects absolute/traversal paths and symlinks escaping the staging directory, validates required files, and only then swaps it into place.
+The 0.4.0-alpha.1 launcher still exposes **WINE / BOX64 STATUS** and **INSTALL WINE RUNTIME BUNDLE (.TAR.GZ)**. The single-APK managed first-run downloader is not yet implemented. A user-selected runtime archive is extracted into app-private storage at `Context.getFilesDir()/runtime/wine/`. Extraction stages the new runtime, rejects absolute/traversal paths and symlinks escaping the staging directory, validates required files, and only then swaps it into place.
 
-The optional Wine probe runs only the fixed headless command `box64 wine --version` through PRoot. It is not a game launch path.
+The optional Wine probe runs only the fixed headless command `box64 wine --version` through PRoot. It is not a game launch path. Wine prefix creation, per-title DXVK installation, and a guarded game launch entry point are now scaffolded under `wine-runtime/scripts/`, but are not yet wired to a device-tested graphics session.
 
 ## Full bundle build
 
 Workflow: `.github/workflows/build-wine-runtime-bundle.yml`
 
-Default artifact: `ghost-town-wine-runtime-arm64-debian-bookworm`
+Default artifact: `ghost-town-wine-runtime-arm64-debian-bookworm`; 0.4.0-alpha.1 pre-release asset target.
 
 The build assembles:
 - Static Android ARM64/Bionic PRoot plus `loader` and `loader32`
@@ -66,3 +66,8 @@ A complete archive and successful import only prove that the payload was assembl
 7. Test one user-supplied 64-bit Unity title on the physical Snapdragon 888 / Adreno 660 device.
 
 Do not mark a title playable until actual gameplay, rendering, input, audio, frame pacing, thermal behavior and stability have been tested on device.
+
+
+## 0.4.0-alpha.1 CI correction
+
+The runtime assembly job now copies the license directory from the downloaded `rootfs-unpacked/provenance` artifact (not the unavailable build-job workspace path) and pins the default Box64 and PRoot source refs to immutable commits. The resulting archive is attached to the `v0.4.0-alpha.1` pre-release only. This remains a separately downloaded archive until the managed in-app downloader is implemented.

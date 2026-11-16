@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
-      PROOT_REF: ${{ inputs.proot_ref || 'main' }}
+      PROOT_REF: ${{ inputs.proot_ref || '6f8ebfd8e24887dfba64c3f2d7d5fe9dc059b60e' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -91,7 +91,7 @@ jobs:
     timeout-minutes: 120
     env:
       DEBIAN_SUITE: ${{ inputs.debian_suite || 'bookworm' }}
-      BOX64_REF: ${{ inputs.box64_ref || 'main' }}
+      BOX64_REF: ${{ inputs.box64_ref || '7fab05334445948c918281b54f2a604ff63337f7' }}
       WINE_SHA256: 40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e
       DXVK_SHA256: 40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608
     steps:
@@ -265,7 +265,6 @@ jobs:
           cp -a rootfs-unpacked/provenance "$OUT/provenance"
           cp -a proot-artifact/provenance/. "$OUT/provenance/"
           mkdir -p "$OUT/provenance/licenses"
-          cp -a rootfs-artifact/provenance/licenses/. "$OUT/provenance/licenses/"
           cp proot-artifact/provenance/PROOT-COPYING "$OUT/provenance/licenses/PROOT-COPYING"
           cp runtime/rootfs/README.md "$OUT/README.md"
           (cd "$OUT" && sha256sum bin/proot libexec/proot/loader libexec/proot/loader32 rootfs/usr/local/bin/box64 rootfs/opt/wine/bin/wine rootfs/opt/dxvk/x64/d3d11.dll rootfs/opt/dxvk/x64/dxgi.dll > provenance/RUNTIME-SHA256SUMS)
@@ -281,18 +280,19 @@ jobs:
             ghost-town-wine-runtime-arm64.tar.gz.sha256
           if-no-files-found: error
           retention-days: 30
-      - name: Attach runtime bundle to v0.3.3 tester release
+      - name: Attach runtime bundle to v0.4.0-alpha.1 pre-release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.3.3
+          tag_name: v0.4.0-alpha.1
           target_commitish: main
-          name: Ghost Town Recomp 0.3.2 - Contributor Tester Candidate
+          name: Ghost Town Recomp 0.4.0-alpha.1 - Runtime Foundation
           prerelease: true
           body: |
-            Android ARM64 tester build plus separately downloadable Debian Bookworm / Box64 / Wine 11.19 / DXVK 3.1.1 runtime bundle.
-            Install the APK first, then import ghost-town-wine-runtime-arm64.tar.gz from the app's runtime installer.
-            See docs/CONTRIBUTOR_TESTING.md for installation and validation steps.
-            This is a headless runtime probe candidate; Windows Unity gameplay, display/Vulkan presentation, audio and input are not yet verified.
+            PRE-RELEASE ONLY. This bundle is a separately managed runtime payload for integration testing.
+            The app currently still requires manual archive import; managed first-run download is not yet integrated.
+            Includes Debian Bookworm ARM64/glibc, Box64, Wine 11.19 amd64, DXVK 3.1.1 and static Android ARM64 PRoot.
+            No claim of Overcooked 2 execution or playability. Wine prefix, Vulkan/Turnip presentation, audio, input and physical-device gameplay remain unverified.
+            See docs/V0.4.0_EXECUTION_GATES.md and docs/PROVENANCE.md.
           files: |
             ghost-town-wine-runtime-arm64.tar.gz
             ghost-town-wine-runtime-arm64.tar.gz.sha256
