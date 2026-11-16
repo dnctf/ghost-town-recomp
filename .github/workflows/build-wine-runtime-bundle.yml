@@ -88,9 +88,12 @@ jobs:
           test -s proot-src/dist/aarch64/proot
           test -s proot-src/dist/aarch64/loader
           test -s proot-src/dist/aarch64/loader32
-          for f in proot-src/dist/aarch64/proot proot-src/dist/aarch64/loader proot-src/dist/aarch64/loader32; do
-            readelf -h "$f" | grep -q AArch64
+          for f in proot-src/dist/aarch64/proot proot-src/dist/aarch64/loader; do
+            readelf -h "$f" | grep -q 'Class:.*ELF64'
+            readelf -h "$f" | grep -q 'Machine:.*AArch64'
           done
+          readelf -h proot-src/dist/aarch64/loader32 | grep -q 'Class:.*ELF32'
+          readelf -h proot-src/dist/aarch64/loader32 | grep -q 'Machine:.*ARM'
 
       - name: Download and verify pinned Wine and DXVK
         run: |
