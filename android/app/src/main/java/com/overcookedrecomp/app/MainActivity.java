@@ -255,7 +255,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(createGameCard(
                 GameStorageVerifier.GameTitle.OVERCOOKED_1,
                 "Overcooked 1 (PC)",
-                "Salin/impor folder 'Overcooked_Data' dari PC",
+                "Impor folder instalasi PC lengkap: .exe, DLL, dan Overcooked_Data",
                 text -> oc1StatusText = text
         ));
 
@@ -267,7 +267,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(createGameCard(
                 GameStorageVerifier.GameTitle.OVERCOOKED_2,
                 "Overcooked 2 (PC)",
-                "Salin/impor folder 'Overcooked2_Data' dari PC (Mendukung lempar bahan/Throw)",
+                "Impor folder instalasi PC lengkap: .exe, DLL, dan Overcooked2_Data",
                 text -> oc2StatusText = text
         ));
 
@@ -279,7 +279,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(createGameCard(
                 GameStorageVerifier.GameTitle.MOVING_OUT,
                 "Moving Out (PC)",
-                "Salin/impor folder 'MovingOut_Data' dari PC (Fisika pindahan rumah & sofa)",
+                "Impor folder instalasi PC lengkap: .exe, DLL, dan MovingOut_Data",
                 text -> moStatusText = text
         ));
 
@@ -291,7 +291,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(createGameCard(
                 GameStorageVerifier.GameTitle.MOVING_OUT_2,
                 "Moving Out 2 (PC)",
-                "Salin/impor folder 'MovingOut2_Data' dari PC (Multiverse delivery, arcade physics & joint chaos)",
+                "Impor folder instalasi PC lengkap: .exe, DLL, dan MovingOut2_Data",
                 text -> mo2StatusText = text
         ));
 
@@ -659,29 +659,19 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             return;
         }
 
-        List<GameStorageVerifier.VerificationResult> installed =
-                GameStorageVerifier.detectInstalledGames(extDir);
-        GameStorageVerifier.VerificationResult selected = null;
-        for (GameStorageVerifier.VerificationResult game : installed) {
-            if (game.gameTitle == title) {
-                selected = game;
-                break;
-            }
-        }
-
-        if (selected == null) {
-            Toast.makeText(this, "Data " + title.displayName + " belum ditemukan. Impor folder PC terlebih dahulu.", Toast.LENGTH_LONG).show();
+        // Import stores the selected complete installation under this per-game directory.
+        File importedRoot = new File(extDir, title.defaultFolderName);
+        if (!importedRoot.isDirectory()) {
+            Toast.makeText(this, "Folder instalasi " + title.displayName + " belum diimpor.", Toast.LENGTH_LONG).show();
             return;
         }
 
+        GameInstallInspector.Inspection inspection = GameInstallInspector.inspect(importedRoot, title);
+        String runtimeStatus = "\\n\\nSTATUS EKSEKUSI: BELUM TERSEDIA. Build ini belum memuat Wine + Box64 atau renderer DirectX yang terintegrasi. Pemeriksaan ini hanya membaca struktur folder dan header PE; tidak menjalankan .exe.";
+        String hardwareNote = "\\n\\nTarget pengujian: Android ARM64. Untuk kandidat x86-64, tahap berikutnya adalah validasi Wine/Box64 dan jalur grafis pada perangkat fisik.";
         new AlertDialog.Builder(this)
-                .setTitle(title.displayName + " • Pemeriksaan Runtime")
-                .setMessage("Folder game terdeteksi dan struktur data lolos pemeriksaan dasar.\n\n"
-                        + "Status eksekusi: BELUM DIDUKUNG. APK saat ini belum memuat Windows compatibility runtime "
-                        + "(Wine/Box64) maupun Unity Player/runtime native lengkap. File .exe tidak dapat dieksekusi "
-                        + "langsung oleh Android.\n\n"
-                        + "Renderer native saat ini masih berupa surface/Vulkan clear-frame, bukan renderer/gameplay Unity. "
-                        + "Tombol ini sengaja tidak menjalankan layar placeholder agar status tidak menyesatkan.")
+                .setTitle(title.displayName + " • Base Game Preflight")
+                .setMessage(inspection.report + runtimeStatus + hardwareNote)
                 .setPositiveButton("Mengerti", null)
                 .show();
     }
