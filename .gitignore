@@ -1,0 +1,31 @@
+# Gradle & Android Build
+.gradle/
+build/
+**/build/
+.cxx/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Native / C++ Artifacts
+*.so
+*.o
+*.a
+*.spv
+
+# IDE & OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# User Game Data (BYOG - Never commit copyrighted files)
+Overcooked_Data/
+cache/
+*.assets
+*.resS
+Assembly-CSharp.dll
+global-metadata.dat
+GameAssembly.dll

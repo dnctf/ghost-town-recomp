@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Overcooked Recomp</string>
+    <string name="graphics_settings">Pengaturan Grafik</string>
+    <string name="resolution_settings">Pengaturan Resolusi</string>
+</resources>
