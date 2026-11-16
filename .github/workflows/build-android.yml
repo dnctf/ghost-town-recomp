@@ -38,6 +38,11 @@ jobs:
         with:
           gradle-version: '8.5'
 
+      - name: Test game installation probe
+        run: |
+          python3 --version
+          python3 -m unittest discover -s tools/tests -v
+
       - name: Verify Native CMake Configuration (arm64-v8a)
         run: |
           $ANDROID_HOME/cmake/3.22.1/bin/cmake \
@@ -70,41 +75,18 @@ jobs:
             android/app/build/intermediates/cxx/Debug/**/obj/arm64-v8a/*.so
           if-no-files-found: warn
 
-      - name: Point v0.3.0 tag at the verified release commit
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'release: finalize Ghost Town Recomp v0.3.0')
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const ref = 'tags/v0.3.0';
-            try {
-              await github.rest.git.updateRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref,
-                sha: context.sha,
-                force: true
-              });
-            } catch (error) {
-              if (error.status !== 404) throw error;
-              await github.rest.git.createRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: 'refs/tags/v0.3.0',
-                sha: context.sha
-              });
-            }
-
-      - name: Publish Ghost Town Recomp v0.3.0 Pre-Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'release: finalize Ghost Town Recomp v0.3.0')
+      - name: Publish Ghost Town Recomp v0.3.1 Tester Pre-Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'release: publish Ghost Town Recomp v0.3.1 tester candidate')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.3.0
+          tag_name: v0.3.1
           target_commitish: main
-          name: "Ghost Town Recomp 0.3.0 (Experimental Runtime Preview)"
+          name: "Ghost Town Recomp 0.3.1 (Contributor Tester Candidate)"
           prerelease: true
           body: |
-            See CHANGELOG.md. This release improves runtime truthfulness and Android packaging.
-            Game data detection is not gameplay support. Unity Player execution is not yet integrated.
+            See CHANGELOG.md and docs/CONTRIBUTOR_TESTING.md.
+            Includes a host-side Unity Windows installation probe and tester workflow.
+            This is not a claim of Android gameplay compatibility. No proprietary game files or Wine/Box64 binaries are bundled.
           files: |
             android/app/build/outputs/apk/release/*.apk
             android/app/build/outputs/apk/debug/*.apk
