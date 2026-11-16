@@ -2,6 +2,8 @@
 
 ## [0.3.1] - 2026-11-16
 
+Release candidate commit: CI publishes tag `v0.3.1` only after probe tests, ARM64 native build, APK packaging, and lint pass.
+
 ### Added
 - Host-side Unity Windows installation probe: detects PE executable architecture, adjacent UnityPlayer.dll, matching Unity data folder, and Mono/IL2CPP metadata hints.
 - Optional explicit host-runner launch attempt for testers. It is opt-in, uses argument arrays without shell expansion, and records timeout/exit status.
