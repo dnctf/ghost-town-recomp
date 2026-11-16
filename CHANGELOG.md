@@ -3,6 +3,7 @@
 ### Added
 - Added a full ARM64 glibc runtime bundle workflow assembling Android PRoot, Debian Bookworm ARM64 userspace, amd64 Wine dependencies, Box64, Wine 11.19, and DXVK 3.1.1.
 - Added an app-private runtime bundle installer for gzip-compressed tar archives, with staging, required-file validation, traversal/symlink checks, and rollback to the previous runtime.
+- Split runtime CI across an x86_64 NDK/PRoot build and a native ARM64 Box64/rootfs build; corrected the 32-bit ARM PRoot loader validation.
 - Added dashboard action to import the runtime bundle through Android's document picker.
 - Added explicit PRoot companion loader environment paths to the Wine probe.
 
