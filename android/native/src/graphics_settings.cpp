@@ -358,6 +358,7 @@ std::string GraphicsSettingsManager::GetSummaryString() const {
     ss << "Layar Fisik: " << display_.native_width << "x" << display_.native_height
        << " @ " << display_.refresh_rate << "Hz (" << display_.density_dpi << " dpi)\n";
     ss << "Target FPS: " << config_.target_fps << " | V-Sync: " << (config_.vsync_enabled ? "ON" : "OFF") << "\n";
+    ss << "GPU profile: Adreno " << adreno_series_ << " | Device RAM: " << total_ram_mb_ << " MB\\n";
 
     const char* aa_str[] = {"OFF", "FXAA", "MSAA 2x", "MSAA 4x"};
     ss << "Anti-Aliasing: " << aa_str[static_cast<int>(config_.anti_aliasing)] << "\n";
