@@ -2,7 +2,6 @@ package com.overcookedrecomp.app;
 
 import android.app.ActivityManager;
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Typeface;
@@ -39,7 +38,6 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
-import com.overcookedrecomp.app.compiler.movingout.MovingOutLauncherActivity;
 import com.overcookedrecomp.app.input.GamepadManager;
 import com.overcookedrecomp.app.input.VirtualGamepadOverlay;
 import java.io.File;
@@ -75,7 +73,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private boolean virtualControlsEnabled = true;
     private TextView importProgressText;
     private ProgressBar importProgressBar;
-    private Button startGameBtn;
 
     private boolean engineInitialized = false;
     private GameStorageVerifier.GameTitle activeGameTitle = GameStorageVerifier.GameTitle.UNKNOWN;
@@ -207,7 +204,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         // Header Title
         TextView titleView = new TextView(this);
-        titleView.setText("🎮 Ghost Town Recomp");
+        titleView.setText("GHOST TOWN • GAME LIBRARY");
         titleView.setTextSize(24);
         titleView.setTextColor(Color.parseColor("#FF9F1C"));
         titleView.setTypeface(null, Typeface.BOLD);
@@ -215,7 +212,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(titleView);
 
         TextView subTitle = new TextView(this);
-        subTitle.setText("Launcher & Compiler Game PC (Overcooked 1 & 2, Moving Out 1 & 2) — Ghost Town Games / Team17");
+        subTitle.setText("GAME LIBRARY • PC DATA IMPORT • ANDROID RUNTIME STATUS");
         subTitle.setTextSize(13);
         subTitle.setTextColor(Color.parseColor("#CCCCCC"));
         subTitle.setGravity(Gravity.CENTER);
@@ -346,20 +343,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         importProgressBar.setVisibility(View.GONE);
         container.addView(importProgressBar);
 
-        // Tombol Mulai Permainan
-        startGameBtn = new Button(this);
-        startGameBtn.setText("🎮 Mulai Permainan");
-        startGameBtn.setTextSize(16);
-        startGameBtn.setTypeface(null, Typeface.BOLD);
-        startGameBtn.setTextColor(Color.WHITE);
-        startGameBtn.setBackground(createButtonDrawable("#FF9F1C"));
-        LinearLayout.LayoutParams playParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        playParams.setMargins(0, 16, 0, 16);
-        startGameBtn.setLayoutParams(playParams);
-        startGameBtn.setOnClickListener(v -> onStartGameClicked());
-        container.addView(startGameBtn);
-
         // Tombol Pengaturan Grafik & Resolusi
         Button gfxBtn = new Button(this);
         gfxBtn.setText("⚙️ Pengaturan Grafik & Resolusi Layar");
@@ -382,8 +365,19 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private View createGameCard(GameStorageVerifier.GameTitle title, String cardTitle, String desc, StatusTextHolder holder) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackground(createCardDrawable("#1E2229", "#343A40"));
-        card.setPadding(28, 20, 28, 20);
+        card.setBackground(createCardDrawable("#151A23", "#394354"));
+        card.setPadding(24, 20, 24, 20);
+
+        ImageView gameIcon = new ImageView(this);
+        gameIcon.setImageResource((title == GameStorageVerifier.GameTitle.OVERCOOKED_1
+                || title == GameStorageVerifier.GameTitle.OVERCOOKED_2)
+                ? R.drawable.ic_overcooked : R.drawable.ic_moving_out);
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(64, 64);
+        iconParams.gravity = Gravity.CENTER_HORIZONTAL;
+        iconParams.bottomMargin = 12;
+        gameIcon.setLayoutParams(iconParams);
+        gameIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        card.addView(gameIcon);
 
         TextView name = new TextView(this);
         name.setText(cardTitle);
@@ -437,6 +431,18 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         btnRow.addView(folderBtn);
 
         card.addView(btnRow);
+
+        Button runtimeBtn = new Button(this);
+        runtimeBtn.setText("▶ Periksa & Pilih Game");
+        runtimeBtn.setTextSize(13);
+        runtimeBtn.setTextColor(Color.WHITE);
+        runtimeBtn.setBackground(createButtonDrawable("#245B86"));
+        LinearLayout.LayoutParams runtimeParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        runtimeParams.topMargin = 10;
+        runtimeBtn.setLayoutParams(runtimeParams);
+        runtimeBtn.setOnClickListener(v -> inspectGameRuntime(title));
+        card.addView(runtimeBtn);
         return card;
     }
 
@@ -503,7 +509,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             runOnUiThread(() -> {
                 if (oc1StatusText != null) {
                     if (fHasOC1) {
-                        oc1StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                        oc1StatusText.setText("Status: DATA TERDETEKSI • RUNTIME BELUM TERSEDIA");
                         oc1StatusText.setTextColor(Color.parseColor("#2EC4B6"));
                     } else {
                         oc1StatusText.setText("Status: ❌ Belum Terpasang (Butuh Overcooked_Data)");
@@ -513,7 +519,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
                 if (oc2StatusText != null) {
                     if (fHasOC2) {
-                        oc2StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                        oc2StatusText.setText("Status: DATA TERDETEKSI • RUNTIME BELUM TERSEDIA");
                         oc2StatusText.setTextColor(Color.parseColor("#2EC4B6"));
                     } else {
                         oc2StatusText.setText("Status: ❌ Belum Terpasang (Butuh Overcooked2_Data)");
@@ -523,7 +529,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
                 if (moStatusText != null) {
                     if (fHasMO) {
-                        moStatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                        moStatusText.setText("Status: DATA TERDETEKSI • RUNTIME BELUM TERSEDIA");
                         moStatusText.setTextColor(Color.parseColor("#06D6A0"));
                     } else {
                         moStatusText.setText("Status: ❌ Belum Terpasang (Butuh MovingOut_Data)");
@@ -533,7 +539,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
                 if (mo2StatusText != null) {
                     if (fHasMO2) {
-                        mo2StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                        mo2StatusText.setText("Status: DATA TERDETEKSI • RUNTIME BELUM TERSEDIA");
                         mo2StatusText.setTextColor(Color.parseColor("#06D6A0"));
                     } else {
                         mo2StatusText.setText("Status: ❌ Belum Terpasang (Butuh MovingOut2_Data)");
@@ -541,11 +547,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     }
                 }
 
-                if (startGameBtn != null) {
-                    boolean anyInstalled = fHasOC1 || fHasOC2 || fHasMO || fHasMO2;
-                    startGameBtn.setEnabled(anyInstalled);
-                    startGameBtn.setAlpha(anyInstalled ? 1.0f : 0.5f);
-                }
             });
         }).start();
     }
@@ -647,58 +648,42 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-    private void onStartGameClicked() {
+    /**
+     * Per-game action: verifies that the selected PC data is present, but does not
+     * claim that a Windows executable or Unity player can run on Android yet.
+     */
+    private void inspectGameRuntime(GameStorageVerifier.GameTitle title) {
         File extDir = getExternalFilesDir(null);
-        if (extDir == null) return;
-
-        List<GameStorageVerifier.VerificationResult> games = GameStorageVerifier.detectInstalledGames(extDir);
-        if (games.isEmpty()) {
-            Toast.makeText(this, "Silakan impor data game PC terlebih dahulu.", Toast.LENGTH_LONG).show();
+        if (extDir == null) {
+            Toast.makeText(this, "Penyimpanan aplikasi tidak tersedia.", Toast.LENGTH_LONG).show();
             return;
         }
 
-        if (games.size() > 1) {
-            String[] titles = new String[games.size()];
-            for (int i = 0; i < games.size(); i++) {
-                titles[i] = games.get(i).gameTitle.displayName;
+        List<GameStorageVerifier.VerificationResult> installed =
+                GameStorageVerifier.detectInstalledGames(extDir);
+        GameStorageVerifier.VerificationResult selected = null;
+        for (GameStorageVerifier.VerificationResult game : installed) {
+            if (game.gameTitle == title) {
+                selected = game;
+                break;
             }
-            new AlertDialog.Builder(this)
-                    .setTitle("Pilih Versi Game")
-                    .setItems(titles, (dialog, which) -> launchGame(games.get(which)))
-                    .show();
-        } else {
-            launchGame(games.get(0));
-        }
-    }
-
-    private void launchGame(GameStorageVerifier.VerificationResult game) {
-        activeGameTitle = game.gameTitle;
-        if (setupOverlayView != null) {
-            setupOverlayView.setVisibility(View.GONE);
         }
 
-        if (game.gameTitle == GameStorageVerifier.GameTitle.MOVING_OUT || game.gameTitle == GameStorageVerifier.GameTitle.MOVING_OUT_2) {
-            Intent intent = new Intent(this, MovingOutLauncherActivity.class);
-            intent.putExtra(MovingOutLauncherActivity.EXTRA_DATA_DIR, game.dataDir.getAbsolutePath());
-            intent.putExtra(MovingOutLauncherActivity.EXTRA_GAME_TITLE, game.gameTitle.displayName);
-            startActivity(intent);
+        if (selected == null) {
+            Toast.makeText(this, "Data " + title.displayName + " belum ditemukan. Impor folder PC terlebih dahulu.", Toast.LENGTH_LONG).show();
             return;
         }
 
-        if (!nativeLoaded) {
-            Toast.makeText(this, "Pustaka native belum siap", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        try {
-            Log.i(TAG, "Meluncurkan " + game.gameTitle.displayName + " dari: " + game.dataDir.getAbsolutePath());
-            nativeInitEngine(game.dataDir.getAbsolutePath(), game.backendType.ordinal(), game.gameTitle.id);
-            engineInitialized = true;
-            Toast.makeText(this, "Memuat " + game.gameTitle.displayName + "...", Toast.LENGTH_SHORT).show();
-        } catch (Throwable t) {
-            Log.e(TAG, "Gagal meluncurkan engine: " + t.getMessage(), t);
-            Toast.makeText(this, "Gagal memulai engine: " + t.getMessage(), Toast.LENGTH_LONG).show();
-        }
+        new AlertDialog.Builder(this)
+                .setTitle(title.displayName + " • Pemeriksaan Runtime")
+                .setMessage("Folder game terdeteksi dan struktur data lolos pemeriksaan dasar.\n\n"
+                        + "Status eksekusi: BELUM DIDUKUNG. APK saat ini belum memuat Windows compatibility runtime "
+                        + "(Wine/Box64) maupun Unity Player/runtime native lengkap. File .exe tidak dapat dieksekusi "
+                        + "langsung oleh Android.\n\n"
+                        + "Renderer native saat ini masih berupa surface/Vulkan clear-frame, bukan renderer/gameplay Unity. "
+                        + "Tombol ini sengaja tidak menjalankan layar placeholder agar status tidak menyesatkan.")
+                .setPositiveButton("Mengerti", null)
+                .show();
     }
 
     private void showGraphicsSettingsDialog() {

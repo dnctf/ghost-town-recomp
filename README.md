@@ -7,9 +7,9 @@
 [![License](https://img.shields.io/badge/License-GPLv3-yellow.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/dnctf/ghost-town-recomp/pulls)
 
-> **Play your favorite PC co-op games natively on Android with blazing-fast Vulkan performance!**
+> **Experimental Android compatibility and porting workspace for PC Unity games. Game execution is not yet implemented.**
 
-**Ghost Town Recomp** is an open-source launcher, runtime shim, and asset recompilation pipeline that lets you run PC installations of classic co-op games on Android devices (Snapdragon, Dimensity, and more).
+**Ghost Town Recomp** is an experimental Android project containing a game-data importer, diagnostic UI, and early native graphics/runtime scaffolding. It does **not** currently execute Windows .exe files or run the complete Unity player/gameplay loop.
 
 > [!NOTE]
 > **100% Legal & Clean-Room (Bring Your Own Game / BYOG):**
@@ -21,16 +21,16 @@
 
 | Game | Status | Required PC Folder | Features |
 | :--- | :---: | :--- | :--- |
-| **Overcooked!** | ✅ Working | `Overcooked_Data` | Unity 5 Mono CIL pipeline, classic kitchen chaos |
-| **Overcooked! 2** | ✅ Working | `Overcooked2_Data` | Recipe sync, ingredient throwing (**Throw** mechanic) |
-| **Moving Out** | ✅ Working | `MovingOut_Data` | Physics joints, sofa tossing, delivery truck bridge |
-| **Moving Out 2** | 🚀 Added | `MovingOut2_Data` | Multiverse delivery, arcade physics & joint simulation |
+| **Overcooked!** | 🧪 Data detection only | `Overcooked_Data` | Unity data folder detection (execution not implemented) |
+| **Overcooked! 2** | 🧪 Data detection only | `Overcooked2_Data` | Unity data folder detection (execution not implemented) |
+| **Moving Out** | 🧪 Data detection only | `MovingOut_Data` | Unity data folder detection (execution not implemented) |
+| **Moving Out 2** | 🧪 Data detection only | `MovingOut2_Data` | Unity data folder detection (execution not implemented) |
 
 ---
 
-## ✨ Features
+## ✨ Prototype Components
 
-- ⚡ **Pure C++20 & Vulkan 1.0 Pipeline**: Direct-to-Vulkan rendering pass with zero translation overhead and Snapdragon Adreno TBDR optimizations.
+- ⚡ **Early C++20 / Vulkan scaffolding**: Android surface and Vulkan initialization experiments. The current frame loop clears the screen; it is not a Unity renderer.
 - 🎮 **Native Controller Support (Plug & Play)**:
   - **Sony DualShock 4 & DualSense (PS4 / PS5)**: Native button glyphs (✕, ◯, ▢, △), analog triggers, and touchpad support.
   - **Xbox Wireless & Elite Controllers**: Auto-detected profiles, standard A/B/X/Y mappings, and LT/RT analog thresholds.
@@ -47,7 +47,7 @@
 
 ---
 
-## 🚀 Quick Start (Play in 3 Simple Steps)
+## ⚙️ Current Prototype Setup (Not Playable Yet)
 
 ### 1. Download & Install the APK
 Grab the latest APK from the [Releases](https://github.com/dnctf/ghost-town-recomp/releases) page. Install it on your Android 10+ phone or tablet.
@@ -65,8 +65,8 @@ Copy the `_Data` folder from your legitimate PC game installation to your device
 
 > 💡 **Tip:** You can also simply zip the folder on your PC, send it to your phone's **Download** folder, and tap **"⚡ Deteksi Otomatis dari Folder Download"** or **"📁 Impor .ZIP PC"** inside the app!
 
-### 3. Launch & Play!
-Open **Ghost Town Recomp**, select your game, connect your Bluetooth controller (or use the touch controls), and enjoy!
+### 3. Inspect the imported game data
+Open **Ghost Town Recomp** and use the per-game action to inspect whether the expected data folder is present. This is a storage/format check only; it does not launch the PC game. See [Runtime Status](docs/RUNTIME_STATUS.md) for current limitations and required implementation work.
 
 ---
 
