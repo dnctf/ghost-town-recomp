@@ -7,7 +7,7 @@
 - Optional explicit host-runner launch attempt for testers. It is opt-in, uses argument arrays without shell expansion, and records timeout/exit status.
 - Automated unit tests for data-only, Mono, and IL2CPP installation layouts.
 - Contributor guide and Android/game runtime tester checklist.
-- CI now runs the installation-probe unit tests before native/APK packaging.
+- CI now runs the installation-probe unit tests before native/APK packaging.\n- Android folder import preserves the full PC installation under a dedicated per-game `_PC` directory instead of flattening it into the Unity data directory.\n- Added an ADB install/launcher smoke-test script for physical Android testers.
 
 ### Changed
 - Android package version is 0.3.1 (versionCode 6).
