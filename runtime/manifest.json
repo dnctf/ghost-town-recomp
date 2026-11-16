@@ -1,31 +1,28 @@
 {
-  "schema_version": 4,
-  "runtime_version": "0.3.3",
-  "release_tag": "v0.3.3",
-  "release_manifest_asset": "runtime-manifest.json",
+  "schema_version": 3,
   "target": "android-arm64-via-glibc-userspace",
-  "status": "runtime-bundle-ci-packaging-fix-and-release-manifest-downloader-added; device-runtime-and-graphics-validation-pending",
+  "status": "android-runtime-bundle-pipeline-and-private-installer-added-ci-and-device-validation-pending",
   "components": {
     "box64": {
       "upstream": "https://github.com/ptitSeb/box64",
-      "build_workflow": ".github/workflows/build-wine-runtime-bundle.yml",
+      "build_workflow": ".github/workflows/build-box64-android.yml",
       "abi": "aarch64-linux-gnu",
       "profile": "Snapdragon 888",
-      "status": "ARM64/glibc build is included in the complete runtime bundle workflow; exact upstream commit is recorded in release manifest",
+      "status": "Snapdragon 888 ARM64/glibc build integrated into complete runtime bundle workflow; app-private provisioning implemented; runtime execution pending",
       "license": "MIT"
     },
     "wine": {
       "upstream": "https://github.com/Kron4ek/Wine-Builds",
       "version": "11.19-amd64",
       "sha256": "40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e",
-      "status": "Pinned Wine 11.19 amd64 payload; dynamic dependency and device execution validation remain separate",
+      "status": "Pinned Wine 11.19 amd64 payload integrated into rootfs bundle workflow; dynamic dependency validation and device execution pending",
       "license": "LGPL-2.1-or-later; Wine third-party notices included"
     },
     "dxvk": {
       "upstream": "https://github.com/doitsujin/DXVK",
       "version": "3.1.1",
       "sha256": "40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608",
-      "status": "Pinned DXVK 3.1.1 Windows DLL payload; Wine prefix installation and Vulkan/display backend remain pending",
+      "status": "Pinned DXVK 3.1.1 payload integrated into rootfs bundle workflow; Wine prefix installation and Vulkan/display backend remain pending",
       "license": "zlib/libpng"
     },
     "unity_player": {
@@ -35,19 +32,19 @@
     "proot": {
       "upstream": "https://github.com/berilevi/proot-static",
       "license": "GPL-2.0-or-later",
-      "build_workflow": ".github/workflows/build-wine-runtime-bundle.yml",
+      "build_workflow": ".github/workflows/build-proot-android.yml",
       "abi": "arm64-v8a",
       "linkage": "static Bionic",
-      "status": "Android ARM64/Bionic PRoot and companion loaders are built in CI; HarmonyOS ptrace validation pending"
+      "status": "Android ARM64/Bionic PRoot and companion-loader build included in full runtime workflow; explicit PROOT_LOADER paths configured; device ptrace validation pending"
     },
     "rootfs": {
-      "status": "Debian Bookworm ARM64/glibc with amd64 Wine dependencies; transferred between CI jobs as tar to preserve permissions and avoid artifact-uploader traversal of private directories; Debian copyright notices retained"
-    },
-    "runtime_installer": {
-      "status": "HTTPS release-manifest downloader with bounded retries/resume, archive size and SHA-256 verification; app-private staged extraction; rollback preserves previous runtime"
+      "status": "Debian Bookworm ARM64/glibc with amd64 Wine dependencies; package copyright files retained in /usr/share/doc/*/copyright"
     },
     "graphics_bridge": {
       "status": "not integrated; Android Vulkan presentation path for Box64/Wine/DXVK still required"
+    },
+    "runtime_installer": {
+      "status": "Android app imports gzip tar runtime to app-private storage with traversal/symlink protections and SHA-256 verification of PRoot, Box64, Wine and DXVK core files"
     },
     "audio_input": {
       "status": "Android audio/input bridge not integrated into Wine runtime"

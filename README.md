@@ -1,79 +1,128 @@
 # 🎮 Ghost Town Recomp (Android)
 
-[![Android build](https://github.com/dnctf/ghost-town-recomp/actions/workflows/build-android.yml/badge.svg)](https://github.com/dnctf/ghost-town-recomp/actions)
-[![Latest release](https://img.shields.io/github/v/release/dnctf/ghost-town-recomp?include_prereleases&color=orange&label=Release)](https://github.com/dnctf/ghost-town-recomp/releases)
+[![Build Ghost Town Recomp Android NDK & APK](https://github.com/dnctf/ghost-town-recomp/actions/workflows/build-android.yml/badge.svg)](https://github.com/dnctf/ghost-town-recomp/actions)
+[![Latest Release](https://img.shields.io/github/v/release/dnctf/ghost-town-recomp?include_prereleases&color=orange&label=Release)](https://github.com/dnctf/ghost-town-recomp/releases)
 [![Platform](https://img.shields.io/badge/Platform-Android%2010%2B%20%7C%20HarmonyOS%204-brightgreen)](https://github.com/dnctf/ghost-town-recomp)
-[![Architecture](https://img.shields.io/badge/Arch-arm64--v8a-blue)](https://github.com/dnctf/ghost-town-recomp)
+[![Architecture](https://img.shields.io/badge/Arch-arm64--v8a%20(Vulkan)-blue)](https://github.com/dnctf/ghost-town-recomp)
 [![License](https://img.shields.io/badge/License-GPLv3-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/dnctf/ghost-town-recomp/pulls)
 
-> An experimental Android launcher and native runtime research project for selected PC co-op games.
+> **An experimental Android launcher and native runtime research project for selected PC co-op games.**
 
-Ghost Town Recomp is an open-source Android launcher and experimental Unity-oriented runtime/recompilation prototype. File inspection, metadata helpers, native rendering groundwork, and runtime provisioning do not establish that a Windows PC game is playable.
+**Ghost Town Recomp** is an open-source Android launcher and experimental Unity-oriented native runtime/recompilation prototype. The current repository includes file inspection, metadata helpers, Vulkan integration points, and title-specific scaffolding; it does not yet establish that the listed PC games are playable.
 
 > [!NOTE]
-> **Bring Your Own Game (BYOG).** This repository does not contain proprietary game assets, Unity Player files, or game binaries. Supply a legally obtained PC installation.
+> **100% Legal & Clean-Room (Bring Your Own Game / BYOG):**
+> This repository contains **NO copyrighted game assets, proprietary code, or binaries**. Users must supply their own legally purchased PC game files (Steam, Epic Games, GOG, etc.).
 
-## Runtime support matrix
+---
 
-| Game / engine | Current evidence |
-|---|---|
-| Overcooked! | Data detection and Mono/CIL inspection scaffold; no execution |
-| Overcooked! 2 | Data detection and IL2CPP metadata inspection scaffold; no execution |
-| Moving Out | Installation inspection scaffold; no verified execution |
-| Moving Out 2 | Installation inspection scaffold; no verified execution |
-| Wine / Box64 | ARM64 runtime bundle pipeline and headless Wine version probe; Windows PE execution not verified |
-| Source Engine | Separate feasibility research |
+## Runtime Support Matrix
 
-See [Runtime Audit](RUNTIME_AUDIT.md), [Multi-Runtime Architecture](docs/MULTI_RUNTIME_ARCHITECTURE.md), [Wine/Box64 Evaluation](docs/WINE_BOX64_EVALUATION.md), and [Graphics Backend Audit](docs/GRAPHICS_BACKEND_AUDIT.md).
+| Game / Engine | Runtime Path | Status |
+| :--- | :--- | :--- |
+| Overcooked! | Data verifier + Mono/CIL inspection scaffold | 🧪 Data detection only; no execution |
+| Overcooked! 2 | IL2CPP metadata inspection scaffold | 🧪 Metadata detection only; no execution |
+| Moving Out | Title-specific inspection scaffold | 🧪 No verified execution |
+| Moving Out 2 | Title-specific inspection scaffold | 🧪 No verified execution |
+| Wine / Box64 (.exe) | Required candidate path for Windows PC builds | 📄 Research only; not integrated or tested |
+| Source Engine (HL2 / mods) | Separate SDK-based fork/port | 📄 Feasibility research; separate project |
 
-## Features and groundwork
+See [Runtime Audit](RUNTIME_AUDIT.md), [Multi-Runtime Architecture](docs/MULTI_RUNTIME_ARCHITECTURE.md), [Wine/Box64 Evaluation](docs/WINE_BOX64_EVALUATION.md), and [Source Engine Feasibility](docs/SOURCE_ENGINE_FEASIBILITY.md) for evidence and limitations.
 
-- C++20 / Android NDK ARM64 native integration and Vulkan capability scaffolding.
-- Controller and virtual touch input scaffolding.
-- Scoped-storage/document-picker game import.
-- Unity Windows installation inspection for EXE architecture, adjacent UnityPlayer.dll, matching `*_Data`, and Mono/IL2CPP metadata hints.
-- App-private Wine runtime installation with archive validation and rollback.
-- Version-matched HTTPS runtime download from GitHub Releases (v0.3.3).
-- Fixed-command, headless Wine version probe.
+---
 
-## Current status — 0.3.3 tester candidate
+## ✨ Features
 
-### 1. Install the launcher
+- ⚡ **C++20 & Vulkan 1.0 integration point**: Android native rendering and device capability groundwork; this is not yet a complete Unity renderer.
+- 🎮 **Native Controller Support (Plug & Play)**:
+  - **Sony DualShock 4 & DualSense (PS4 / PS5)**: Native button glyphs (✕, ◯, ▢, △), analog triggers, and touchpad support.
+  - **Xbox Wireless & Elite Controllers**: Auto-detected profiles, standard A/B/X/Y mappings, and LT/RT analog thresholds.
+  - **Split-Controller Co-op**: Play with a friend on a single controller (Left Stick & L1/L2 for Player 1, Right Stick & R1/R2 for Player 2).
+- 📱 **On-Screen Touch Controls (Virtual Gamepad)**:
+  - Responsive analog touch joystick on the bottom-left with deadzone smoothing.
+  - Diamond action buttons (A, B, X, Y) + shoulder buttons (L1, L2, R1, R2).
+  - Multi-touch tracking and haptic feedback. Can be toggled on/off anytime.
+- 🛡️ **Android 10 to 15+ Compatibility**:
+  - Full support for Android 10 (API 29), Android 12 (HarmonyOS 4), and modern Android 14/15.
+  - **16 KB page-size aligned** (`-Wl,-z,max-page-size=16384`) for next-gen Android kernels.
+  - Scoped storage & SAF file importer with zip extraction safeguards.
+- 🌡️ **Smart Thermal Governor**: Automatically adjusts resolution scale (`0.75x` – `1.0x`) during long gaming sessions to keep your device cool and battery healthy.
 
-Download `app-debug.apk` or `app-release.apk` from [GitHub Releases](https://github.com/dnctf/ghost-town-recomp/releases). The release APK is CI/debug-signed for testing, not a production-signed distribution.
+---
 
-### 2. Install the optional Windows runtime
+## 🚧 Current Status (0.3.0)
 
-Open Ghost Town Recomp and select **DOWNLOAD & INSTALL WINE RUNTIME v0.3.3**. The app downloads a version-matched manifest and archive over HTTPS, validates the declared size and SHA-256, then stages the runtime in app-private storage. Manual `.tar.gz` import remains available.
+### 1. Install the experimental launcher
+Install the APK from the [Releases](https://github.com/dnctf/ghost-town-recomp/releases) page on an Android 10+ device. This release is a launcher and runtime-readiness preview, not a playable Unity runtime.
 
-### 3. Run the headless probe
+### 2. Import game data for inspection
+Copy the `_Data` folder from your legitimate PC game installation to your device:
 
-Open **WINE / BOX64 STATUS** and select **TEST WINE VERSION**. A successful result means the fixed `box64 wine --version` command returned exit code 0 through PRoot. It does not prove PE execution, Wine prefix initialization, DXVK/Vulkan rendering, audio/input, or gameplay.
+```text
+/sdcard/Android/data/com.overcookedrecomp.app/files/
+  ├── Overcooked_Data/     # for Overcooked 1
+  ├── Overcooked2_Data/    # for Overcooked 2
+  ├── MovingOut_Data/      # for Moving Out
+  └── MovingOut2_Data/     # for Moving Out 2
+```
 
-### 4. Import game files for inspection
+> 💡 **Tip:** You can also simply zip the folder on your PC, send it to your phone's **Download** folder, and tap **"⚡ Deteksi Otomatis dari Folder Download"** or **"📁 Impor .ZIP PC"** inside the app!
 
-Select the complete Windows PC installation containing the game EXE, adjacent `UnityPlayer.dll`, and matching `*_Data` folder. The app reports data detection separately from execution readiness.
+### 3. Inspect execution requirements
+Open **Ghost Town Recomp** and inspect the imported game data. The app reports detected data separately from execution readiness. Press **EXECUTION STATUS** on a game card to see the missing runtime components. The orange clear-only renderer has been removed. Mono hosting, IL2CPP recompilation, Unity rendering, and Wine/Box64 integration are not yet implemented; therefore no PC game is claimed playable.
 
-**Game launch remains disabled.** No X11/Wayland display backend, glibc-to-Android Vulkan presentation bridge, Android audio bridge, or complete Wine game lifecycle is integrated. Do not claim a game is playable until it reaches gameplay on the target physical device with graphics, input, audio, and stability verified.
+---
 
-## Build from source
+## 🤝 We Love Contributors!
 
-Prerequisites: JDK 17, Android NDK r26d (`26.3.11579264`), CMake 3.22.1+, Gradle 8.5, and target ABI `arm64-v8a`.
+Ghost Town Recomp is an open-source project and we welcome contributions of all skill levels! Whether you want to add a feature, optimize performance, or fix a bug, we'd love to have you on board.
 
-```sh
+### 🔥 Great Areas to Help With:
+- 🎮 **New Controller Profiles**: Add support for Nintendo Switch Pro Controller, 8BitDo, Joy-Cons, Razer Kishi, etc.
+- 🎨 **UI / UX Polish**: Modernize the setup launcher, add themes, customizable button layouts, or game art scrapers.
+- ⚡ **Graphics & Shaders**: Unity ShaderLab-to-SPIRV translations, Mali/PowerVR/Xclipse GPU compatibility.
+- 🌐 **Translations & Docs**: Help translate the app and documentation into more languages.
+- 🧪 **Device Testing**: Test on different chips (Snapdragon 8 Gen 1/2/3, Dimensity 9000+, Tensor G3, etc.) and submit test reports.
+
+### 🛠️ How to Contribute:
+1. **Fork** the repository.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Commit your changes (`git commit -m "feat: add support for Nintendo Switch Pro Controller"`).
+4. Push to your branch (`git push origin feature/amazing-feature`).
+5. Open a **Pull Request** and describe what you built!
+
+---
+
+## 🏗️ Building from Source
+
+### Prerequisites
+- **Android Studio** (Hedgehog or newer) / JDK 17
+- **Android NDK**: `r26d` (26.3.11579264)
+- **CMake**: `3.22.1+`
+- **Target ABI**: `arm64-v8a`
+
+### Build Command
+```bash
 git clone --recursive https://github.com/dnctf/ghost-town-recomp.git
 cd ghost-town-recomp/android
 gradle assembleDebug
-gradle assembleRelease
 gradle lint
 ```
+The output APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`. This repository currently does not include `gradlew` or the Gradle wrapper JAR/properties; use installed Gradle 8.5+ as CI does, or add a verified wrapper before using `./gradlew`.
 
-The repository does not currently include the Gradle wrapper.
+---
 
-## Contributing
+## ⚖️ Legal Disclaimer
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [Contributor & Tester Guide](docs/CONTRIBUTOR_TESTING.md). Priority milestones include a harmless Windows PE test, a real display backend, glibc-visible Vulkan/Adreno driver integration, audio/input bridging, and physical-device validation.
+*Ghost Town Recomp* is an independent, non-commercial open-source project developed for interoperability and preservation purposes. It is **not** endorsed by, affiliated with, or associated with Ghost Town Games, SMG Studio, Team17 Digital, or Unity Technologies. All game trademarks, titles, and copyrighted materials belong to their respective owners. Users must own legitimate copies of the PC games to use this software.
 
-## Legal disclaimer
 
-Ghost Town Recomp is independent and is not endorsed by Ghost Town Games, SMG Studio, Team17 Digital, or Unity Technologies. All trademarks and copyrighted materials belong to their respective owners. Users must own legitimate copies of PC games.
+## Contributor and tester tooling
+
+- [Contributor guide](CONTRIBUTING.md)
+- [Game installation and Android tester guide](docs/CONTRIBUTOR_TESTING.md)
+- Run the host-side installation probe: `python3 tools/game_installation_probe.py /path/to/Game --json report.json`
+- Run probe tests: `python3 -m unittest discover -s tools/tests -v`\n- Run Android launcher smoke test: `tools/android_device_smoke_test.sh /path/to/app-debug.apk`
+
+A complete Windows folder layout is not proof of Android compatibility. This project does not bundle Wine/Box64 or proprietary game files.

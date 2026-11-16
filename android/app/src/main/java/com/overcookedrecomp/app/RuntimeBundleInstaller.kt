@@ -67,22 +67,12 @@ object RuntimeBundleInstaller {
                                 }
                                 entry.isSymbolicLink -> {
                                     val link = Paths.get(entry.linkName)
-                                    val rootfsRoot = root.resolve("rootfs").normalize()
-                                    val boundary = if (destination.toAbsolutePath().normalize().startsWith(rootfsRoot)) {
-                                        rootfsRoot
-                                    } else {
-                                        root
-                                    }
-                                    val resolved = if (link.isAbsolute) {
-                                        boundary.resolve(link.toString().removePrefix("/")).normalize()
-                                    } else {
-                                        destination.parent.resolve(link).normalize()
-                                    }
-                                    if (!resolved.toAbsolutePath().normalize().startsWith(boundary)) {
+                                    if (link.isAbsolute) throw IOException("Symlink absolut ditolak: ${entry.name}")
+                                    val resolved = destination.parent.resolve(link).normalize()
+                                    if (!resolved.toAbsolutePath().normalize().startsWith(root)) {
                                         throw IOException("Symlink keluar dari runtime ditolak: ${entry.name}")
                                     }
-                                    val safeLink = destination.parent.relativize(resolved)
-                                    Files.createSymbolicLink(destination, safeLink)
+                                    Files.createSymbolicLink(destination, link)
                                 }
                                 entry.isLink -> {
                                     val linkTarget = safeRelativePath(entry.linkName)
@@ -150,10 +140,6 @@ object RuntimeBundleInstaller {
         if (raw.isBlank() || raw == "." || raw == "./") return null
         if (raw.startsWith("/") || raw.startsWith("\\")) {
             throw IOException("Path absolut ditolak: $raw")
-        }
-        val rawParts = raw.split('/')
-        if (rawParts.any { it == ".." }) {
-            throw IOException("Path traversal ditolak: $raw")
         }
         val path = Paths.get(raw).normalize()
         if (path.isAbsolute || path.any { it.toString() == ".." }) {

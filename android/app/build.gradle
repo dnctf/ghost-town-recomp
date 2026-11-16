@@ -8,6 +8,11 @@ android {
     compileSdk 34
     ndkVersion '26.3.11579264'
 
+    // Generate the BuildConfig class used by RuntimeBundleDownloader.
+    buildFeatures {
+        buildConfig true
+    }
+
     defaultConfig {
         applicationId "com.overcookedrecomp.app"
         minSdk 29
