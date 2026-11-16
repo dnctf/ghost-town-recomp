@@ -217,7 +217,7 @@ jobs:
           cp -a rootfs-artifact/provenance "$OUT/provenance"
           cp -a proot-artifact/provenance/. "$OUT/provenance/"
           cp runtime/rootfs/README.md "$OUT/README.md"
-          (cd "$OUT" && sha256sum bin/proot libexec/proot/loader libexec/proot/loader32 rootfs/usr/local/bin/box64 > provenance/RUNTIME-SHA256SUMS)
+          (cd "$OUT" && sha256sum bin/proot libexec/proot/loader libexec/proot/loader32 rootfs/usr/local/bin/box64 rootfs/opt/wine/bin/wine rootfs/opt/dxvk/x64/d3d11.dll rootfs/opt/dxvk/x64/dxgi.dll > provenance/RUNTIME-SHA256SUMS)
           tar --numeric-owner --xattrs --acls -czf ghost-town-wine-runtime-arm64.tar.gz -C "$OUT" .
           sha256sum ghost-town-wine-runtime-arm64.tar.gz > ghost-town-wine-runtime-arm64.tar.gz.sha256
           du -h ghost-town-wine-runtime-arm64.tar.gz
