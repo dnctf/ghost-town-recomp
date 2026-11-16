@@ -55,6 +55,10 @@ jobs:
         working-directory: ./android
         run: gradle assembleRelease assembleDebug --no-daemon --stacktrace
 
+      - name: Run Android lint
+        working-directory: ./android
+        run: gradle lint --no-daemon --stacktrace
+
       - name: Upload Built APKs & Native Symbols
         uses: actions/upload-artifact@v4
         with:
