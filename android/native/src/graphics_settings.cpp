@@ -41,6 +41,15 @@ void GraphicsSettingsManager::Initialize(uint32_t width, uint32_t height, float 
          display_.aspect_ratio, adreno_series_, total_ram_mb_);
 }
 
+void GraphicsSettingsManager::UpdateGpuCapabilities(uint32_t adreno_series) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    adreno_series_ = adreno_series;
+    current_preset_ = AutoDetectPreset(adreno_series_, total_ram_mb_);
+    ApplyPreset(current_preset_);
+    LOGI("GPU profile refreshed after Vulkan discovery: Adreno %u, RAM %u MB, preset %s",
+         adreno_series_, total_ram_mb_, GetPresetString().c_str());
+}
+
 GraphicsPreset GraphicsSettingsManager::AutoDetectPreset(uint32_t adreno_series, uint32_t total_ram_mb) const {
     // Conservative starting presets: GPU identity and RAM are read at runtime.
     // Unknown GPUs stay LOW rather than being assigned an unverified profile.
