@@ -136,6 +136,8 @@ object WineRuntimeBridge {
                     environment()["HOME"] = "/root"
                     environment()["BOX64_LD_LIBRARY_PATH"] =
                         "/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib"
+                    environment()["PROOT_LOADER"] = l.prootLoader.absolutePath
+                    environment()["PROOT_LOADER_32"] = File(l.root, "libexec/proot/loader32").absolutePath
                     environment()["PROOT_NO_SECCOMP"] = "1"
                 }
                 .start()
