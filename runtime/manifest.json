@@ -1,26 +1,26 @@
 {
   "schema_version": 3,
   "target": "android-arm64-via-glibc-userspace",
-  "status": "android-runtime-adapter-integrated-proot-build-pipeline-added-rootfs-and-graphics-pending",
+  "status": "android-runtime-bundle-pipeline-and-private-installer-added-ci-and-device-validation-pending",
   "components": {
     "box64": {
       "upstream": "https://github.com/ptitSeb/box64",
       "build_workflow": ".github/workflows/build-box64-android.yml",
       "abi": "aarch64-linux-gnu",
       "profile": "Snapdragon 888",
-      "status": "Linux ARM64 glibc artifact pipeline; runtime adapter expects it inside ARM64 glibc rootfs; device execution pending"
+      "status": "Snapdragon 888 ARM64/glibc build integrated into complete runtime bundle workflow; app-private provisioning implemented; runtime execution pending"
     },
     "wine": {
       "upstream": "https://github.com/Kron4ek/Wine-Builds",
       "version": "11.19-amd64",
       "sha256": "40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e",
-      "status": "Pinned amd64 payload packaged; adapter expects it at rootfs/opt/wine; process execution not yet validated"
+      "status": "Pinned Wine 11.19 amd64 payload integrated into rootfs bundle workflow; dynamic dependency validation and device execution pending"
     },
     "dxvk": {
       "upstream": "https://github.com/doitsujin/DXVK",
       "version": "3.1.1",
       "sha256": "40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608",
-      "status": "Pinned DLL payload packaged; adapter checks x64 d3d11/dxgi files; Wine prefix install and Vulkan bridge validation pending"
+      "status": "Pinned DXVK 3.1.1 payload integrated into rootfs bundle workflow; Wine prefix installation and Vulkan/display backend remain pending"
     },
     "unity_player": {
       "status": "user-provided",
@@ -32,13 +32,19 @@
       "build_workflow": ".github/workflows/build-proot-android.yml",
       "abi": "arm64-v8a",
       "linkage": "static Bionic",
-      "status": "Static Android ARM64 PRoot plus companion-loader build workflow added; CI artifact and device ptrace validation pending"
+      "status": "Android ARM64/Bionic PRoot and companion-loader build included in full runtime workflow; explicit PROOT_LOADER paths configured; device ptrace validation pending"
     },
     "rootfs": {
-      "status": "required ARM64 glibc Linux userspace with Wine x86_64 dependencies; not yet built or provisioned"
+      "status": "Debian Bookworm ARM64/glibc with amd64 Wine dependency layer build pipeline added; artifact build and Box64/Wine execution validation pending"
     },
     "graphics_bridge": {
-      "status": "not integrated; DXVK cannot render through Android Vulkan without a compatible translation/display backend"
+      "status": "not integrated; Android Vulkan presentation path for Box64/Wine/DXVK still required"
+    },
+    "runtime_installer": {
+      "status": "Android app can import a gzip tar bundle into app-private storage with path traversal and symlink escape checks; installation not yet CI/device tested"
+    },
+    "audio_input": {
+      "status": "Android audio/input bridge not integrated into Wine runtime"
     }
   },
   "playable_claim_policy": "No game is playable until Wine launches a Windows PE under Box64 on target hardware and graphics, input, audio, lifecycle, and stability pass gameplay tests."
