@@ -14,6 +14,10 @@ Provision under `Context.getFilesDir()/runtime/wine/`:
 runtime/wine/
   bin/
     proot                 # executable Android ARM64/Bionic PRoot
+  libexec/
+    proot/
+      loader              # required PRoot companion loader
+      loader32            # companion loader for 32-bit guest binaries
   rootfs/                 # ARM64 Linux userspace with glibc
     etc/os-release
     usr/local/bin/
@@ -31,11 +35,14 @@ runtime/wine/
           ...
 ```
 
+The PRoot artifact is a separate Android ARM64/Bionic layer. Copy the contents of its `root/` directory into `runtime/wine/`, preserving `bin/proot` and `libexec/proot/*`. The adapter requires both the executable and the primary companion loader.
+
 Wine and its x86_64 dependencies must be installed inside the rootfs. Box64 and its ARM64/glibc dependencies must be available in the same rootfs. The Wine bundle artifact alone is not a rootfs and cannot be copied directly into the APK as a runnable Android executable.
 
 ## Adapter checks
 
 - PRoot exists and is executable.
+- PRoot companion loader exists at `libexec/proot/loader`.
 - `rootfs/etc/os-release` exists.
 - Box64 exists at `rootfs/usr/local/bin/box64` or `rootfs/usr/bin/box64`.
 - Wine exists at `rootfs/opt/wine/bin/wine`.
