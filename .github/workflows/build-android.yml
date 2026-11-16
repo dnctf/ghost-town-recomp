@@ -94,3 +94,40 @@ jobs:
             android/app/build/outputs/apk/release/*.apk
             build-native-arm64/**/*.so
           generate_release_notes: true
+
+  runtime-components:
+    name: Package verified Wine and DXVK components
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install archive tools
+        run: sudo apt-get update && sudo apt-get install -y curl xz-utils tar file
+      - name: Download pinned upstream releases
+        run: |
+          set -euo pipefail
+          mkdir -p downloads bundle/wine bundle/dxvk
+          curl -fL --retry 3 https://github.com/Kron4ek/Wine-Builds/releases/download/11.19/wine-11.19-amd64.tar.xz -o downloads/wine.tar.xz
+          curl -fL --retry 3 https://github.com/doitsujin/DXVK/releases/download/v3.1.1/dxvk-3.1.1.tar.gz -o downloads/dxvk.tar.gz
+      - name: Verify SHA-256 and extract components
+        run: |
+          set -euo pipefail
+          echo "40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e  downloads/wine.tar.xz" | sha256sum -c -
+          echo "40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608  downloads/dxvk.tar.gz" | sha256sum -c -
+          tar -xJf downloads/wine.tar.xz -C bundle/wine --strip-components=1
+          tar -xzf downloads/dxvk.tar.gz -C bundle/dxvk --strip-components=1
+          WINE_BIN="$(find bundle/wine -type f -path '*/bin/wine' -print -quit)"
+          test -n "$WINE_BIN"
+          test -d bundle/dxvk/x64
+          test -d bundle/dxvk/x32
+          mkdir -p bundle/provenance
+          sha256sum downloads/* > bundle/provenance/SHA256SUMS
+          printf 'Wine=11.19 amd64\\nDXVK=3.1.1\\nWine target=Linux x86_64; requires Box64 + ARM64 glibc userspace\\nDXVK target=Windows DLLs for Wine prefix; requires Vulkan bridge\\n' > bundle/provenance/COMPONENTS.txt
+          cp docs/runtime-bundle-README.md bundle/README.md
+      - name: Upload Wine and DXVK contributor bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghost-town-wine-11.19-dxvk-3.1.1
+          path: bundle/
+          if-no-files-found: error
+          retention-days: 30
