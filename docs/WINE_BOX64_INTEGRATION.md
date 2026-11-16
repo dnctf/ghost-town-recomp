@@ -12,6 +12,32 @@
 
 Box64 is not itself a Windows PE loader or a complete Windows runtime. The project must provide a compatible Wine build, the expected libc/linker/userspace arrangement, filesystem layout, process environment, and required 32-bit support strategy. A 32-bit Windows game cannot be assumed to work with a 64-bit-only configuration.
 
+## Selected reference implementation
+
+For the first compatibility prototype, use the public [Winlator WB64 project](https://github.com/winebox64/winlator) as the Android reference implementation rather than inventing a new Wine/Box64 userspace from scratch. Its published project description documents an Android x86-64 Windows application stack using Wine and Box86/Box64, with Ubuntu root filesystem, PRoot, Mesa (including Turnip/Zink/VirGL), DXVK, and VKD3D among its third-party components. The upstream README also describes per-shortcut settings and Unity-specific stability guidance.
+
+This is a **reference and evaluation target**, not permission to copy binaries blindly and not proof that its internal runtime exposes a stable embedding API. Before importing or redistributing any source, patch, rootfs, or binary:
+- pin an exact upstream commit/release;
+- inspect the license for each component and the app's own license;
+- preserve required notices and source-offer/source-publication obligations;
+- record checksums and provenance;
+- check whether the component can be invoked in-process or must remain a separate Android app;
+- verify that its runtime works on the target HarmonyOS build.
+
+Do not bundle the Winlator APK inside Ghost Town Recomp or extract its private app data. Prefer a documented, reproducible runtime component build or a legally compliant, separately downloadable runtime bundle.
+
+## First implementation milestone
+
+The first milestone is **not yet an integrated game launcher**. It is a standalone runtime bootstrap test:
+1. Prepare an ARM64 userspace/rootfs and verify its dynamic linker and libc requirements.
+2. Run Box64 from the app's private files directory with the correct executable permissions and Android process constraints.
+3. Start the matching Wine loader inside that userspace.
+4. Launch a small redistributable Windows test program (not one of the commercial game executables) and capture stdout/stderr/exit status.
+5. Verify a Vulkan test surface and the selected graphics translation layer separately.
+6. Only then connect the game picker to a per-game Wine prefix and executable path.
+
+This sequence separates process/runtime failures from game-specific DRM, engine, graphics, and dependency failures.
+
 ## Integration gates
 
 1. **Select a known Android Wine/Box64 implementation as a reference.** Record upstream URL, commit, license, patches, toolchain, build instructions, and supported Android versions.
