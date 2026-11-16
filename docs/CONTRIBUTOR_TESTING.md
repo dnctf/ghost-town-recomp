@@ -14,7 +14,7 @@ The APK does not embed the large Wine runtime bundle, Unity Player, or proprieta
 
 ## Obtain the Android APK
 
-Use the latest successful **Ghost Town Recomp Android Build and Tester Release** workflow on the `main` branch. Download the `ghost-town-recomp-0.3.2-arm64` artifact ZIP and extract:
+Open the GitHub **Releases** page and select **Ghost Town Recomp 0.3.2 - Contributor Tester Candidate** (`v0.3.2`). Download `app-debug.apk` for debugging or `app-release.apk` for release-mode smoke tests. If the release is not published yet, use the successful **Ghost Town Recomp Android Build and Tester Release** workflow on `main` and download artifact `ghost-town-recomp-0.3.2-arm64`:
 - `app-debug.apk` for debugging
 - `app-release.apk` for release-mode smoke tests
 
@@ -22,15 +22,15 @@ The current release APK is CI/debug-signed and is a tester build, not a producti
 
 ## Install the optional Wine runtime bundle
 
-1. Open the successful **Build Complete ARM64 Wine Runtime Bundle** workflow run.
-2. Download artifact `ghost-town-wine-runtime-arm64-debian-bookworm`.
-3. Extract the outer Actions artifact ZIP. Inside it, locate `ghost-town-wine-runtime-arm64.tar.gz` and its `.sha256` file.
+1. Open the GitHub **Releases** page and select release `v0.3.2`.
+2. Download both `ghost-town-wine-runtime-arm64.tar.gz` and `ghost-town-wine-runtime-arm64.tar.gz.sha256` from the release assets. The SHA-256 file is provided for independent integrity verification.
+3. If the runtime assets have not appeared yet, wait for **Build Complete ARM64 Wine Runtime Bundle** to finish successfully; the workflow attaches them to the same release automatically.
 4. Keep enough free internal storage for the expanded rootfs plus temporary staging space. The installer creates a new staging directory before replacing an existing runtime.
 5. Install the APK, open Ghost Town Recomp, and choose **INSTALL WINE RUNTIME BUNDLE (.TAR.GZ)**.
 6. Select `ghost-town-wine-runtime-arm64.tar.gz`. Wait for the app to report that installation and payload checksums completed.
 7. Open **WINE / BOX64 STATUS**. If the runtime is complete, run **TEST WINE VERSION** and save the displayed output/log.
 
-The archive is a separate runtime payload, not an APK expansion file. The installer does not download it automatically.
+The archive is a separate runtime payload, not an APK expansion file. The installer does not download it automatically. Install the APK first, then import the `.tar.gz` file from the release assets.
 
 ## What a successful Wine probe means
 
