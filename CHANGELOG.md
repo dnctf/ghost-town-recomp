@@ -10,7 +10,7 @@
 ### Changed
 - Game folder scanning is now reported as **data detected**, not as a playable or runnable installation.
 - Mono and IL2CPP verifier messages now describe inspection only.
-- App version is `0.3.0-alpha` (versionCode 5).
+- App version is `0.3.0` (versionCode 5).
 
 ### Fixed
 - Removed the hard-coded orange Vulkan clear-only loop from the visible surface lifecycle.
