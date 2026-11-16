@@ -146,8 +146,11 @@ jobs:
           test -x "$ROOTFS/usr/local/bin/box64"
           test -s "$ROOTFS/opt/dxvk/x64/d3d11.dll"
           test -s "$ROOTFS/opt/dxvk/x64/dxgi.dll"
+          set +e
           sudo lddtree -R "$ROOTFS" /opt/wine/bin/wine | tee wine-lddtree.txt
-          if grep -q 'not found' wine-lddtree.txt; then
+          LDDTREE_STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$LDDTREE_STATUS" -ne 0 ] || grep -Eq '=> None|could not locate library|not found' wine-lddtree.txt; then
             echo "Wine has unresolved x86_64 shared-library dependencies." >&2
             exit 1
           fi
