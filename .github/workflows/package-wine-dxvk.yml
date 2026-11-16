@@ -1,0 +1,80 @@
+name: Package Wine and DXVK runtime components
+
+on:
+  workflow_dispatch:
+    inputs:
+      wine_version:
+        description: Pinned Kron4ek Wine version
+        required: true
+        default: '11.19'
+        type: string
+      dxvk_version:
+        description: Pinned upstream DXVK version
+        required: true
+        default: '3.1.1'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package-runtime:
+    name: Fetch, verify and package Wine x86_64 + DXVK
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install archive tools
+        run: sudo apt-get update && sudo apt-get install -y curl xz-utils tar file python3
+
+      - name: Fetch pinned Wine and DXVK releases
+        env:
+          WINE_VERSION: ${{ inputs.wine_version }}
+          DXVK_VERSION: ${{ inputs.dxvk_version }}
+        run: |
+          set -euo pipefail
+          mkdir -p downloads bundle/wine bundle/dxvk
+          WINE_FILE="wine-${WINE_VERSION}-amd64.tar.xz"
+          DXVK_FILE="dxvk-${DXVK_VERSION}.tar.gz"
+          curl -fL --retry 3 "https://github.com/Kron4ek/Wine-Builds/releases/download/${WINE_VERSION}/${WINE_FILE}" -o "downloads/$WINE_FILE"
+          curl -fL --retry 3 "https://github.com/doitsujin/DXVK/releases/download/v${DXVK_VERSION}/${DXVK_FILE}" -o "downloads/$DXVK_FILE"
+          echo "WINE_FILE=$WINE_FILE" >> "$GITHUB_ENV"
+          echo "DXVK_FILE=$DXVK_FILE" >> "$GITHUB_ENV"
+
+      - name: Verify release asset SHA-256
+        env:
+          WINE_VERSION: ${{ inputs.wine_version }}
+          DXVK_VERSION: ${{ inputs.dxvk_version }}
+        run: |
+          set -euo pipefail
+          WINE_FILE="downloads/wine-${WINE_VERSION}-amd64.tar.xz"
+          DXVK_FILE="downloads/dxvk-${DXVK_VERSION}.tar.gz"
+          if [ "$WINE_VERSION" = "11.19" ]; then
+            echo "40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e  $WINE_FILE" | sha256sum -c -
+          else
+            echo "Wine version is not in the verified baseline allowlist."; exit 1
+          fi
+          if [ "$DXVK_VERSION" = "3.1.1" ]; then
+            echo "40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608  $DXVK_FILE" | sha256sum -c -
+          else
+            echo "DXVK version is not in the verified baseline allowlist."; exit 1
+          fi
+
+      - name: Extract and validate runtime components
+        run: |
+          set -euo pipefail
+          tar -xJf "downloads/$WINE_FILE" -C bundle/wine --strip-components=1
+          tar -xzf "downloads/$DXVK_FILE" -C bundle/dxvk --strip-components=1
+          test -x bundle/wine/bin/wine
+          test -d bundle/dxvk/x64
+          test -d bundle/dxvk/x32
+          mkdir -p bundle/provenance
+          sha256sum downloads/* > bundle/provenance/SHA256SUMS
+          printf 'Wine=%s\nWine source=https://github.com/Kron4ek/Wine-Builds\nDXVK=%s\nDXVK source=https://github.com/doitsujin/DXVK\nWine target=Linux x86_64 (requires glibc userspace + Box64)\nDXVK target=Windows DLLs installed into Wine prefix\n' "${{ inputs.wine_version }}" "${{ inputs.dxvk_version }}" > bundle/provenance/COMPONENTS.txt
+          cp docs/runtime-bundle-README.md bundle/README.md
+
+      - name: Upload runtime component bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghost-town-wine-${{ inputs.wine_version }}-dxvk-${{ inputs.dxvk_version }}
+          path: bundle/
+          if-no-files-found: error
+          retention-days: 30
