@@ -1,65 +1,68 @@
-# Android Wine / Box64 runtime adapter
+# Android Wine / Box64 runtime adapter and provisioning
 
 ## Current integration
 
-The Android launcher exposes **WINE / BOX64 STATUS** in its dashboard. The adapter checks a provisioned runtime directory and can run a fixed, headless `wine --version` probe when the required files are present. It never invokes a shell and does not accept arbitrary command strings.
+The launcher exposes **WINE / BOX64 STATUS** and **INSTALL WINE RUNTIME BUNDLE (.TAR.GZ)**. A user-selected runtime archive is extracted into app-private storage at `Context.getFilesDir()/runtime/wine/`. Extraction stages the new runtime, rejects absolute/traversal paths and symlinks escaping the staging directory, validates required files, and only then swaps it into place.
 
-This is a diagnostic/process-integration milestone, not a game-launcher claim. The current APK does not download, unpack, or bundle a Linux root filesystem. Game launch remains disabled until the graphics/display backend and lifecycle integration are implemented.
+The optional Wine probe runs only the fixed headless command `box64 wine --version` through PRoot. It is not a game launch path.
 
-## Expected app-private layout
+## Full bundle build
 
-Provision under `Context.getFilesDir()/runtime/wine/`:
+Workflow: `.github/workflows/build-wine-runtime-bundle.yml`
+
+Default artifact: `ghost-town-wine-runtime-arm64-debian-bookworm`
+
+The build assembles:
+- Static Android ARM64/Bionic PRoot plus `loader` and `loader32`
+- Debian Bookworm ARM64/glibc rootfs
+- Debian amd64 runtime libraries for x86_64 Wine
+- Box64 built for ARM64/glibc with the Snapdragon 888 profile
+- Pinned Wine 11.19 amd64 payload
+- Pinned DXVK 3.1.1 DLL payload
+- Upstream commit IDs, package dependency report, checksums and license notice
+
+The workflow checks the Wine ELF dependency tree before packaging. Debian package versions are recorded in the dpkg database; for byte-identical rebuilds, use a dated Debian snapshot and immutable upstream commit refs.
+
+## Expected extracted layout
 
 ```text
-runtime/wine/
-  bin/
-    proot                 # executable Android ARM64/Bionic PRoot
-  libexec/
-    proot/
-      loader              # required PRoot companion loader
-      loader32            # companion loader for 32-bit guest binaries
-  rootfs/                 # ARM64 Linux userspace with glibc
+filesDir/runtime/wine/
+  bin/proot
+  libexec/proot/
+    loader
+    loader32
+  rootfs/
     etc/os-release
-    usr/local/bin/
-      box64               # Linux ARM64/glibc Box64 build
-    opt/
-      wine/
-        bin/wine          # Linux x86_64 Wine binary
-        lib/              # Wine runtime libraries
-        lib64/
-      dxvk/
-        x64/
-          d3d11.dll
-          dxgi.dll
-        x32/
-          ...
+    usr/local/bin/box64
+    opt/wine/bin/wine
+    opt/wine/lib/
+    opt/wine/lib64/
+    opt/dxvk/x64/d3d11.dll
+    opt/dxvk/x64/dxgi.dll
+    opt/dxvk/x32/...
+  provenance/
 ```
 
-The PRoot artifact is a separate Android ARM64/Bionic layer. Copy the contents of its `root/` directory into `runtime/wine/`, preserving `bin/proot` and `libexec/proot/*`. The adapter requires both the executable and the primary companion loader.
+The PRoot process must receive explicit `PROOT_LOADER` and `PROOT_LOADER_32` paths because the executable is installed under the app-private files directory rather than the build-time Termux prefix.
 
-Wine and its x86_64 dependencies must be installed inside the rootfs. Box64 and its ARM64/glibc dependencies must be available in the same rootfs. The Wine bundle artifact alone is not a rootfs and cannot be copied directly into the APK as a runnable Android executable.
+## Validation boundary
 
-## Adapter checks
+A complete archive and successful import only prove that the payload was assembled and copied. They do not prove:
+- PRoot ptrace support under the MatePad's HarmonyOS kernel policy
+- Box64 can load the Wine x86_64 ELF and all dependencies on device
+- Wine can initialize a prefix
+- DXVK can create a Vulkan device or present a window
+- audio, touch, keyboard, mouse, gamepad, pause/resume, and process cleanup work
+- a Unity Windows game reaches a playable state
 
-- PRoot exists and is executable.
-- PRoot companion loader exists at `libexec/proot/loader`.
-- `rootfs/etc/os-release` exists.
-- Box64 exists at `rootfs/usr/local/bin/box64` or `rootfs/usr/bin/box64`.
-- Wine exists at `rootfs/opt/wine/bin/wine`.
-- DXVK x64 `d3d11.dll` and `dxgi.dll` exist under `rootfs/opt/dxvk/x64`.
-- The optional headless probe invokes only `box64 wine --version` through PRoot, with a 45-second timeout and a log file.
+## Remaining gates
 
-The probe does **not** verify PE game execution, a Wine prefix, Direct3D initialization, DXVK Vulkan device creation, rendering, audio, input, or sustained gameplay.
+1. Build and inspect the complete bundle artifact; fix missing x86_64 dependencies.
+2. Install the archive on the MatePad Air and run the headless Wine version probe.
+3. Run a minimal Windows PE executable and initialize a per-game Wine prefix.
+4. Install DXVK into the prefix and configure native DLL overrides.
+5. Integrate a compatible Android Vulkan/display backend. DXVK itself is not a Vulkan driver.
+6. Bridge audio and input; implement process lifecycle, storage mapping, logs, cancellation and cleanup.
+7. Test one user-supplied 64-bit Unity title on the physical Snapdragon 888 / Adreno 660 device.
 
-## Remaining engineering gates
-
-1. **Runtime provisioning:** build/package an Android ARM64/Bionic PRoot executable; create a reproducible ARM64 glibc rootfs with required ARM64 and x86_64 libraries; install Box64 and pinned Wine; verify licenses and notices.
-2. **Prefix bootstrap:** initialize a per-game Wine prefix, install DXVK into the prefix, configure native DLL overrides, and preserve per-game settings.
-3. **Graphics/display:** integrate a compatible Android Vulkan driver/translation layer and a display backend. DXVK only translates Direct3D calls to Vulkan; it is not the Android Vulkan driver or window system.
-4. **Audio/input:** bridge Wine audio to Android audio and map touch, keyboard, mouse, and gamepad events.
-5. **Lifecycle/security:** manage process groups, pause/resume, force-stop, storage binds, permissions, logs, and cleanup without exposing arbitrary shell execution.
-6. **Compatibility validation:** first run Wine self-tests and a minimal Direct3D test; then test one 64-bit game on physical Snapdragon 888 hardware. Record menu, gameplay, frame pacing, audio, controller, memory, temperature, crashes, and long-session stability.
-
-## Target device validation
-
-The target is Huawei MatePad Air 2023 (Snapdragon 888 / Adreno 660 / HarmonyOS 4.2). CI compilation on an ARM64 runner is not a substitute for testing on this device. Do not mark a game playable until all gameplay gates pass.
+Do not mark a title playable until actual gameplay, rendering, input, audio, frame pacing, thermal behavior and stability have been tested on device.
