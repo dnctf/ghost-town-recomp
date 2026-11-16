@@ -12,6 +12,7 @@ import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.function.Consumer
 
 /**
  * Installs a user-selected .tar.gz runtime into app-private storage.
@@ -25,7 +26,7 @@ object RuntimeBundleInstaller {
 
     @JvmStatic
     @Throws(IOException::class)
-    fun install(context: Context, archiveUri: Uri, progress: ((String) -> Unit)? = null) {
+    fun install(context: Context, archiveUri: Uri, progress: Consumer<String>? = null) {
         val runtimeParent = File(context.filesDir, "runtime")
         if (!runtimeParent.exists() && !runtimeParent.mkdirs()) {
             throw IOException("Tidak dapat membuat direktori runtime.")
@@ -108,7 +109,7 @@ object RuntimeBundleInstaller {
                             }
                         }
                         if (entries % 1000 == 0) {
-                            progress?.invoke("Mengekstrak runtime: $entries entri, ${totalBytes / (1024 * 1024)} MiB")
+                            progress?.accept("Mengekstrak runtime: $entries entri, ${totalBytes / (1024 * 1024)} MiB")
                         }
                         entry = tar.nextTarEntry
                     }
