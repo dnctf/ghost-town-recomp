@@ -1,4 +1,5 @@
 #include "vulkan_context.h"
+#include "graphics_settings.h"
 #include <android/log.h>
 #include <algorithm>
 #include <cstring>
@@ -107,6 +108,10 @@ bool VulkanContext::SelectPhysicalDevice() {
          static_cast<unsigned long long>(gpu_caps_.safe_max_storage_buffer_range),
          gpu_caps_.max_sampler_anisotropy,
          gpu_caps_.supports_sampler_anisotropy ? "yes" : "no");
+
+    // Java reports display/RAM before the Surface exists. Refresh the automatic
+    // profile now that the real Vulkan GPU has been discovered.
+    GraphicsSettingsManager::Instance().UpdateGpuCapabilities(gpu_caps_.adreno_series);
 
     uint32_t queue_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device_, &queue_count, nullptr);
