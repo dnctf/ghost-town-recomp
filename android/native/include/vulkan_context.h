@@ -4,6 +4,7 @@
 #include <vulkan/vulkan_android.h>
 #include <cstdint>
 #include <vector>
+#include <mutex>
 
 namespace overcooked {
 
@@ -34,8 +35,12 @@ private:
     bool CreateLogicalDevice();
     bool CreateSwapchain(ANativeWindow* window);
     bool CreateTBDRRenderPass();
-    bool CreateFramebuffersAndSync();
+    bool CreateFramebuffers();
+    bool CreateSyncObjects();
     void DestroySwapchainResources();
+
+    ANativeWindow* window_ = nullptr;
+    std::mutex render_mutex_;
 
     VkInstance instance_ = VK_NULL_HANDLE;
     VkSurfaceKHR surface_ = VK_NULL_HANDLE;

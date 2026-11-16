@@ -10,13 +10,16 @@
 namespace overcooked {
 
 bool VulkanContext::Initialize(ANativeWindow* window) {
+    std::lock_guard<std::mutex> lock(render_mutex_);
+    window_ = window;
     if (!CreateInstance()) { LOGE("Vulkan: CreateInstance gagal"); return false; }
     if (!CreateAndroidSurface(window)) { LOGE("Vulkan: CreateAndroidSurface gagal"); return false; }
     if (!SelectPhysicalDevice()) { LOGE("Vulkan: SelectPhysicalDevice gagal"); return false; }
     if (!CreateLogicalDevice()) { LOGE("Vulkan: CreateLogicalDevice gagal"); return false; }
     if (!CreateSwapchain(window)) { LOGE("Vulkan: CreateSwapchain gagal"); return false; }
     if (!CreateTBDRRenderPass()) { LOGE("Vulkan: CreateTBDRRenderPass gagal"); return false; }
-    if (!CreateFramebuffersAndSync()) { LOGE("Vulkan: CreateFramebuffersAndSync gagal"); return false; }
+    if (!CreateSyncObjects()) { LOGE("Vulkan: CreateSyncObjects gagal"); return false; }
+    if (!CreateFramebuffers()) { LOGE("Vulkan: CreateFramebuffers gagal"); return false; }
     LOGI("VulkanContext berhasil diinisialisasi sepenuhnya!");
     return true;
 }
@@ -243,7 +246,21 @@ bool VulkanContext::CreateTBDRRenderPass() {
     return vkCreateRenderPass(device_, &rp_info, nullptr, &main_render_pass_) == VK_SUCCESS;
 }
 
-bool VulkanContext::CreateFramebuffersAndSync() {
+bool VulkanContext::CreateSyncObjects() {
+    VkCommandPoolCreateInfo pool_info{};
+    pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    pool_info.queueFamilyIndex = graphics_queue_family_;
+    pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    if (vkCreateCommandPool(device_, &pool_info, nullptr, &command_pool_) != VK_SUCCESS) return false;
+
+    VkSemaphoreCreateInfo sem_info{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0 };
+    VkFenceCreateInfo fence_info{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT };
+    return vkCreateSemaphore(device_, &sem_info, nullptr, &image_available_sem_) == VK_SUCCESS &&
+           vkCreateSemaphore(device_, &sem_info, nullptr, &render_finished_sem_) == VK_SUCCESS &&
+           vkCreateFence(device_, &fence_info, nullptr, &in_flight_fence_) == VK_SUCCESS;
+}
+
+bool VulkanContext::CreateFramebuffers() {
     framebuffers_.resize(swapchain_image_views_.size());
     for (size_t i = 0; i < swapchain_image_views_.size(); ++i) {
         VkFramebufferCreateInfo fb_info{};
@@ -257,11 +274,10 @@ bool VulkanContext::CreateFramebuffersAndSync() {
         if (vkCreateFramebuffer(device_, &fb_info, nullptr, &framebuffers_[i]) != VK_SUCCESS) return false;
     }
 
-    VkCommandPoolCreateInfo pool_info{};
-    pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    pool_info.queueFamilyIndex = graphics_queue_family_;
-    pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    if (vkCreateCommandPool(device_, &pool_info, nullptr, &command_pool_) != VK_SUCCESS) return false;
+    if (!command_buffers_.empty()) {
+        vkFreeCommandBuffers(device_, command_pool_, static_cast<uint32_t>(command_buffers_.size()), command_buffers_.data());
+        command_buffers_.clear();
+    }
 
     command_buffers_.resize(framebuffers_.size());
     VkCommandBufferAllocateInfo alloc_info{};
@@ -269,24 +285,33 @@ bool VulkanContext::CreateFramebuffersAndSync() {
     alloc_info.commandPool = command_pool_;
     alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     alloc_info.commandBufferCount = static_cast<uint32_t>(command_buffers_.size());
-    if (vkAllocateCommandBuffers(device_, &alloc_info, command_buffers_.data()) != VK_SUCCESS) return false;
-
-    VkSemaphoreCreateInfo sem_info{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0 };
-    VkFenceCreateInfo fence_info{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT };
-    return vkCreateSemaphore(device_, &sem_info, nullptr, &image_available_sem_) == VK_SUCCESS &&
-           vkCreateSemaphore(device_, &sem_info, nullptr, &render_finished_sem_) == VK_SUCCESS &&
-           vkCreateFence(device_, &fence_info, nullptr, &in_flight_fence_) == VK_SUCCESS;
+    return vkAllocateCommandBuffers(device_, &alloc_info, command_buffers_.data()) == VK_SUCCESS;
 }
 
 void VulkanContext::RenderClearFrame(float r, float g, float b, float resolution_scale) {
-    if (device_ == VK_NULL_HANDLE || swapchain_ == VK_NULL_HANDLE) return;
+    std::lock_guard<std::mutex> lock(render_mutex_);
+    if (device_ == VK_NULL_HANDLE || swapchain_ == VK_NULL_HANDLE || framebuffers_.empty()) return;
 
-    vkWaitForFences(device_, 1, &in_flight_fence_, VK_TRUE, UINT64_MAX);
-    vkResetFences(device_, 1, &in_flight_fence_);
+    // Timeout 500ms mencegah ANR jika display pipeline sedang terhambat
+    VkResult fence_wait = vkWaitForFences(device_, 1, &in_flight_fence_, VK_TRUE, 500000000ULL);
+    if (fence_wait != VK_SUCCESS) {
+        return;
+    }
 
     uint32_t image_index = 0;
-    if (vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX, image_available_sem_,
-                              VK_NULL_HANDLE, &image_index) != VK_SUCCESS) {
+    VkResult acq_res = vkAcquireNextImageKHR(device_, swapchain_, 500000000ULL, image_available_sem_,
+                                             VK_NULL_HANDLE, &image_index);
+    if (acq_res == VK_ERROR_OUT_OF_DATE_KHR) {
+        // Swapchain kadaluarsa (misal perubahan orientasi layar), perlu refresh
+        return;
+    } else if (acq_res != VK_SUCCESS && acq_res != VK_SUBOPTIMAL_KHR) {
+        return;
+    }
+
+    // Reset fence HANYA setelah image berhasil di-acquire untuk mencegah permanent deadlock
+    vkResetFences(device_, 1, &in_flight_fence_);
+
+    if (image_index >= command_buffers_.size() || image_index >= framebuffers_.size()) {
         return;
     }
 
@@ -323,8 +348,8 @@ void VulkanContext::RenderClearFrame(float r, float g, float b, float resolution
     VkRect2D scissor{};
     scissor.offset = { 0, 0 };
     scissor.extent = {
-        static_cast<uint32_t>(viewport.width),
-        static_cast<uint32_t>(viewport.height)
+        std::min<uint32_t>(static_cast<uint32_t>(viewport.width), swapchain_extent_.width),
+        std::min<uint32_t>(static_cast<uint32_t>(viewport.height), swapchain_extent_.height)
     };
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
@@ -357,14 +382,25 @@ void VulkanContext::RenderClearFrame(float r, float g, float b, float resolution
 
 void VulkanContext::Resize(uint32_t width, uint32_t height) {
     if (device_ == VK_NULL_HANDLE || width == 0 || height == 0) return;
+    std::lock_guard<std::mutex> lock(render_mutex_);
     vkDeviceWaitIdle(device_);
-    swapchain_extent_ = { width, height };
+    DestroySwapchainResources();
+    swapchain_extent_.width = width;
+    swapchain_extent_.height = height;
+    if (CreateSwapchain(window_)) {
+        CreateFramebuffers();
+        LOGI("Vulkan swapchain berhasil di-resize: %u x %u", width, height);
+    }
 }
 
 void VulkanContext::DestroySwapchainResources() {
-    for (auto fb : framebuffers_) vkDestroyFramebuffer(device_, fb, nullptr);
+    for (auto fb : framebuffers_) {
+        if (fb != VK_NULL_HANDLE) vkDestroyFramebuffer(device_, fb, nullptr);
+    }
     framebuffers_.clear();
-    for (auto iv : swapchain_image_views_) vkDestroyImageView(device_, iv, nullptr);
+    for (auto iv : swapchain_image_views_) {
+        if (iv != VK_NULL_HANDLE) vkDestroyImageView(device_, iv, nullptr);
+    }
     swapchain_image_views_.clear();
     if (swapchain_ != VK_NULL_HANDLE) {
         vkDestroySwapchainKHR(device_, swapchain_, nullptr);
@@ -373,9 +409,14 @@ void VulkanContext::DestroySwapchainResources() {
 }
 
 void VulkanContext::Shutdown() {
+    std::lock_guard<std::mutex> lock(render_mutex_);
     if (device_ != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(device_);
         DestroySwapchainResources();
+        if (!command_buffers_.empty() && command_pool_ != VK_NULL_HANDLE) {
+            vkFreeCommandBuffers(device_, command_pool_, static_cast<uint32_t>(command_buffers_.size()), command_buffers_.data());
+            command_buffers_.clear();
+        }
         if (image_available_sem_ != VK_NULL_HANDLE) vkDestroySemaphore(device_, image_available_sem_, nullptr);
         if (render_finished_sem_ != VK_NULL_HANDLE) vkDestroySemaphore(device_, render_finished_sem_, nullptr);
         if (in_flight_fence_ != VK_NULL_HANDLE) vkDestroyFence(device_, in_flight_fence_, nullptr);
@@ -392,6 +433,7 @@ void VulkanContext::Shutdown() {
         vkDestroyInstance(instance_, nullptr);
         instance_ = VK_NULL_HANDLE;
     }
+    window_ = nullptr;
 }
 
 } // namespace overcooked

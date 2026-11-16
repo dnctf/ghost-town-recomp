@@ -1,5 +1,6 @@
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
 }
 
 android {
@@ -11,8 +12,8 @@ android {
         applicationId "com.overcookedrecomp.app"
         minSdk 29
         targetSdk 34
-        versionCode 1
-        versionName "0.1.0-alpha"
+        versionCode 2
+        versionName "0.2.4-alpha"
 
         ndk {
             abiFilters 'arm64-v8a'
@@ -22,7 +23,14 @@ android {
             cmake {
                 cppFlags "-std=c++20 -O3 -fvisibility=hidden -Wall -Wextra"
                 arguments "-DANDROID_STL=c++_static", "-DANDROID_PLATFORM=android-29"
+                cFlags "-Wl,-z,max-page-size=16384"
             }
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 
@@ -48,9 +56,15 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
 }
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.documentfile:documentfile:1.0.1'
+    implementation 'androidx.cardview:cardview:1.0.0'
 }

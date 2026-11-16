@@ -1,0 +1,35 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Background Circle Warm Cooking Orange -->
+    <path
+        android:fillColor="#FF9F1C"
+        android:pathData="M54,4 A50,50 0 1,1 53.9,4 Z" />
+    <!-- Outer Chef Pan Rim Teal -->
+    <path
+        android:fillColor="#2EC4B6"
+        android:pathData="M54,14 A40,40 0 1,1 53.9,14 Z" />
+    <!-- Inner Dark Kitchen Plate -->
+    <path
+        android:fillColor="#011627"
+        android:pathData="M54,18 A36,36 0 1,1 53.9,18 Z" />
+    <!-- Iconic Chef Hat (Toque Blanche) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,58 L68,58 L66,66 L42,66 Z M36,56 C32,54 30,48 34,44 C32,38 38,32 44,34 C48,28 60,28 64,34 C70,32 76,38 74,44 C78,48 76,54 72,56 Z" />
+    <!-- Hat Fold Accents -->
+    <path
+        android:strokeColor="#E71D36"
+        android:strokeWidth="2"
+        android:pathData="M44,42 C46,50 48,54 48,58 M54,36 C54,46 54,52 54,58 M64,42 C62,50 60,54 60,58" />
+    <!-- Crossed Spatula & Cleaver -->
+    <path
+        android:fillColor="#E71D36"
+        android:pathData="M34,72 L46,60 L50,64 L38,76 Z M74,72 L62,60 L58,64 L70,76 Z" />
+    <!-- Star Rating Badge (Overcooked 3-Star Chef) -->
+    <path
+        android:fillColor="#FFD166"
+        android:pathData="M54,72 L56,77 L61,77 L57,80 L59,85 L54,82 L49,85 L51,80 L47,77 L52,77 Z" />
+</vector>

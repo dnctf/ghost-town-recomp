@@ -1,0 +1,46 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Background Moving Out Bright Cyan Blue -->
+    <path
+        android:fillColor="#00A8E8"
+        android:pathData="M54,4 A50,50 0 1,1 53.9,4 Z" />
+    <!-- Outer Rim Accent -->
+    <path
+        android:fillColor="#007EA7"
+        android:pathData="M54,12 A42,42 0 1,1 53.9,12 Z" />
+    <!-- Inner Dark Road Background -->
+    <path
+        android:fillColor="#003459"
+        android:pathData="M54,16 A38,38 0 1,1 53.9,16 Z" />
+    <!-- Delivery Truck Cargo Bed White -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,40 L84,40 L84,72 L24,72 Z" />
+    <!-- Truck Cab Front Green -->
+    <path
+        android:fillColor="#06D6A0"
+        android:pathData="M66,42 L80,42 L84,54 L84,72 L66,72 Z" />
+    <!-- Moving Box Cardboard Brown -->
+    <path
+        android:fillColor="#C38D53"
+        android:pathData="M32,46 L60,46 L60,68 L32,68 Z" />
+    <!-- Box Packing Tape -->
+    <path
+        android:fillColor="#E5C185"
+        android:pathData="M43,46 L49,46 L49,68 L43,68 Z" />
+    <!-- Fragile Handle With Care Red Stamp -->
+    <path
+        android:fillColor="#D90429"
+        android:pathData="M36,50 L40,50 L40,54 L36,54 Z M36,58 L40,58 L40,60 L36,60 Z" />
+    <!-- Truck Wheels Dark Charcoal -->
+    <path
+        android:fillColor="#2B2D42"
+        android:pathData="M34,72 A8,8 0 1,1 33.9,72 Z M74,72 A8,8 0 1,1 73.9,72 Z" />
+    <!-- Truck Wheel Rims -->
+    <path
+        android:fillColor="#8D99AE"
+        android:pathData="M34,75 A5,5 0 1,1 33.9,75 Z M74,75 A5,5 0 1,1 73.9,75 Z" />
+</vector>

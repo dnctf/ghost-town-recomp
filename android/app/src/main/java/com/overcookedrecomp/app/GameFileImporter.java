@@ -35,7 +35,20 @@ public final class GameFileImporter {
                 targetDir.mkdirs();
             }
 
-            try (InputStream is = context.getContentResolver().openInputStream(zipUri);
+            InputStream rawStream;
+            try {
+                if ("file".equalsIgnoreCase(zipUri.getScheme()) || zipUri.getScheme() == null) {
+                    rawStream = new FileInputStream(zipUri.getPath());
+                } else {
+                    rawStream = context.getContentResolver().openInputStream(zipUri);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Gagal membuka stream berkas ZIP: " + e.getMessage());
+                if (listener != null) listener.onComplete(false, "Gagal membuka berkas ZIP: " + e.getLocalizedMessage());
+                return;
+            }
+
+            try (InputStream is = rawStream;
                  BufferedInputStream bis = new BufferedInputStream(is);
                  ZipInputStream zis = new ZipInputStream(bis)) {
 
@@ -156,7 +169,7 @@ public final class GameFileImporter {
             if (files != null) {
                 for (File f : files) {
                     String name = f.getName().toLowerCase();
-                    if (name.contains("overcooked") && name.endsWith(".zip")) {
+                    if ((name.contains("overcooked") || name.contains("moving")) && name.endsWith(".zip")) {
                         candidates.add(f);
                     }
                 }

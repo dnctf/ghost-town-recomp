@@ -2,6 +2,7 @@ package com.overcookedrecomp.app;
 
 import android.app.ActivityManager;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Typeface;
@@ -26,6 +27,7 @@ import android.view.WindowManager;
 import android.view.WindowMetrics;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -36,6 +38,8 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import com.overcookedrecomp.app.compiler.movingout.MovingOutLauncherActivity;
 import java.io.File;
 import java.util.List;
 
@@ -62,6 +66,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private View setupOverlayView;
     private TextView oc1StatusText;
     private TextView oc2StatusText;
+    private TextView moStatusText;
     private TextView importProgressText;
     private ProgressBar importProgressBar;
     private Button startGameBtn;
@@ -152,6 +157,60 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         subTitle.setPadding(0, 8, 0, 24);
         container.addView(subTitle);
 
+        // Developer Switcher & Icon Bar
+        LinearLayout devBar = new LinearLayout(this);
+        devBar.setOrientation(LinearLayout.HORIZONTAL);
+        devBar.setGravity(Gravity.CENTER);
+        devBar.setPadding(0, 0, 0, 20);
+
+        // Badge Ghost Town Games (Overcooked)
+        LinearLayout gtgBadge = new LinearLayout(this);
+        gtgBadge.setOrientation(LinearLayout.HORIZONTAL);
+        gtgBadge.setGravity(Gravity.CENTER_VERTICAL);
+        gtgBadge.setBackground(createCardDrawable("#1E2229", "#FF9F1C"));
+        gtgBadge.setPadding(16, 10, 20, 10);
+        ImageView gtgIcon = new ImageView(this);
+        gtgIcon.setImageResource(R.drawable.ic_overcooked);
+        gtgIcon.setLayoutParams(new LinearLayout.LayoutParams(40, 40));
+        gtgBadge.addView(gtgIcon);
+        TextView gtgText = new TextView(this);
+        gtgText.setText(" Ghost Town Games");
+        gtgText.setTextSize(12);
+        gtgText.setTextColor(Color.parseColor("#FF9F1C"));
+        gtgText.setTypeface(null, Typeface.BOLD);
+        gtgBadge.addView(gtgText);
+        devBar.addView(gtgBadge);
+
+        View devSpacer = new View(this);
+        devSpacer.setLayoutParams(new LinearLayout.LayoutParams(16, ViewGroup.LayoutParams.MATCH_PARENT));
+        devBar.addView(devSpacer);
+
+        // Badge SMG Studio (Moving Out)
+        LinearLayout smgBadge = new LinearLayout(this);
+        smgBadge.setOrientation(LinearLayout.HORIZONTAL);
+        smgBadge.setGravity(Gravity.CENTER_VERTICAL);
+        smgBadge.setBackground(createCardDrawable("#1E2229", "#00A8E8"));
+        smgBadge.setPadding(16, 10, 20, 10);
+        smgBadge.setClickable(true);
+        smgBadge.setFocusable(true);
+        smgBadge.setOnClickListener(v -> {
+            Intent moIntent = new Intent(MainActivity.this, MovingOutLauncherActivity.class);
+            startActivity(moIntent);
+        });
+        ImageView smgIcon = new ImageView(this);
+        smgIcon.setImageResource(R.drawable.ic_moving_out);
+        smgIcon.setLayoutParams(new LinearLayout.LayoutParams(40, 40));
+        smgBadge.addView(smgIcon);
+        TextView smgText = new TextView(this);
+        smgText.setText(" SMG Studio (Moving Out ↗)");
+        smgText.setTextSize(12);
+        smgText.setTextColor(Color.parseColor("#00A8E8"));
+        smgText.setTypeface(null, Typeface.BOLD);
+        smgBadge.addView(smgText);
+        devBar.addView(smgBadge);
+
+        container.addView(devBar);
+
         // Kartu Overcooked 1
         container.addView(createGameCard(
                 GameStorageVerifier.GameTitle.OVERCOOKED_1,
@@ -170,6 +229,18 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 "Overcooked 2 (PC)",
                 "Salin/impor folder 'Overcooked2_Data' dari PC (Mendukung lempar bahan/Throw)",
                 text -> oc2StatusText = text
+        ));
+
+        View spacer2 = new View(this);
+        spacer2.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 20));
+        container.addView(spacer2);
+
+        // Kartu Moving Out (SMG Studio)
+        container.addView(createGameCard(
+                GameStorageVerifier.GameTitle.MOVING_OUT,
+                "Moving Out (PC) — SMG Studio",
+                "Salin/impor folder 'MovingOut_Data' dari PC (Fisika pindahan rumah & sofa)",
+                text -> moStatusText = text
         ));
 
         // Tombol Auto-Scan dari folder Download
@@ -336,39 +407,59 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         File extDir = getExternalFilesDir(null);
         if (extDir == null) return;
 
-        List<GameStorageVerifier.VerificationResult> games = GameStorageVerifier.detectInstalledGames(extDir);
-        boolean hasOC1 = false;
-        boolean hasOC2 = false;
+        new Thread(() -> {
+            List<GameStorageVerifier.VerificationResult> games = GameStorageVerifier.detectInstalledGames(extDir);
+            boolean hasOC1 = false;
+            boolean hasOC2 = false;
+            boolean hasMO = false;
 
-        for (GameStorageVerifier.VerificationResult g : games) {
-            if (g.gameTitle == GameStorageVerifier.GameTitle.OVERCOOKED_1) hasOC1 = true;
-            if (g.gameTitle == GameStorageVerifier.GameTitle.OVERCOOKED_2) hasOC2 = true;
-        }
-
-        if (oc1StatusText != null) {
-            if (hasOC1) {
-                oc1StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
-                oc1StatusText.setTextColor(Color.parseColor("#2EC4B6"));
-            } else {
-                oc1StatusText.setText("Status: ❌ Belum Terpasang (Butuh Overcooked_Data)");
-                oc1StatusText.setTextColor(Color.parseColor("#E71D36"));
+            for (GameStorageVerifier.VerificationResult g : games) {
+                if (g.gameTitle == GameStorageVerifier.GameTitle.OVERCOOKED_1) hasOC1 = true;
+                if (g.gameTitle == GameStorageVerifier.GameTitle.OVERCOOKED_2) hasOC2 = true;
+                if (g.gameTitle == GameStorageVerifier.GameTitle.MOVING_OUT) hasMO = true;
             }
-        }
 
-        if (oc2StatusText != null) {
-            if (hasOC2) {
-                oc2StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
-                oc2StatusText.setTextColor(Color.parseColor("#2EC4B6"));
-            } else {
-                oc2StatusText.setText("Status: ❌ Belum Terpasang (Butuh Overcooked2_Data)");
-                oc2StatusText.setTextColor(Color.parseColor("#E71D36"));
-            }
-        }
+            final boolean fHasOC1 = hasOC1;
+            final boolean fHasOC2 = hasOC2;
+            final boolean fHasMO = hasMO;
 
-        if (startGameBtn != null) {
-            startGameBtn.setEnabled(hasOC1 || hasOC2);
-            startGameBtn.setAlpha((hasOC1 || hasOC2) ? 1.0f : 0.5f);
-        }
+            runOnUiThread(() -> {
+                if (oc1StatusText != null) {
+                    if (fHasOC1) {
+                        oc1StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                        oc1StatusText.setTextColor(Color.parseColor("#2EC4B6"));
+                    } else {
+                        oc1StatusText.setText("Status: ❌ Belum Terpasang (Butuh Overcooked_Data)");
+                        oc1StatusText.setTextColor(Color.parseColor("#E71D36"));
+                    }
+                }
+
+                if (oc2StatusText != null) {
+                    if (fHasOC2) {
+                        oc2StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                        oc2StatusText.setTextColor(Color.parseColor("#2EC4B6"));
+                    } else {
+                        oc2StatusText.setText("Status: ❌ Belum Terpasang (Butuh Overcooked2_Data)");
+                        oc2StatusText.setTextColor(Color.parseColor("#E71D36"));
+                    }
+                }
+
+                if (moStatusText != null) {
+                    if (fHasMO) {
+                        moStatusText.setText("Status: ✅ Terpasang & Siap Dimainkan (SMG Studio)");
+                        moStatusText.setTextColor(Color.parseColor("#06D6A0"));
+                    } else {
+                        moStatusText.setText("Status: ❌ Belum Terpasang (Butuh MovingOut_Data)");
+                        moStatusText.setTextColor(Color.parseColor("#E71D36"));
+                    }
+                }
+
+                if (startGameBtn != null) {
+                    startGameBtn.setEnabled(fHasOC1 || fHasOC2 || fHasMO);
+                    startGameBtn.setAlpha((fHasOC1 || fHasOC2 || fHasMO) ? 1.0f : 0.5f);
+                }
+            });
+        }).start();
     }
 
     private void handleImportZipUri(Uri uri) {
@@ -443,9 +534,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 .setTitle("Pilih File ZIP dari Folder Download")
                 .setItems(zipNames, (dialog, which) -> {
                     File selected = zips.get(which);
-                    GameStorageVerifier.GameTitle title = selected.getName().toLowerCase().contains("2")
-                            ? GameStorageVerifier.GameTitle.OVERCOOKED_2
-                            : GameStorageVerifier.GameTitle.OVERCOOKED_1;
+                    String selName = selected.getName().toLowerCase();
+                    GameStorageVerifier.GameTitle title;
+                    if (selName.contains("moving")) {
+                        title = GameStorageVerifier.GameTitle.MOVING_OUT;
+                    } else if (selName.contains("2")) {
+                        title = GameStorageVerifier.GameTitle.OVERCOOKED_2;
+                    } else {
+                        title = GameStorageVerifier.GameTitle.OVERCOOKED_1;
+                    }
                     pendingImportTitle = title;
                     handleImportZipUri(Uri.fromFile(selected));
                 })
@@ -488,6 +585,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         activeGameTitle = game.gameTitle;
         if (setupOverlayView != null) {
             setupOverlayView.setVisibility(View.GONE);
+        }
+
+        if (game.gameTitle == GameStorageVerifier.GameTitle.MOVING_OUT) {
+            Intent intent = new Intent(this, MovingOutLauncherActivity.class);
+            intent.putExtra(MovingOutLauncherActivity.EXTRA_DATA_DIR, game.dataDir.getAbsolutePath());
+            intent.putExtra(MovingOutLauncherActivity.EXTRA_GAME_TITLE, game.gameTitle.displayName);
+            startActivity(intent);
+            return;
         }
 
         if (!nativeLoaded) {

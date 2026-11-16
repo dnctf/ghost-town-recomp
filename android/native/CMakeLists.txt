@@ -49,3 +49,8 @@ target_link_libraries(overcooked_native
     ${VULKAN_LIB}
     ${AAUDIO_LIB}
 )
+
+# Kesiapan 16 KB Page Alignment untuk Android 15+
+target_link_options(overcooked_native PRIVATE
+    "-Wl,-z,max-page-size=16384"
+)
