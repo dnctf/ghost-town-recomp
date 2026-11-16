@@ -66,14 +66,22 @@ jobs:
           install -m 0755 "$SRC/proot" "$OUT/root/bin/proot"
           install -m 0755 "$SRC/loader" "$OUT/root/libexec/proot/loader"
           install -m 0755 "$SRC/loader32" "$OUT/root/libexec/proot/loader32"
-          for f in "$OUT/root/bin/proot" "$OUT/root/libexec/proot/loader" "$OUT/root/libexec/proot/loader32"; do
+          for f in "$OUT/root/bin/proot" "$OUT/root/libexec/proot/loader"; do
             file "$f"
-            readelf -h "$f" | grep -q 'AArch64'
+            readelf -h "$f" | grep -q 'Class:.*ELF64'
+            readelf -h "$f" | grep -q 'Machine:.*AArch64'
             if readelf -l "$f" | grep -q 'Requesting program interpreter'; then
               echo "Expected a static Android binary without ELF interpreter: $f" >&2
               exit 1
             fi
           done
+          file "$OUT/root/libexec/proot/loader32"
+          readelf -h "$OUT/root/libexec/proot/loader32" | grep -q 'Class:.*ELF32'
+          readelf -h "$OUT/root/libexec/proot/loader32" | grep -q 'Machine:.*ARM' 
+          if readelf -l "$OUT/root/libexec/proot/loader32" | grep -q 'Requesting program interpreter'; then
+            echo "Expected the 32-bit companion loader to be static." >&2
+            exit 1
+          fi
           cp proot-src/COPYING "$OUT/provenance/PROOT-COPYING"
           cp proot-upstream-commit.txt "$OUT/provenance/"
           printf 'source=https://github.com/berilevi/proot-static\nabi=arm64-v8a\nlinkage=static\nndk=28.2.13676358\n' > "$OUT/provenance/BUILD-INFO.txt"
