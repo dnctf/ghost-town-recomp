@@ -1,6 +1,7 @@
-import tempfile, unittest
+import tempfile, unittest, sys
 from pathlib import Path
-from game_installation_probe import inspect, pe_arch
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from game_installation_probe import inspect
 
 def write_pe(path: Path, machine=0x8664):
     path.parent.mkdir(parents=True, exist_ok=True)
