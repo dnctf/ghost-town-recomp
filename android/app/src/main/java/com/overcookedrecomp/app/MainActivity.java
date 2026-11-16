@@ -27,6 +27,7 @@ import android.view.WindowManager;
 import android.view.WindowMetrics;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -331,25 +332,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         actionRow.setOrientation(LinearLayout.HORIZONTAL);
         actionRow.setGravity(Gravity.CENTER_VERTICAL);
 
-        startGameBtn = createDashboardButton("OPEN EXPERIMENTAL RUNTIME", "#0878D1");
-        startGameBtn.setTextSize(12);
-        startGameBtn.setOnClickListener(v -> onStartGameClicked());
-        LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
-        startParams.setMarginEnd(dp(10));
-        actionRow.addView(startGameBtn, startParams);
+        Button refreshBtn = createDashboardButton("REFRESH LIBRARY", "#0878D1");
+        refreshBtn.setOnClickListener(v -> refreshInstalledGamesStatus());
+        LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        refreshParams.setMarginEnd(dp(10));
+        actionRow.addView(refreshBtn, refreshParams);
 
         Button autoScanBtn = createDashboardButton("SCAN DOWNLOADS", "#1A2B40");
         autoScanBtn.setOnClickListener(v -> scanDownloadFolder());
-        LinearLayout.LayoutParams scanParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
-        scanParams.setMarginEnd(dp(10));
-        actionRow.addView(autoScanBtn, scanParams);
-
-        Button importZipBtn = createDashboardButton("IMPORT GAME DATA", "#1A2B40");
-        importZipBtn.setOnClickListener(v -> {
-            pendingImportTitle = GameStorageVerifier.GameTitle.OVERCOOKED_1;
-            openZipLauncher.launch(new String[]{"application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*"});
-        });
-        actionRow.addView(importZipBtn, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        actionRow.addView(autoScanBtn, new LinearLayout.LayoutParams(0, dp(48), 1f));
         container.addView(actionRow);
 
         LinearLayout settingsRow = new LinearLayout(this);
@@ -453,30 +444,16 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         card.addView(status);
         holder.hold(status);
 
-        Button zipBtn = createDashboardButton("IMPORT ZIP", "#0878D1");
-        zipBtn.setTextSize(10);
-        zipBtn.setOnClickListener(v -> {
-            pendingImportTitle = title;
-            openZipLauncher.launch(new String[]{"application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*"});
-        });
-        card.addView(zipBtn, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
+        TextView actionHint = new TextView(this);
+        actionHint.setText("SELECT GAME  ›");
+        actionHint.setTextSize(10);
+        actionHint.setTextColor(Color.parseColor("#66B9FF"));
+        actionHint.setTypeface(null, Typeface.BOLD);
+        actionHint.setPadding(0, dp(12), 0, 0);
+        card.addView(actionHint);
 
-        Button folderBtn = createDashboardButton("CHOOSE FOLDER", "#1A2B40");
-        folderBtn.setTextSize(10);
-        LinearLayout.LayoutParams folderParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(38));
-        folderParams.topMargin = dp(7);
-        folderBtn.setOnClickListener(v -> {
-            pendingImportTitle = title;
-            openFolderLauncher.launch(null);
-        });
-        card.addView(folderBtn, folderParams);
-
-        card.setOnClickListener(v -> {
-            pendingImportTitle = title;
-            Toast.makeText(this, cardTitle + " selected", Toast.LENGTH_SHORT).show();
-        });
+        // Selecting a tile opens its own game action dialog (Play / Import).
+        card.setOnClickListener(v -> showGameActionDialog(title, cardTitle));
         card.setOnFocusChangeListener((v, hasFocus) ->
                 card.setBackground(createCardDrawable(
                         hasFocus ? "#14253A" : "#111A28",
@@ -487,6 +464,48 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         cardParams.setMarginEnd(dp(14));
         card.setLayoutParams(cardParams);
         return card;
+    }
+
+    private void showGameActionDialog(GameStorageVerifier.GameTitle title, String cardTitle) {
+        pendingImportTitle = title;
+        GameStorageVerifier.VerificationResult installed = null;
+        File extDir = getExternalFilesDir(null);
+        if (extDir != null) {
+            for (GameStorageVerifier.VerificationResult result : GameStorageVerifier.detectInstalledGames(extDir)) {
+                if (result.gameTitle == title) {
+                    installed = result;
+                    break;
+                }
+            }
+        }
+
+        final GameStorageVerifier.VerificationResult selectedGame = installed;
+        String statusMessage = selectedGame == null
+                ? "DATA NOT FOUND\nImpor data game ini terlebih dahulu."
+                : "DATA DETECTED\n" + selectedGame.message
+                    + "\n\nRuntime masih eksperimental. Deteksi file tidak menjamin game dapat berjalan.";
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(cardTitle)
+                .setMessage(statusMessage)
+                .setPositiveButton("PLAY", (d, which) -> {
+                    if (selectedGame != null) {
+                        launchGame(selectedGame);
+                    } else {
+                        Toast.makeText(this, "Impor data " + cardTitle + " terlebih dahulu.", Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNeutralButton("IMPORT ZIP", (d, which) -> {
+                    pendingImportTitle = title;
+                    openZipLauncher.launch(new String[]{"application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*"});
+                })
+                .setNegativeButton("PILIH FOLDER", (d, which) -> {
+                    pendingImportTitle = title;
+                    openFolderLauncher.launch(null);
+                })
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setEnabled(selectedGame != null));
+        dialog.show();
     }
 
     private Button createDashboardButton(String label, String backgroundColor) {
@@ -609,11 +628,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     }
                 }
 
-                if (startGameBtn != null) {
-                    boolean anyInstalled = fHasOC1 || fHasOC2 || fHasMO || fHasMO2;
-                    startGameBtn.setEnabled(anyInstalled);
-                    startGameBtn.setAlpha(anyInstalled ? 1.0f : 0.5f);
-                }
             });
         }).start();
     }
