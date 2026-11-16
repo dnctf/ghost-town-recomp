@@ -74,7 +74,7 @@ Copy the `_Data` folder from your legitimate PC game installation to your device
 > 💡 **Tip:** You can also simply zip the folder on your PC, send it to your phone's **Download** folder, and tap **"⚡ Deteksi Otomatis dari Folder Download"** or **"📁 Impor .ZIP PC"** inside the app!
 
 ### 3. Inspect the imported game data
-Open **Ghost Town Recomp** and use the per-game action to inspect whether the expected data folder is present. This is a storage/format check only; it does not launch the PC game. See [Runtime Status](docs/RUNTIME_STATUS.md) for current limitations and required implementation work.
+Open **Ghost Town Recomp**, import the complete installation folder on the relevant game card, then use **Periksa Base Game** to list PE executable architectures and Unity data markers. This is a preflight check only; it does not launch the PC game. See [Runtime Status](docs/RUNTIME_STATUS.md) for current limitations and required implementation work.
 
 ---
 
