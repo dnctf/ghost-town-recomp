@@ -380,7 +380,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(importProgressBar);
 
         TextView footer = new TextView(this);
-        footer.setText("GHOST TOWN RECOMP  •  BUILD 0.2.5  •  GAME DATA MUST BE PROVIDED BY THE USER");
+        footer.setText("GHOST TOWN RECOMP  •  BUILD 0.3.0  •  EXPERIMENTAL RUNTIME / BYOG");
         footer.setTextSize(9);
         footer.setTextColor(Color.parseColor("#63748B"));
         footer.setLetterSpacing(0.08f);
@@ -480,18 +480,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         final GameStorageVerifier.VerificationResult selectedGame = installed;
         String statusMessage = selectedGame == null
-                ? "DATA NOT FOUND\nImpor data game ini terlebih dahulu."
-                : "DATA DETECTED\n" + selectedGame.message
-                    + "\n\nRuntime masih eksperimental. Deteksi file tidak menjamin game dapat berjalan.";
+                ? "DATA NOT FOUND\\nImpor data game ini terlebih dahulu."
+                : "DATA FOUND\\n" + selectedGame.message
+                    + "\\n\\nEXECUTION BLOCKED: build ini belum menyertakan Unity Player runtime atau Windows compatibility layer. Folder _Data dan metadata saja tidak dapat menjalankan game PC.\\n\\nImpor lengkap game PC (EXE, UnityPlayer.dll, folder _Data, dan runtime files) tetap diperlukan untuk tahap integrasi berikutnya.";
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(cardTitle)
                 .setMessage(statusMessage)
-                .setPositiveButton("PLAY", (d, which) -> {
-                    if (selectedGame != null) {
-                        launchGame(selectedGame);
-                    } else {
-                        Toast.makeText(this, "Impor data " + cardTitle + " terlebih dahulu.", Toast.LENGTH_LONG).show();
-                    }
+                .setPositiveButton("EXECUTION STATUS", (d, which) -> {
+                    if (selectedGame != null) showExecutionRequirements(selectedGame);
                 })
                 .setNeutralButton("IMPORT ZIP", (d, which) -> {
                     pendingImportTitle = title;
@@ -589,7 +585,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             runOnUiThread(() -> {
                 if (oc1StatusText != null) {
                     if (fHasOC1) {
-                        oc1StatusText.setText("DATA DETECTED  •  RUNTIME UNVERIFIED");
+                        oc1StatusText.setText("DATA FOUND  •  NOT EXECUTABLE");
                         oc1StatusText.setTextColor(Color.parseColor("#2EC4B6"));
                     } else {
                         oc1StatusText.setText("NOT INSTALLED  •  IMPORT DATA");
@@ -728,34 +724,22 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-    private void launchGame(GameStorageVerifier.VerificationResult game) {
-        activeGameTitle = game.gameTitle;
-        if (setupOverlayView != null) {
-            setupOverlayView.setVisibility(View.GONE);
-        }
-
-        if (game.gameTitle == GameStorageVerifier.GameTitle.MOVING_OUT || game.gameTitle == GameStorageVerifier.GameTitle.MOVING_OUT_2) {
-            Intent intent = new Intent(this, MovingOutLauncherActivity.class);
-            intent.putExtra(MovingOutLauncherActivity.EXTRA_DATA_DIR, game.dataDir.getAbsolutePath());
-            intent.putExtra(MovingOutLauncherActivity.EXTRA_GAME_TITLE, game.gameTitle.displayName);
-            startActivity(intent);
-            return;
-        }
-
-        if (!nativeLoaded) {
-            Toast.makeText(this, "Pustaka native belum siap", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        try {
-            Log.i(TAG, "Meluncurkan " + game.gameTitle.displayName + " dari: " + game.dataDir.getAbsolutePath());
-            nativeInitEngine(game.dataDir.getAbsolutePath(), game.backendType.ordinal(), game.gameTitle.id);
-            engineInitialized = true;
-            Toast.makeText(this, "Memuat " + game.gameTitle.displayName + "...", Toast.LENGTH_SHORT).show();
-        } catch (Throwable t) {
-            Log.e(TAG, "Gagal meluncurkan engine: " + t.getMessage(), t);
-            Toast.makeText(this, "Gagal memulai engine: " + t.getMessage(), Toast.LENGTH_LONG).show();
-        }
+    private void showExecutionRequirements(GameStorageVerifier.VerificationResult game) {
+        String message = "Selected: " + game.gameTitle.displayName
+                + "\\nData folder: " + game.dataDir.getAbsolutePath()
+                + "\\nDetected backend: " + game.backendType
+                + "\\n\\nCurrent status: DATA DETECTED, GAME NOT EXECUTABLE."
+                + "\\n\\nWhy Play is unavailable:"
+                + "\\n• The APK does not contain a Unity Player implementation."
+                + "\\n• Mono CIL validation is only a PE-header check; it does not host or execute managed Unity code."
+                + "\\n• IL2CPP metadata parsing is not native recompilation."
+                + "\\n• Windows PC builds need a compatible execution layer (for example, a validated Wine + Box64 path) or a genuine native port."
+                + "\\n\\nNext integration target: verify the complete PC installation, identify CPU/Unity build requirements, then integrate and test the matching runtime on ARM64 Vulkan.";
+        new AlertDialog.Builder(this)
+                .setTitle("Execution Readiness")
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
     }
 
     private void showGraphicsSettingsDialog() {
