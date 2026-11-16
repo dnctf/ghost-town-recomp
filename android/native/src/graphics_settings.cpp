@@ -42,6 +42,10 @@ void GraphicsSettingsManager::Initialize(uint32_t width, uint32_t height, float 
 }
 
 GraphicsPreset GraphicsSettingsManager::AutoDetectPreset(uint32_t adreno_series, uint32_t total_ram_mb) const {
+    // Conservative starting presets: GPU identity and RAM are read at runtime.
+    // Unknown GPUs stay LOW rather than being assigned an unverified profile.
+    // Adreno 630 covers Snapdragon 845; 640/650/660 cover later pre-8-series
+    // flagships; 7xx/8xx generations use progressively higher defaults.
     if (adreno_series >= 750 && total_ram_mb >= 12000) {
         return GraphicsPreset::ULTRA;
     }
