@@ -1,29 +1,35 @@
 # Source Engine Feasibility
 
-**Status: research only. Source Engine is not implemented in this repository.**
+**Status:** research only. No Source Engine SDK, port, or game runtime is included.
 
 ## Architectural separation
 
-Source Engine (including Half-Life 2 and Source-based mods) is a separate C++ engine codebase. It is not a Unity title and does not use Unity `*_Data` folders, Unity Mono CIL, IL2CPP metadata, or the repository's Unity asset/shader mapping as its engine runtime.
+Source Engine (including Half-Life 2 and Source-based mods) is a separate C++ engine codebase. It is not a Unity title and does not use Unity `*_Data` layouts, Mono/CIL assemblies, or IL2CPP metadata. The current Unity asset/runtime scaffolding cannot execute Source Engine games.
 
-The current Android project is built around an Android launcher, a C++20 Vulkan-facing library, Unity-oriented runtime-shim files, and Unity asset helpers. No Source SDK code, `source-sdk-2013` submodule, Source client/server targets, or Source platform abstraction was found in the audited `main` paths.
+No `source-sdk-2013` submodule, Source Engine SDK integration, Source-specific build target, or Source platform abstraction was found in the audited repository. The root `.gitmodules` file is absent.
 
-## Work a real port would require
+## Recommended project boundary
 
-A credible Source Engine Android port would need, at minimum:
+Create a separate repository/fork based on an appropriate upstream such as Source SDK 2013, after verifying the upstream's current availability, license terms, redistribution conditions, third-party notices, and compatibility with the target game/mod.
 
-- A legally usable and technically suitable Source SDK/upstream codebase and an explicit review of its license and third-party notices.
-- An ARM64 Android toolchain/build system and platform abstraction for filesystem, threads, sockets, timing, input, audio, and window/surface lifecycle.
-- A renderer path compatible with the selected Android graphics APIs (likely a dedicated Vulkan or GLES adaptation, depending on the chosen upstream branch).
-- SDL or another validated Android input/window integration where appropriate.
-- Audio, controller, touch, storage, shader/material, and asset compatibility work.
-- Separate packaging, user-supplied game data handling, and device performance testing.
-- A game/mod-specific validation matrix; compiling the engine is not proof that Half-Life 2 or a mod is playable.
+A real Android port would require:
 
-## Recommendation
+- Android ARM64 toolchain and build-system adaptation.
+- SDL or another maintained Android window/input integration.
+- Platform adaptation for filesystem, threads, timing, sockets, audio, and lifecycle.
+- Renderer port/adaptation. Vulkan support must be implemented and tested, not inferred from this launcher.
+- VPK/content mounting and user-provided game content handling.
+- Controller/touch input, save/config paths, suspend/resume, thermal and memory management.
+- Per-title/mod build and gameplay tests on physical devices.
 
-Create a separate repository/fork for Source Engine work (for example, a carefully selected Source SDK 2013-based project if its license and target game/mod compatibility permit it). Do not add Source Engine dependencies to the Unity runtime CMake target or represent a stub as a successful port.
+Compiling an engine is not proof that Half-Life 2 or a particular mod is playable.
 
-## Non-claim
+## Launcher integration
 
-This document is a feasibility assessment only. No Source Engine source, SDK, renderer, or game has been ported or tested by this change.
+After the separate project exposes a stable runtime interface, Ghost Town can register it as an external provider. The launcher should pass a validated user-selected content path and profile, then receive structured capability, launch, exit, and log events. Source Engine objects should not be linked into the Unity runtime target.
+
+## Conclusion
+
+Source Engine support is a plausible independent porting project, but not a small extension to the current Unity/Vulkan scaffolding. Keep it in a separate fork/repository and integrate it only after a real Android build and game boot test.
+
+No Source Engine compatibility or successful port is claimed by this document.
