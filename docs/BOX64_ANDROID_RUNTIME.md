@@ -1,53 +1,26 @@
-# Android runtime integration status
+# Runtime integration status: Box64, Wine, DXVK
 
-## What is being built now
+## Correct execution model
+Android app → managed Linux ARM64/glibc userspace → Box64 ARM64 Linux binary → Wine x86_64 → Windows game → DXVK → Vulkan bridge/driver.
 
-The repository now provides an on-demand GitHub Actions workflow to compile
-upstream Box64 for Android Bionic ARM64 using the Android NDK. The workflow
-records the exact upstream commit used, verifies the produced executable is
-AArch64 ELF, and publishes it as a short-lived workflow artifact for
-contributors.
+Box64 translates Linux x86_64 ELF programs; it is not a Windows loader. Wine provides Windows API compatibility. DXVK supplies D3D8/9/10/11-to-Vulkan DLLs loaded inside Wine.
 
-This is the first real runtime binary build step. It is intentionally separate
-from the normal APK workflow: a successful Box64 build does not mean the
-launcher can execute Windows games.
+## Why the original Android/Bionic build was wrong
+Upstream Box64 documents native Termux/Bionic as experimental and explicitly warns that it will not run Linux binaries. The TERMUX build is therefore not the correct Box64 artifact for an x86_64 Linux Wine build. The repository workflow now builds Box64 natively on an ARM64 Linux runner for glibc and the Snapdragon 888 profile. That artifact is intended to run inside a compatible ARM64 glibc userspace on Android, not directly as a Bionic app executable.
 
-## Why Wine is a separate milestone
+## Wine + DXVK bundle
+The separate package workflow downloads Kron4ek Wine 11.19 amd64 and DXVK 3.1.1 with pinned SHA-256 digests. Wine 11.20 is not selected because its release notes report a startup segmentation-fault regression on some systems. DXVK is packaged as DLL payload for Wine prefixes; it is not a driver.
 
-Box64 executes Linux x86-64 ELF binaries. A Windows game executable is PE,
-not ELF. Wine supplies Windows API compatibility, but x86-64 Wine itself
-requires a compatible Linux userspace and libraries. Android Bionic is not a
-drop-in glibc distribution. The project must choose and validate a supported
-runtime layout (for example, an app-managed userspace or a separately
-provisioned compatible environment) before launching Wine.
-
-Do not treat the following as equivalent:
-
-- Android ARM64 Box64 binary exists.
-- Wine can start on Android.
-- A Windows game starts.
-- A Unity game renders and is playable.
-
-Each is a separate test gate.
+The bundle is an auditable contributor artifact, not yet an APK-integrated runtime. Full Android integration still needs an app-managed ARM64 glibc rootfs, x86_64 Wine libraries, process/loader integration, display server or graphics bridge, audio, input, and lifecycle management.
 
 ## Test sequence
+1. Build Box64 with .github/workflows/build-box64-android.yml; inspect ELF, ldd, and upstream commit provenance.
+2. Run the Wine/DXVK package workflow and verify artifact provenance.
+3. Provision an ARM64 glibc userspace and verify Box64 starts there.
+4. Verify Box64 can load Wine x86_64 and initialize a Wine prefix.
+5. Run a harmless Windows PE test app before a game.
+6. Install DXVK into the prefix and verify Vulkan/D3D device creation.
+7. Test Overcooked 2 on MatePad Air: menu, gameplay, input, audio, and at least 15 minutes stability.
 
-1. Run the Box64 workflow with a pinned upstream commit SHA.
-2. Download the artifact and inspect `file`, `readelf -h`, and upstream
-   commit provenance.
-3. Install/test the binary on a supported Android test environment and capture
-   stdout/stderr and exit status.
-4. Select and build a Wine path that matches the Android/Bionic or managed
-   userspace strategy. Do not bundle random Wine builds.
-5. Start a harmless Windows PE test application before using a game.
-6. Test the imported Overcooked 2 installation only after Wine starts reliably.
-7. Verify first frame, menu, gameplay, input, audio, process lifecycle, and a
-   15-minute stability run on the MatePad Air.
-
-## Current limitations
-
-- Box64 is not yet linked into the APK or called by `WineRuntimeBridge`.
-- Wine, Linux userspace, DXVK, and VKD3D-Proton are not included.
-- No Unity Editor is required; the game installation supplies its matching
-  Unity Player files.
-- No Android game execution or physical-device compatibility is claimed.
+## No premature compatibility claims
+A successful compile or archive hash check is not a Wine startup test. A Wine startup is not a DXVK/Vulkan test. A DXVK test is not proof that Overcooked 2 is playable.
