@@ -1,7 +1,7 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "target": "android-arm64-via-glibc-userspace",
-  "status": "android-probe-adapter-integrated-runtime-provisioning-and-graphics-pending",
+  "status": "android-runtime-adapter-integrated-proot-build-pipeline-added-rootfs-and-graphics-pending",
   "components": {
     "box64": {
       "upstream": "https://github.com/ptitSeb/box64",
@@ -27,11 +27,15 @@
       "reason": "Unity Player and game assets are build-specific proprietary game files; do not redistribute"
     },
     "proot": {
-      "upstream": "https://github.com/termux/proot",
-      "status": "required Android ARM64 Bionic executable; not yet packaged or provisioned"
+      "upstream": "https://github.com/berilevi/proot-static",
+      "license": "GPL-2.0-or-later",
+      "build_workflow": ".github/workflows/build-proot-android.yml",
+      "abi": "arm64-v8a",
+      "linkage": "static Bionic",
+      "status": "Static Android ARM64 PRoot plus companion-loader build workflow added; CI artifact and device ptrace validation pending"
     },
     "rootfs": {
-      "status": "required ARM64 glibc Linux userspace with Wine x86_64 dependencies; not yet packaged or provisioned"
+      "status": "required ARM64 glibc Linux userspace with Wine x86_64 dependencies; not yet built or provisioned"
     },
     "graphics_bridge": {
       "status": "not integrated; DXVK cannot render through Android Vulkan without a compatible translation/display backend"
