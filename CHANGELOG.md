@@ -1,3 +1,5 @@
+## [0.3.2] - 2026-11-16 (tester candidate)
+
 ## Unreleased — Runtime provisioning
 
 ### Added
