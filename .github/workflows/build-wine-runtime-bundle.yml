@@ -177,9 +177,13 @@ jobs:
             exit 1
           fi
           sudo chroot "$ROOTFS" /usr/bin/apt-get clean
-          sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/doc/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/locale/"*
+          sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/locale/"*
+          sudo find "$ROOTFS/usr/share/doc" -type f ! -name copyright -delete
+          sudo find "$ROOTFS/usr/share/doc" -mindepth 1 -type d -empty -delete
           sudo dpkg-query --admindir="$ROOTFS/var/lib/dpkg" -W -f='${Package}:${Architecture}=${Version}\n' > rootfs-package-manifest.txt
-          mkdir -p rootfs-artifact/provenance
+          mkdir -p rootfs-artifact/provenance/licenses
+          cp box64-src/LICENSE rootfs-artifact/provenance/licenses/BOX64-LICENSE
+          cp runtime/licenses/WINE-LICENSE runtime/licenses/WINE-COPYING.LIB runtime/licenses/WINE-NOTICES.md runtime/licenses/DXVK-LICENSE rootfs-artifact/provenance/licenses/
           cp box64-upstream-commit.txt box64-ldd.txt wine-lddtree.txt rootfs-package-manifest.txt rootfs-artifact/provenance/
           sha256sum downloads/wine.tar.xz downloads/dxvk.tar.gz > rootfs-artifact/provenance/UPSTREAM-ARCHIVE-SHA256SUMS
           printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=3.1.1\n' "$DEBIAN_SUITE" > rootfs-artifact/provenance/ROOTFS-BUILD-INFO.txt
@@ -218,6 +222,9 @@ jobs:
           cp -a rootfs-artifact/rootfs "$OUT/rootfs"
           cp -a rootfs-artifact/provenance "$OUT/provenance"
           cp -a proot-artifact/provenance/. "$OUT/provenance/"
+          mkdir -p "$OUT/provenance/licenses"
+          cp -a rootfs-artifact/provenance/licenses/. "$OUT/provenance/licenses/"
+          cp proot-artifact/provenance/PROOT-COPYING "$OUT/provenance/licenses/PROOT-COPYING"
           cp runtime/rootfs/README.md "$OUT/README.md"
           (cd "$OUT" && sha256sum bin/proot libexec/proot/loader libexec/proot/loader32 rootfs/usr/local/bin/box64 rootfs/opt/wine/bin/wine rootfs/opt/dxvk/x64/d3d11.dll rootfs/opt/dxvk/x64/dxgi.dll > provenance/RUNTIME-SHA256SUMS)
           tar --numeric-owner --xattrs --acls -czf ghost-town-wine-runtime-arm64.tar.gz -C "$OUT" .
