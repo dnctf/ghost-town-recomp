@@ -1,5 +1,18 @@
 ## Unreleased — Runtime component groundwork
 
+## Unreleased
+
+### Added
+- Added an Android launcher Wine/Box64 runtime diagnostics panel.
+- Added a guarded, fixed-command headless Wine version probe through PRoot and Box64 when a complete runtime is provisioned.
+- Documented the required ARM64 glibc rootfs layout and remaining runtime integration gates in `runtime/ANDROID_RUNTIME_LAYOUT.md`.
+
+### Limitations
+- The APK does not yet provision PRoot, a glibc rootfs, Wine, Box64, or DXVK automatically.
+- The headless probe does not validate DXVK, Vulkan rendering, Windows game execution, audio, input, or gameplay.
+- Game launch remains disabled pending graphics/display integration and physical-device validation.
+
+
 - Corrected Box64 target from Android Bionic to Linux ARM64/glibc for use inside a managed Linux userspace; native Termux/Bionic Box64 is not suitable for executing Linux Wine binaries.
 - Added an ARM64 Linux Box64 build workflow for the Snapdragon 888 profile, with ELF and dynamic dependency reports.
 - Added a verified contributor bundle job for Kron4ek Wine 11.19 amd64 and DXVK 3.1.1, including pinned SHA-256 checks and artifact provenance.
