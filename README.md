@@ -51,7 +51,7 @@ See [Runtime Audit](RUNTIME_AUDIT.md), [Multi-Runtime Architecture](docs/MULTI_R
 
 ---
 
-## 🚧 Current Status (0.3.0-alpha)
+## 🚧 Current Status (0.3.0)
 
 ### 1. Install the experimental launcher
 Install the APK from the [Releases](https://github.com/dnctf/ghost-town-recomp/releases) page on an Android 10+ device. This release is a launcher and runtime-readiness preview, not a playable Unity runtime.
