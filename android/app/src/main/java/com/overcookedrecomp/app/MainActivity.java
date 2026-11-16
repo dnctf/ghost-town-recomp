@@ -44,6 +44,7 @@ import com.overcookedrecomp.app.compiler.movingout.MovingOutLauncherActivity;
 import com.overcookedrecomp.app.input.GamepadManager;
 import com.overcookedrecomp.app.input.VirtualGamepadOverlay;
 import java.io.File;
+import java.util.concurrent.TimeUnit;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
@@ -385,6 +386,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         installRuntimeParams.topMargin = dp(8);
         container.addView(installRuntimeBtn, installRuntimeParams);
 
+        Button diagnosticsBtn = createDashboardButton("BAGIKAN LOG DIAGNOSTIK", "#493018");
+        diagnosticsBtn.setOnClickListener(v -> shareDiagnosticReport());
+        LinearLayout.LayoutParams diagnosticsParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        diagnosticsParams.topMargin = dp(8);
+        container.addView(diagnosticsBtn, diagnosticsParams);
+
         importProgressText = new TextView(this);
         importProgressText.setText("");
         importProgressText.setTextSize(11);
@@ -401,7 +409,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(importProgressBar);
 
         TextView footer = new TextView(this);
-        footer.setText("GHOST TOWN RECOMP  •  BUILD 0.3.2  •  EXPERIMENTAL RUNTIME / BYOG");
+        footer.setText("GHOST TOWN RECOMP  •  BUILD 0.3.3  •  EXPERIMENTAL RUNTIME / BYOG");
         footer.setTextSize(9);
         footer.setTextColor(Color.parseColor("#63748B"));
         footer.setLetterSpacing(0.08f);
@@ -594,6 +602,105 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             });
         }
         builder.show();
+    }
+
+    /**
+     * Builds a shareable device report containing system details, runtime status,
+     * game-data detection, and recent logcat output filtered to this app process.
+     */
+    private void shareDiagnosticReport() {
+        Log.i(TAG, "Tester requested diagnostic report export.");
+        StringBuilder report = new StringBuilder(16000);
+        report.append("GHOST TOWN RECOMP - DEVICE TEST REPORT\\n");
+        report.append("Generated: ").append(new java.util.Date()).append("\\n\\n");
+        report.append("DEVICE\\n");
+        report.append("Manufacturer: ").append(Build.MANUFACTURER).append("\\n");
+        report.append("Model: ").append(Build.MODEL).append("\\n");
+        report.append("Device: ").append(Build.DEVICE).append("\\n");
+        report.append("OS: ").append(Build.VERSION.RELEASE).append(" (SDK ").append(Build.VERSION.SDK_INT).append(")\\n");
+        report.append("Build fingerprint: ").append(Build.FINGERPRINT).append("\\n");
+        report.append("Supported ABIs: ").append(java.util.Arrays.toString(Build.SUPPORTED_ABIS)).append("\\n");
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        report.append("Display: ").append(metrics.widthPixels).append("x").append(metrics.heightPixels)
+                .append(" @ ").append(metrics.densityDpi).append(" dpi\\n");
+        ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        if (am != null) {
+            ActivityManager.MemoryInfo memory = new ActivityManager.MemoryInfo();
+            am.getMemoryInfo(memory);
+            report.append("RAM total: ").append(memory.totalMem / (1024 * 1024)).append(" MiB\\n");
+            report.append("RAM available: ").append(memory.availMem / (1024 * 1024)).append(" MiB\\n");
+        }
+        report.append("App storage available: ").append(getFilesDir().getUsableSpace() / (1024 * 1024)).append(" MiB\\n");
+
+        report.append("\\nAPPLICATION\\n");
+        try {
+            android.content.pm.PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+            report.append("Package: ").append(getPackageName()).append("\\n");
+            report.append("Version: ").append(info.versionName).append(" (").append(info.getLongVersionCode()).append(")\\n");
+        } catch (Throwable error) {
+            report.append("Version unavailable: ").append(error.getClass().getSimpleName()).append("\\n");
+        }
+        report.append("Native library loaded: ").append(nativeLoaded).append("\\n");
+        if (nativeLoadError != null) report.append("Native load error: ").append(nativeLoadError).append("\\n");
+
+        report.append("\\nGAME DATA DETECTION\\n");
+        File externalFiles = getExternalFilesDir(null);
+        if (externalFiles == null) {
+            report.append("App external files directory unavailable.\\n");
+        } else {
+            try {
+                List<GameStorageVerifier.VerificationResult> games = GameStorageVerifier.detectInstalledGames(externalFiles);
+                if (games.isEmpty()) report.append("No supported game data detected.\\n");
+                for (GameStorageVerifier.VerificationResult game : games) {
+                    report.append("- ").append(game.gameTitle.name()).append(": detected\\n");
+                }
+            } catch (Throwable error) {
+                report.append("Game scan error: ").append(error.getClass().getSimpleName()).append(": ").append(error.getMessage()).append("\\n");
+            }
+        }
+
+        report.append("\\nWINE / BOX64 RUNTIME\\n");
+        try {
+            WineRuntimeBridge.RuntimeStatus runtime = WineRuntimeBridge.probe(this);
+            report.append("State: ").append(runtime.getState()).append("\\n");
+            report.append("Message: ").append(runtime.getMessage()).append("\\n");
+            for (String missing : runtime.getMissing()) report.append("Missing: ").append(missing).append("\\n");
+        } catch (Throwable error) {
+            report.append("Runtime probe error: ").append(error.getClass().getSimpleName()).append(": ").append(error.getMessage()).append("\\n");
+        }
+
+        report.append("\\nAPP LOGCAT (last 1200 lines, this app process only)\\n");
+        report.append(collectAppLogcat());
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Ghost Town Recomp - Device Test Report");
+        shareIntent.putExtra(Intent.EXTRA_TEXT, report.toString());
+        try {
+            startActivity(Intent.createChooser(shareIntent, "Bagikan laporan diagnostik"));
+        } catch (Throwable error) {
+            Toast.makeText(this, "Tidak dapat membuka menu berbagi: " + error.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private String collectAppLogcat() {
+        File output = new File(getCacheDir(), "device-diagnostic-logcat.txt");
+        try {
+            Process process = new ProcessBuilder("logcat", "-d", "-v", "threadtime",
+                    "--pid=" + android.os.Process.myPid(), "-t", "1200")
+                    .redirectErrorStream(true).redirectOutput(output).start();
+            if (!process.waitFor(8, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return "logcat collection timed out after 8 seconds.\\n";
+            }
+            String content = output.isFile()
+                    ? java.nio.file.Files.readString(output.toPath(), java.nio.charset.StandardCharsets.UTF_8) : "";
+            if (content.length() > 60000) content = content.substring(content.length() - 60000);
+            return "logcat exit code: " + process.exitValue() + "\\n"
+                    + (content.isEmpty() ? "(No app logcat output captured.)\\n" : content);
+        } catch (Throwable error) {
+            return "Unable to collect app logcat: " + error.getClass().getSimpleName()
+                    + ": " + error.getMessage() + "\\n";
+        }
     }
 
     private Button createDashboardButton(String label, String backgroundColor) {

@@ -2,7 +2,7 @@
 
 This is an experimental Android ARM64 launcher and Windows-game runtime research project. APK compilation, runtime installation, Wine startup, DXVK initialization, and playable gameplay are separate validation gates.
 
-## What build 0.3.2 contains
+## What build 0.3.3 contains
 
 - Android launcher, game-library UI, storage importer, touch/gamepad input scaffolding, and native C++/Vulkan scaffolding.
 - Unity Windows installation inspection for PE architecture, adjacent UnityPlayer.dll, matching `*_Data`, and Mono/IL2CPP metadata hints.
@@ -14,7 +14,7 @@ The APK does not embed the large Wine runtime bundle, Unity Player, or proprieta
 
 ## Obtain the Android APK
 
-Open the GitHub **Releases** page and select **Ghost Town Recomp 0.3.2 - Contributor Tester Candidate** (`v0.3.2`). Download `app-debug.apk` for debugging or `app-release.apk` for release-mode smoke tests. If the release is not published yet, use the successful **Ghost Town Recomp Android Build and Tester Release** workflow on `main` and download artifact `ghost-town-recomp-0.3.2-arm64`:
+Open the GitHub **Releases** page and select **Ghost Town Recomp 0.3.3 - Contributor Tester Candidate** (`v0.3.3`). Download `app-debug.apk` for debugging or `app-release.apk` for release-mode smoke tests. If the release is not published yet, use the successful **Ghost Town Recomp Android Build and Tester Release** workflow on `main` and download artifact `ghost-town-recomp-0.3.3-arm64`:
 - `app-debug.apk` for debugging
 - `app-release.apk` for release-mode smoke tests
 
@@ -22,7 +22,7 @@ The current release APK is CI/debug-signed and is a tester build, not a producti
 
 ## Install the optional Wine runtime bundle
 
-1. Open the GitHub **Releases** page and select release `v0.3.2`.
+1. Open the GitHub **Releases** page and select release `v0.3.3`.
 2. Download both `ghost-town-wine-runtime-arm64.tar.gz` and `ghost-town-wine-runtime-arm64.tar.gz.sha256` from the release assets. The SHA-256 file is provided for independent integrity verification.
 3. If the runtime assets have not appeared yet, wait for **Build Complete ARM64 Wine Runtime Bundle** to finish successfully; the workflow attaches them to the same release automatically.
 4. Keep enough free internal storage for the expanded rootfs plus temporary staging space. The installer creates a new staging directory before replacing an existing runtime.
@@ -81,6 +81,19 @@ tools/android_device_smoke_test.sh android/app/build/outputs/apk/debug/app-debug
 ```
 
 This installs and launches the APK and captures startup logcat. It does not run a Windows game.
+
+## Export a device test report from the app
+
+Open the dashboard and tap **BAGIKAN LOG DIAGNOSTIK**. The Android share sheet will contain device/OS/ABI/display/RAM/storage details, app version, native-library status, game-data detection, Wine/Box64 runtime status, and recent logcat lines filtered to the app process. Choose ChatGPT in the share sheet if available, or copy the report text and paste it into this conversation. Review the report before sharing; it may include technical paths or error messages.
+
+If the app cannot open, collect logs from a computer with ADB instead:
+
+```sh
+adb logcat -c
+adb shell monkey -p com.overcookedrecomp.app 1
+# Reproduce the issue, then:
+adb logcat -d -v threadtime > ghost-town-device-logcat.txt
+```
 
 ## Device test report
 

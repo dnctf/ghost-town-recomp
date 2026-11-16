@@ -1,3 +1,17 @@
+## [0.3.3] - 2026-11-16 (tester candidate)
+
+### Fixed
+- Changed the runtime workflow to upload the privileged Debian rootfs as a checksummed tar archive, avoiding upload-artifact directory traversal failures on restricted paths such as `/lib/ssl/private`.
+- Verify the rootfs component archive checksum before extracting it for final runtime assembly.
+- Align Android and runtime assets with the `v0.3.3` tester release.
+
+### Added
+- Added a dashboard **BAGIKAN LOG DIAGNOSTIK** action that shares device/build/runtime information and recent app-process logcat as plain text.
+- Updated physical-device tester instructions with in-app report export and an ADB fallback.
+
+### Validation boundary
+- APK and runtime CI success do not prove PRoot, Wine, DXVK/Vulkan, display, audio, input, or game execution on a physical MatePad. These remain separate device-test gates.
+
 ## [0.3.2] - 2026-11-16 (tester candidate)
 
 ## Unreleased — Runtime provisioning
