@@ -33,3 +33,10 @@ Debian packages are fetched from the selected Debian suite at build time; the ex
 ## Important compatibility boundary
 
 This runtime is a foundation, not a playable Windows emulator. A successful artifact build is not proof of PRoot ptrace compatibility on HarmonyOS or of Wine/Box64 execution on the MatePad Air. Do not enable game launch until the headless probe, a harmless PE test, DXVK/Vulkan initialization, input/audio, and gameplay tests pass on device.
+
+
+## App installation
+
+Use the dashboard action **INSTALL WINE RUNTIME BUNDLE (.TAR.GZ)** and select the workflow's `ghost-town-wine-runtime-arm64.tar.gz` artifact after downloading it. The installer extracts into app-private storage and validates the required runtime files before activation. Keep at least the archive's expanded size plus temporary staging space free; installation stages a second copy before replacing an existing runtime.
+
+The installer does not make the runtime executable on a particular Android kernel/GPU. Run the headless Wine version probe after import and record its log and exit code.
