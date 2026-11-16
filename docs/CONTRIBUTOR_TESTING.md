@@ -21,7 +21,7 @@ Game/
 ```
 The exact layout varies by Unity version and title. Do not upload game files, keys, saves, or copyrighted assets to this public repository.
 
-## Static installation probe (Linux/macOS/Windows with Python 3)
+## Import the complete folder into the Android app\nIn the game card, choose **PILIH FOLDER INSTALASI PC** and select the top-level folder containing the EXE, UnityPlayer.dll, and the matching *_Data directory. The app stores the imported contents under its private `<GAME_TITLE>_PC` directory so the EXE and UnityPlayer.dll remain alongside the data folder. Importing only *_Data can verify data but cannot qualify as a complete PC installation.\n\n## Static installation probe (Linux/macOS/Windows with Python 3)
 ```sh
 python3 tools/game_installation_probe.py /path/to/Game --json game-report.json
 python3 -m unittest discover -s tools/tests -v
@@ -36,7 +36,7 @@ python3 tools/game_installation_probe.py /path/to/Game \
 ```
 The runner prefix is passed as an argument array (no shell expansion). This is a host-side diagnostic, not an Android launch integration. A process exit code alone does not prove playable rendering. Record logs, renderer, first rendered scene, input, audio, and a 15-minute stability test separately.
 
-## Android tester checklist
+## Android launcher smoke test\nWith USB debugging enabled and the device authorized by ADB:\n\n```sh\ntools/android_device_smoke_test.sh android/app/build/outputs/apk/debug/app-debug.apk\n```\n\nThis installs and launches the APK and captures startup logcat. It does not run a Windows game.\n\n## Android tester checklist
 1. Install the debug APK on the target device; record model, Android/HarmonyOS version, ABI, GPU and driver.
 2. Import the complete PC installation into app-private storage only if the app's importer supports the required size and folder structure. Do not import only `*_Data` and label it runnable.
 3. Capture `adb logcat -c`, launch the app, reproduce the test, then capture `adb logcat -d -v threadtime`.
