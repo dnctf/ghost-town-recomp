@@ -14,7 +14,7 @@ on:
         required: true
         default: bookworm
         type: choice
-        options: [bookworm, trixie]
+        options: [bookworm]
       box64_ref:
         description: Box64 upstream ref
         required: true
@@ -47,7 +47,7 @@ jobs:
       - name: Install host build tools and Android NDK
         run: |
           sudo apt-get update
-          sudo apt-get install -y debootstrap schroot qemu-user-static             git cmake ninja-build build-essential file binutils             libcapstone-dev curl xz-utils tar zstd python3
+          sudo apt-get install -y debootstrap schroot qemu-user-static             git cmake ninja-build build-essential file binutils             libcapstone-dev curl xz-utils tar zstd python3 pax-utils
           echo "ANDROID_HOME=$HOME/Android/Sdk" >> "$GITHUB_ENV"
 
       - name: Set up Android NDK
@@ -161,16 +161,16 @@ jobs:
           printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=3.1.1\nproot_abi=arm64-v8a\n' "$DEBIAN_SUITE" > "$OUT/provenance/BUILD-INFO.txt"
           cp runtime/rootfs/README.md "$OUT/README.md"
           (cd "$OUT" && sha256sum bin/proot libexec/proot/loader libexec/proot/loader32 rootfs/usr/local/bin/box64 > provenance/SHA256SUMS)
-          tar --numeric-owner --xattrs --acls -I 'zstd -T0 -10' -cf ghost-town-wine-runtime-arm64.tar.zst -C "$OUT" .
-          sha256sum ghost-town-wine-runtime-arm64.tar.zst > ghost-town-wine-runtime-arm64.tar.zst.sha256
-          du -h ghost-town-wine-runtime-arm64.tar.zst
+          tar --numeric-owner --xattrs --acls -czf ghost-town-wine-runtime-arm64.tar.gz -C "$OUT" .
+          sha256sum ghost-town-wine-runtime-arm64.tar.gz > ghost-town-wine-runtime-arm64.tar.gz.sha256
+          du -h ghost-town-wine-runtime-arm64.tar.gz
 
       - name: Upload complete runtime bundle
         uses: actions/upload-artifact@v4
         with:
           name: ghost-town-wine-runtime-arm64-debian-${{ env.DEBIAN_SUITE }}
           path: |
-            ghost-town-wine-runtime-arm64.tar.zst
-            ghost-town-wine-runtime-arm64.tar.zst.sha256
+            ghost-town-wine-runtime-arm64.tar.gz
+            ghost-town-wine-runtime-arm64.tar.gz.sha256
           if-no-files-found: error
           retention-days: 30
