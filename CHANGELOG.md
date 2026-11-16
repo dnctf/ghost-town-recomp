@@ -1,3 +1,11 @@
+## Unreleased — Runtime component groundwork
+
+- Corrected Box64 target from Android Bionic to Linux ARM64/glibc for use inside a managed Linux userspace; native Termux/Bionic Box64 is not suitable for executing Linux Wine binaries.
+- Added an ARM64 Linux Box64 build workflow for the Snapdragon 888 profile, with ELF and dynamic dependency reports.
+- Added a verified contributor bundle job for Kron4ek Wine 11.19 amd64 and DXVK 3.1.1, including pinned SHA-256 checks and artifact provenance.
+- Added a DXVK Wine-prefix installer helper and runtime architecture documentation.
+- Wine/Box64/DXVK are not yet integrated into the APK; Android glibc userspace, process bridge, Vulkan presentation, audio/input, and physical-device execution tests remain outstanding.
+
 # Changelog
 
 ## [0.3.1] - 2026-11-16
