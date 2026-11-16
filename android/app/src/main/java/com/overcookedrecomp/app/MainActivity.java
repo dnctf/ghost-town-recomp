@@ -512,9 +512,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     private void showWineRuntimeStatus() {
         WineRuntimeBridge.RuntimeStatus status = WineRuntimeBridge.probe(this);
-        StringBuilder message = new StringBuilder(status.message);
-        message.append("\\n\\nRuntime path: ").append(status.runtimeRoot);
-        if (!status.missing.isEmpty()) {
+        StringBuilder message = new StringBuilder(status.getMessage());
+        message.append("\\n\\nRuntime path: ").append(status.getRuntimeRoot());
+        if (!status.getMissing().isEmpty()) {
             message.append("\\n\\nKomponen yang belum tersedia:");
             for (String item : status.missing) message.append("\\n• ").append(item);
         }
@@ -523,15 +523,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 .setTitle("WINE / BOX64 RUNTIME")
                 .setMessage(message.toString())
                 .setPositiveButton("TUTUP", null);
-        if (status.state == WineRuntimeBridge.State.READY_FOR_HEADLESS_PROBE) {
+        if (status.getState() == WineRuntimeBridge.State.READY_FOR_HEADLESS_PROBE) {
             builder.setNeutralButton("TEST WINE VERSION", (dialog, which) -> {
                 Toast.makeText(this, "Menjalankan probe Wine...", Toast.LENGTH_SHORT).show();
                 new Thread(() -> {
                     WineRuntimeBridge.ProbeResult result = WineRuntimeBridge.runWineVersionProbe(this);
                     runOnUiThread(() -> new AlertDialog.Builder(this)
-                            .setTitle(result.success ? "WINE PROBE BERHASIL" : "WINE PROBE GAGAL")
-                            .setMessage((result.output.isEmpty() ? "Tidak ada output." : result.output)
-                                    + (result.exitCode == null ? "" : "\\nExit code: " + result.exitCode))
+                            .setTitle(result.getSuccess() ? "WINE PROBE BERHASIL" : "WINE PROBE GAGAL")
+                            .setMessage((result.getOutput().isEmpty() ? "Tidak ada output." : result.output)
+                                    + (result.getExitCode() == null ? "" : "\\nExit code: " + result.exitCode))
                             .setPositiveButton("OK", null)
                             .show());
                 }).start();
