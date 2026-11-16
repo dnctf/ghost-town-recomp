@@ -7,9 +7,9 @@
 [![License](https://img.shields.io/badge/License-GPLv3-yellow.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/dnctf/ghost-town-recomp/pulls)
 
-> **Play your favorite PC co-op games natively on Android with blazing-fast Vulkan performance!**
+> **An experimental Android launcher and native runtime research project for selected PC co-op games.**
 
-**Ghost Town Recomp** is an open-source launcher, runtime shim, and asset recompilation pipeline that lets you run PC installations of classic co-op games on Android devices (Snapdragon, Dimensity, and more).
+**Ghost Town Recomp** is an open-source Android launcher and experimental Unity-oriented native runtime/recompilation prototype. The current repository includes file inspection, metadata helpers, Vulkan integration points, and title-specific scaffolding; it does not yet establish that the listed PC games are playable.
 
 > [!NOTE]
 > **100% Legal & Clean-Room (Bring Your Own Game / BYOG):**
@@ -17,20 +17,24 @@
 
 ---
 
-## 🕹️ Supported Games
+## Runtime Support Matrix
 
-| Game | Status | Required PC Folder | Features |
-| :--- | :---: | :--- | :--- |
-| **Overcooked!** | ✅ Working | `Overcooked_Data` | Unity 5 Mono CIL pipeline, classic kitchen chaos |
-| **Overcooked! 2** | ✅ Working | `Overcooked2_Data` | Recipe sync, ingredient throwing (**Throw** mechanic) |
-| **Moving Out** | ✅ Working | `MovingOut_Data` | Physics joints, sofa tossing, delivery truck bridge |
-| **Moving Out 2** | 🚀 Added | `MovingOut2_Data` | Multiverse delivery, arcade physics & joint simulation |
+| Game / Engine | Runtime Path | Status |
+| :--- | :--- | :--- |
+| Overcooked! | Unity Mono/CIL shim + Vulkan-facing native layer | 🧪 Prototype scaffolding; gameplay not verified |
+| Overcooked! 2 | Unity runtime/asset path + Vulkan-facing native layer | 🧪 Prototype scaffolding; gameplay not verified |
+| Moving Out | Title-specific launcher/compiler scaffolding | 🧪 Prototype; gameplay not verified |
+| Moving Out 2 | Title-specific launcher/compiler scaffolding | 🧪 Prototype; gameplay not verified |
+| Wine / Box64 (.exe) | Separate external compatibility runtime | 📄 Evaluation only; not integrated |
+| Source Engine (HL2 / mods) | Separate SDK-based fork/port | 📄 Feasibility research only |
+
+See [Runtime Audit](RUNTIME_AUDIT.md), [Wine/Box64 Evaluation](docs/WINE_BOX64_EVALUATION.md), and [Source Engine Feasibility](docs/SOURCE_ENGINE_FEASIBILITY.md) for evidence and limitations.
 
 ---
 
 ## ✨ Features
 
-- ⚡ **Pure C++20 & Vulkan 1.0 Pipeline**: Direct-to-Vulkan rendering pass with zero translation overhead and Snapdragon Adreno TBDR optimizations.
+- ⚡ **C++20 & Vulkan 1.0 integration point**: Android native rendering and device capability groundwork; this is not yet a complete Unity renderer.
 - 🎮 **Native Controller Support (Plug & Play)**:
   - **Sony DualShock 4 & DualSense (PS4 / PS5)**: Native button glyphs (✕, ◯, ▢, △), analog triggers, and touchpad support.
   - **Xbox Wireless & Elite Controllers**: Auto-detected profiles, standard A/B/X/Y mappings, and LT/RT analog thresholds.
