@@ -1,6 +1,6 @@
 # Complete Android Wine runtime bundle
 
-This workflow creates a single app-private runtime payload for the experimental Android launcher.
+This workflow creates a single app-private runtime payload for the experimental Android launcher. The build is split across an x86_64 host for Android NDK/PRoot and a native ARM64 host for the Debian rootfs/Box64 build, then merged in a final packaging job.
 
 ## Target layout after extraction
 
