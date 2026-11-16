@@ -25,7 +25,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -180,6 +180,10 @@ jobs:
           sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/locale/"*
           sudo find "$ROOTFS/usr/share/doc" -type f ! -name copyright -delete
           sudo find "$ROOTFS/usr/share/doc" -mindepth 1 -type d -empty -delete
+          # upload-artifact runs as the unprivileged runner user; make rootfs traversable
+          # without changing executable bits or following symlinks.
+          sudo find "$ROOTFS" -type d -exec chmod 0755 {} +
+          sudo find "$ROOTFS" -type f -exec chmod a+r {} +
           sudo dpkg-query --admindir="$ROOTFS/var/lib/dpkg" -W -f='${Package}:${Architecture}=${Version}\n' > rootfs-package-manifest.txt
           mkdir -p rootfs-artifact/provenance/licenses
           cp box64-src/LICENSE rootfs-artifact/provenance/licenses/BOX64-LICENSE
@@ -239,3 +243,19 @@ jobs:
             ghost-town-wine-runtime-arm64.tar.gz.sha256
           if-no-files-found: error
           retention-days: 30
+      - name: Attach runtime bundle to v0.3.2 tester release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.3.2
+          target_commitish: main
+          name: Ghost Town Recomp 0.3.2 - Contributor Tester Candidate
+          prerelease: true
+          body: |
+            Android ARM64 tester build plus separately downloadable Debian Bookworm / Box64 / Wine 11.19 / DXVK 3.1.1 runtime bundle.
+            Install the APK first, then import ghost-town-wine-runtime-arm64.tar.gz from the app's runtime installer.
+            See docs/CONTRIBUTOR_TESTING.md for installation and validation steps.
+            This is a headless runtime probe candidate; Windows Unity gameplay, display/Vulkan presentation, audio and input are not yet verified.
+          files: |
+            ghost-town-wine-runtime-arm64.tar.gz
+            ghost-town-wine-runtime-arm64.tar.gz.sha256
+          fail_on_unmatched_files: true
