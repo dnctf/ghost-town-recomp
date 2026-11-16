@@ -1,6 +1,12 @@
 name: Package Wine and DXVK runtime components
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/package-wine-dxvk.yml'
+      - 'docs/runtime-bundle-README.md'
+      - 'docs/BOX64_ANDROID_RUNTIME.md'
   workflow_dispatch:
     inputs:
       wine_version:
@@ -27,8 +33,8 @@ jobs:
 
       - name: Fetch pinned Wine and DXVK releases
         env:
-          WINE_VERSION: ${{ inputs.wine_version }}
-          DXVK_VERSION: ${{ inputs.dxvk_version }}
+          WINE_VERSION: ${{ inputs.wine_version || '11.19' }}
+          DXVK_VERSION: ${{ inputs.dxvk_version || '3.1.1' }}
         run: |
           set -euo pipefail
           mkdir -p downloads bundle/wine bundle/dxvk
@@ -41,8 +47,8 @@ jobs:
 
       - name: Verify release asset SHA-256
         env:
-          WINE_VERSION: ${{ inputs.wine_version }}
-          DXVK_VERSION: ${{ inputs.dxvk_version }}
+          WINE_VERSION: ${{ inputs.wine_version || '11.19' }}
+          DXVK_VERSION: ${{ inputs.dxvk_version || '3.1.1' }}
         run: |
           set -euo pipefail
           WINE_FILE="downloads/wine-${WINE_VERSION}-amd64.tar.xz"
