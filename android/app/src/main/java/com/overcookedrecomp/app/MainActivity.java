@@ -419,7 +419,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         btnRow.addView(zipBtn);
 
         Button folderBtn = new Button(this);
-        folderBtn.setText("📂 Pilih Folder");
+        folderBtn.setText("📂 Folder Instalasi PC");
         folderBtn.setTextSize(12);
         folderBtn.setTextColor(Color.WHITE);
         folderBtn.setBackground(createButtonDrawable("#011627"));
@@ -433,7 +433,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         card.addView(btnRow);
 
         Button runtimeBtn = new Button(this);
-        runtimeBtn.setText("▶ Periksa & Pilih Game");
+        runtimeBtn.setText("▶ Periksa Base Game");
         runtimeBtn.setTextSize(13);
         runtimeBtn.setTextColor(Color.WHITE);
         runtimeBtn.setBackground(createButtonDrawable("#245B86"));
