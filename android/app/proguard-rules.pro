@@ -9,3 +9,4 @@
 }
 
 -keep class com.overcookedrecomp.app.GameStorageVerifier$** { *; }
+-keep class com.overcookedrecomp.app.GameFileImporter$** { *; }

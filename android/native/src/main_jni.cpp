@@ -97,9 +97,10 @@ void NativeEngine::RenderLoop() {
 
         // Hindari floating point overflow setelah running lama
         phase = std::fmod(phase + 0.02f, kTwoPi);
-        float r = 0.15f + 0.05f * std::sin(phase);
-        float g = 0.25f + 0.05f * std::cos(phase);
-        float b = 0.35f;
+        // Warna tema Overcooked (oranye hangat / gold dapur) agar tidak black screen saat standby
+        float r = 0.88f + 0.08f * std::sin(phase);
+        float g = 0.42f + 0.08f * std::cos(phase);
+        float b = 0.15f;
 
         // Hitung skala resolusi render aktif
         float active_scale = std::clamp(budget.resolution_scale * gfx_cfg.custom_resolution_scale, 0.4f, 1.25f);

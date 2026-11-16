@@ -10,13 +10,14 @@
 namespace overcooked {
 
 bool VulkanContext::Initialize(ANativeWindow* window) {
-    if (!CreateInstance()) return false;
-    if (!CreateAndroidSurface(window)) return false;
-    if (!SelectPhysicalDevice()) return false;
-    if (!CreateLogicalDevice()) return false;
-    if (!CreateSwapchain(window)) return false;
-    if (!CreateTBDRRenderPass()) return false;
-    if (!CreateFramebuffersAndSync()) return false;
+    if (!CreateInstance()) { LOGE("Vulkan: CreateInstance gagal"); return false; }
+    if (!CreateAndroidSurface(window)) { LOGE("Vulkan: CreateAndroidSurface gagal"); return false; }
+    if (!SelectPhysicalDevice()) { LOGE("Vulkan: SelectPhysicalDevice gagal"); return false; }
+    if (!CreateLogicalDevice()) { LOGE("Vulkan: CreateLogicalDevice gagal"); return false; }
+    if (!CreateSwapchain(window)) { LOGE("Vulkan: CreateSwapchain gagal"); return false; }
+    if (!CreateTBDRRenderPass()) { LOGE("Vulkan: CreateTBDRRenderPass gagal"); return false; }
+    if (!CreateFramebuffersAndSync()) { LOGE("Vulkan: CreateFramebuffersAndSync gagal"); return false; }
+    LOGI("VulkanContext berhasil diinisialisasi sepenuhnya!");
     return true;
 }
 
@@ -130,15 +131,48 @@ bool VulkanContext::CreateSwapchain(ANativeWindow* window) {
     VkSurfaceCapabilitiesKHR caps{};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device_, surface_, &caps);
 
-    swapchain_extent_ = caps.currentExtent;
-    if (swapchain_extent_.width == UINT32_MAX) {
-        swapchain_extent_.width = static_cast<uint32_t>(ANativeWindow_getWidth(window));
-        swapchain_extent_.height = static_cast<uint32_t>(ANativeWindow_getHeight(window));
+    // Kueri format warna yang didukung oleh layar HP
+    uint32_t format_count = 0;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device_, surface_, &format_count, nullptr);
+    if (format_count > 0) {
+        std::vector<VkSurfaceFormatKHR> formats(format_count);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device_, surface_, &format_count, formats.data());
+        swapchain_format_ = formats[0].format;
+        for (const auto& f : formats) {
+            if (f.format == VK_FORMAT_R8G8B8A8_UNORM || f.format == VK_FORMAT_B8G8R8A8_UNORM) {
+                swapchain_format_ = f.format;
+                break;
+            }
+        }
     }
 
-    // Triple buffering mencegah black frames dan stall pada Adreno 735/750
-    uint32_t img_count = std::clamp(3u, caps.minImageCount,
-                                    caps.maxImageCount > 0 ? caps.maxImageCount : 3u);
+    if (caps.currentExtent.width != UINT32_MAX) {
+        swapchain_extent_ = caps.currentExtent;
+    } else {
+        uint32_t w = static_cast<uint32_t>(ANativeWindow_getWidth(window));
+        uint32_t h = static_cast<uint32_t>(ANativeWindow_getHeight(window));
+        swapchain_extent_.width = std::clamp(w, caps.minImageExtent.width, caps.maxImageExtent.width);
+        swapchain_extent_.height = std::clamp(h, caps.minImageExtent.height, caps.maxImageExtent.height);
+    }
+
+    // Triple buffering mencegah black frames dan stall pada Adreno
+    uint32_t max_count = caps.maxImageCount > 0 ? caps.maxImageCount : 3u;
+    uint32_t img_count = std::clamp(3u, caps.minImageCount, max_count);
+
+    // Composite alpha yang kompatibel dengan Android OS (OPAQUE adalah standar Android)
+    VkCompositeAlphaFlagBitsKHR composite_alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    if (!(caps.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)) {
+        if (caps.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR) {
+            composite_alpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+        } else if (caps.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR) {
+            composite_alpha = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
+        }
+    }
+
+    VkSurfaceTransformFlagBitsKHR pre_transform = caps.currentTransform;
+    if (caps.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) {
+        pre_transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    }
 
     VkSwapchainCreateInfoKHR sc_info{};
     sc_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -150,12 +184,16 @@ bool VulkanContext::CreateSwapchain(ANativeWindow* window) {
     sc_info.imageArrayLayers = 1;
     sc_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     sc_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    sc_info.preTransform = caps.currentTransform;
-    sc_info.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+    sc_info.preTransform = pre_transform;
+    sc_info.compositeAlpha = composite_alpha;
     sc_info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
     sc_info.clipped = VK_TRUE;
 
-    if (vkCreateSwapchainKHR(device_, &sc_info, nullptr, &swapchain_) != VK_SUCCESS) return false;
+    VkResult res = vkCreateSwapchainKHR(device_, &sc_info, nullptr, &swapchain_);
+    if (res != VK_SUCCESS) {
+        LOGE("vkCreateSwapchainKHR gagal dengan error code: %d", res);
+        return false;
+    }
 
     uint32_t actual_count = 0;
     vkGetSwapchainImagesKHR(device_, swapchain_, &actual_count, nullptr);

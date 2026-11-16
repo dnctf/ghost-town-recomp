@@ -121,6 +121,23 @@ public final class GameStorageVerifier {
         File level0 = new File(dataDir, "level0");
 
         if (!globalGameManagers.exists() && !dataUnity3d.exists() && !level0.exists()) {
+            // Cek apakah berkas berada di dalam subdirektori (misal: ekstraksi ZIP membuat folder pembungkus)
+            File sub1 = new File(dataDir, "Overcooked_Data");
+            if (sub1.exists() && sub1.isDirectory()) {
+                return verifyDataDir(sub1, GameTitle.OVERCOOKED_1);
+            }
+            File sub2 = new File(dataDir, "Overcooked2_Data");
+            if (sub2.exists() && sub2.isDirectory()) {
+                return verifyDataDir(sub2, GameTitle.OVERCOOKED_2);
+            }
+            File[] subs = dataDir.listFiles(File::isDirectory);
+            if (subs != null) {
+                for (File s : subs) {
+                    if (new File(s, "globalgamemanagers").exists() || new File(s, "data.unity3d").exists() || new File(s, "level0").exists()) {
+                        return verifyDataDir(s, s.getName().toLowerCase().contains("2") ? GameTitle.OVERCOOKED_2 : hint);
+                    }
+                }
+            }
             return new VerificationResult(false, resolvedTitle, RuntimeBackendType.UNKNOWN,
                     "Berkas inti Unity (globalgamemanagers/data.unity3d) tidak ditemukan di " + dataDir.getName(), "", dataDir);
         }

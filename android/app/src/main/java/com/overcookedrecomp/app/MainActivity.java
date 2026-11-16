@@ -2,20 +2,35 @@ package com.overcookedrecomp.app;
 
 import android.app.ActivityManager;
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
+import android.view.Gravity;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import android.widget.Toast;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -34,8 +49,28 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private SurfaceView gameSurfaceView;
+    private FrameLayout rootLayout;
+    private View setupOverlayView;
+    private TextView oc1StatusText;
+    private TextView oc2StatusText;
+    private TextView importProgressText;
+    private ProgressBar importProgressBar;
+    private Button startGameBtn;
+
     private boolean engineInitialized = false;
     private GameStorageVerifier.GameTitle activeGameTitle = GameStorageVerifier.GameTitle.UNKNOWN;
+    private GameStorageVerifier.GameTitle pendingImportTitle = GameStorageVerifier.GameTitle.OVERCOOKED_1;
+
+    // File pickers untuk ZIP dan Folder
+    private final ActivityResultLauncher<String[]> openZipLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
+                if (uri != null) handleImportZipUri(uri);
+            });
+
+    private final ActivityResultLauncher<Uri> openFolderLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocumentTree(), uri -> {
+                if (uri != null) handleImportFolderUri(uri);
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,59 +80,465 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         // Deteksi spesifikasi layar ponsel (resolusi, dpi, refresh rate) dan RAM
         detectAndApplyDeviceDisplaySettings();
 
-        gameSurfaceView = new SurfaceView(this);
-        gameSurfaceView.getHolder().addCallback(this);
-        setContentView(gameSurfaceView);
+        // Buat root view dengan SurfaceView di belakang dan Overlay UI di depan
+        rootLayout = new FrameLayout(this);
+        rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
+        gameSurfaceView = new SurfaceView(this);
+        gameSurfaceView.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        gameSurfaceView.getHolder().addCallback(this);
+        rootLayout.addView(gameSurfaceView);
+
+        // Buat UI Importer & Setup
+        setupOverlayView = createSetupOverlay();
+        rootLayout.addView(setupOverlayView);
+
+        // Tombol Mengambang (Floating Action Button) untuk Buka Menu & Pengaturan
+        Button menuBtn = createFloatingMenuButton();
+        rootLayout.addView(menuBtn);
+
+        setContentView(rootLayout);
+
+        // Refresh status game yang terpasang
+        refreshInstalledGamesStatus();
+    }
+
+    private View createSetupOverlay() {
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        scrollView.setBackgroundColor(Color.parseColor("#E6121418")); // Semi-transparent dark
+        scrollView.setFillViewport(true);
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(48, 36, 48, 48);
+        container.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        // Header Title
+        TextView titleView = new TextView(this);
+        titleView.setText("🍳 Overcooked Recomp (Android)");
+        titleView.setTextSize(24);
+        titleView.setTextColor(Color.parseColor("#FF9F1C"));
+        titleView.setTypeface(null, Typeface.BOLD);
+        titleView.setGravity(Gravity.CENTER);
+        container.addView(titleView);
+
+        TextView subTitle = new TextView(this);
+        subTitle.setText("Jalankan game PC Overcooked 1 & 2 langsung di Android Snapdragon");
+        subTitle.setTextSize(13);
+        subTitle.setTextColor(Color.parseColor("#CCCCCC"));
+        subTitle.setGravity(Gravity.CENTER);
+        subTitle.setPadding(0, 8, 0, 24);
+        container.addView(subTitle);
+
+        // Kartu Overcooked 1
+        container.addView(createGameCard(
+                GameStorageVerifier.GameTitle.OVERCOOKED_1,
+                "Overcooked 1 (PC)",
+                "Salin/impor folder 'Overcooked_Data' dari PC",
+                text -> oc1StatusText = text
+        ));
+
+        View spacer1 = new View(this);
+        spacer1.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 20));
+        container.addView(spacer1);
+
+        // Kartu Overcooked 2
+        container.addView(createGameCard(
+                GameStorageVerifier.GameTitle.OVERCOOKED_2,
+                "Overcooked 2 (PC)",
+                "Salin/impor folder 'Overcooked2_Data' dari PC (Mendukung lempar bahan/Throw)",
+                text -> oc2StatusText = text
+        ));
+
+        // Tombol Auto-Scan dari folder Download
+        Button autoScanBtn = new Button(this);
+        autoScanBtn.setText("⚡ Deteksi Otomatis dari Folder Download");
+        autoScanBtn.setTextSize(14);
+        autoScanBtn.setTextColor(Color.WHITE);
+        autoScanBtn.setBackground(createButtonDrawable("#2EC4B6"));
+        LinearLayout.LayoutParams scanParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        scanParams.setMargins(0, 24, 0, 16);
+        autoScanBtn.setLayoutParams(scanParams);
+        autoScanBtn.setOnClickListener(v -> scanDownloadFolder());
+        container.addView(autoScanBtn);
+
+        // Progress Impor
+        importProgressText = new TextView(this);
+        importProgressText.setText("");
+        importProgressText.setTextSize(12);
+        importProgressText.setTextColor(Color.parseColor("#E71D36"));
+        importProgressText.setGravity(Gravity.CENTER);
+        importProgressText.setVisibility(View.GONE);
+        container.addView(importProgressText);
+
+        importProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        importProgressBar.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        importProgressBar.setIndeterminate(true);
+        importProgressBar.setVisibility(View.GONE);
+        container.addView(importProgressBar);
+
+        // Tombol Mulai Permainan
+        startGameBtn = new Button(this);
+        startGameBtn.setText("🎮 Mulai Permainan");
+        startGameBtn.setTextSize(16);
+        startGameBtn.setTypeface(null, Typeface.BOLD);
+        startGameBtn.setTextColor(Color.WHITE);
+        startGameBtn.setBackground(createButtonDrawable("#FF9F1C"));
+        LinearLayout.LayoutParams playParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        playParams.setMargins(0, 16, 0, 16);
+        startGameBtn.setLayoutParams(playParams);
+        startGameBtn.setOnClickListener(v -> onStartGameClicked());
+        container.addView(startGameBtn);
+
+        // Tombol Pengaturan Grafik & Resolusi
+        Button gfxBtn = new Button(this);
+        gfxBtn.setText("⚙️ Pengaturan Grafik & Resolusi Layar");
+        gfxBtn.setTextSize(13);
+        gfxBtn.setTextColor(Color.WHITE);
+        gfxBtn.setBackground(createButtonDrawable("#495057"));
+        gfxBtn.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        gfxBtn.setOnClickListener(v -> showGraphicsSettingsDialog());
+        container.addView(gfxBtn);
+
+        scrollView.addView(container);
+        return scrollView;
+    }
+
+    private interface StatusTextHolder {
+        void hold(TextView tv);
+    }
+
+    private View createGameCard(GameStorageVerifier.GameTitle title, String cardTitle, String desc, StatusTextHolder holder) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(createCardDrawable("#1E2229", "#343A40"));
+        card.setPadding(28, 20, 28, 20);
+
+        TextView name = new TextView(this);
+        name.setText(cardTitle);
+        name.setTextSize(16);
+        name.setTextColor(Color.parseColor("#FFFFFF"));
+        name.setTypeface(null, Typeface.BOLD);
+        card.addView(name);
+
+        TextView descView = new TextView(this);
+        descView.setText(desc);
+        descView.setTextSize(12);
+        descView.setTextColor(Color.parseColor("#ADB5BD"));
+        descView.setPadding(0, 4, 0, 8);
+        card.addView(descView);
+
+        TextView status = new TextView(this);
+        status.setText("Status: Memeriksa...");
+        status.setTextSize(13);
+        status.setTypeface(null, Typeface.BOLD);
+        card.addView(status);
+        holder.hold(status);
+
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setPadding(0, 12, 0, 0);
+
+        Button zipBtn = new Button(this);
+        zipBtn.setText("📁 Impor .ZIP PC");
+        zipBtn.setTextSize(12);
+        zipBtn.setTextColor(Color.WHITE);
+        zipBtn.setBackground(createButtonDrawable("#011627"));
+        LinearLayout.LayoutParams btnP1 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+        btnP1.setMarginEnd(8);
+        zipBtn.setLayoutParams(btnP1);
+        zipBtn.setOnClickListener(v -> {
+            pendingImportTitle = title;
+            openZipLauncher.launch(new String[]{"application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*"});
+        });
+        btnRow.addView(zipBtn);
+
+        Button folderBtn = new Button(this);
+        folderBtn.setText("📂 Pilih Folder");
+        folderBtn.setTextSize(12);
+        folderBtn.setTextColor(Color.WHITE);
+        folderBtn.setBackground(createButtonDrawable("#011627"));
+        folderBtn.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        folderBtn.setOnClickListener(v -> {
+            pendingImportTitle = title;
+            openFolderLauncher.launch(null);
+        });
+        btnRow.addView(folderBtn);
+
+        card.addView(btnRow);
+        return card;
+    }
+
+    private Button createFloatingMenuButton() {
+        Button btn = new Button(this);
+        btn.setText("⚙️ Menu");
+        btn.setTextSize(12);
+        btn.setTextColor(Color.WHITE);
+        btn.setBackground(createButtonDrawable("#CC1E2229"));
+        FrameLayout.LayoutParams p = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        p.gravity = Gravity.TOP | Gravity.END;
+        p.setMargins(0, 16, 24, 0);
+        btn.setLayoutParams(p);
+        btn.setOnClickListener(v -> {
+            if (setupOverlayView.getVisibility() == View.VISIBLE) {
+                setupOverlayView.setVisibility(View.GONE);
+            } else {
+                refreshInstalledGamesStatus();
+                setupOverlayView.setVisibility(View.VISIBLE);
+            }
+        });
+        return btn;
+    }
+
+    private GradientDrawable createButtonDrawable(String hexColor) {
+        GradientDrawable gd = new GradientDrawable();
+        gd.setColor(Color.parseColor(hexColor));
+        gd.setCornerRadius(14);
+        return gd;
+    }
+
+    private GradientDrawable createCardDrawable(String bgHex, String borderHex) {
+        GradientDrawable gd = new GradientDrawable();
+        gd.setColor(Color.parseColor(bgHex));
+        gd.setCornerRadius(18);
+        gd.setStroke(2, Color.parseColor(borderHex));
+        return gd;
+    }
+
+    private void refreshInstalledGamesStatus() {
         File extDir = getExternalFilesDir(null);
-        if (extDir == null) {
-            Log.e(TAG, "External storage tidak dapat diakses.");
-            Toast.makeText(this, "External storage tidak dapat diakses", Toast.LENGTH_LONG).show();
-            return;
+        if (extDir == null) return;
+
+        List<GameStorageVerifier.VerificationResult> games = GameStorageVerifier.detectInstalledGames(extDir);
+        boolean hasOC1 = false;
+        boolean hasOC2 = false;
+
+        for (GameStorageVerifier.VerificationResult g : games) {
+            if (g.gameTitle == GameStorageVerifier.GameTitle.OVERCOOKED_1) hasOC1 = true;
+            if (g.gameTitle == GameStorageVerifier.GameTitle.OVERCOOKED_2) hasOC2 = true;
         }
 
-        // Deteksi otomatis apakah pengguna memiliki Overcooked 1, Overcooked 2, atau keduanya
-        List<GameStorageVerifier.VerificationResult> detectedGames =
-                GameStorageVerifier.detectInstalledGames(extDir);
+        if (oc1StatusText != null) {
+            if (hasOC1) {
+                oc1StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                oc1StatusText.setTextColor(Color.parseColor("#2EC4B6"));
+            } else {
+                oc1StatusText.setText("Status: ❌ Belum Terpasang (Butuh Overcooked_Data)");
+                oc1StatusText.setTextColor(Color.parseColor("#E71D36"));
+            }
+        }
 
-        if (detectedGames.size() > 1) {
-            // Kedua game terpasang: tampilkan dialog pemilih game
-            showGameSelectionDialog(detectedGames);
-        } else if (detectedGames.size() == 1) {
-            // Satu game terpasang: langsung luncurkan game tersebut
-            launchGame(detectedGames.get(0));
-        } else {
-            // Belum ada data game terdeteksi
-            Log.w(TAG, "Tidak ditemukan Overcooked 1 maupun Overcooked 2 di " + extDir.getAbsolutePath());
-            Toast.makeText(this, "Salin folder 'Overcooked_Data' (OC1) atau 'Overcooked2_Data' (OC2) ke folder aplikasi", Toast.LENGTH_LONG).show();
-            File defaultDir = new File(extDir, "Overcooked_Data");
-            nativeInitEngine(defaultDir.getAbsolutePath(), 0, GameStorageVerifier.GameTitle.OVERCOOKED_1.id);
-            engineInitialized = true;
+        if (oc2StatusText != null) {
+            if (hasOC2) {
+                oc2StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                oc2StatusText.setTextColor(Color.parseColor("#2EC4B6"));
+            } else {
+                oc2StatusText.setText("Status: ❌ Belum Terpasang (Butuh Overcooked2_Data)");
+                oc2StatusText.setTextColor(Color.parseColor("#E71D36"));
+            }
+        }
+
+        if (startGameBtn != null) {
+            startGameBtn.setEnabled(hasOC1 || hasOC2);
+            startGameBtn.setAlpha((hasOC1 || hasOC2) ? 1.0f : 0.5f);
         }
     }
 
-    private void showGameSelectionDialog(List<GameStorageVerifier.VerificationResult> games) {
-        String[] titles = new String[games.size()];
-        for (int i = 0; i < games.size(); i++) {
-            titles[i] = games.get(i).gameTitle.displayName + " (" + games.get(i).dataDir.getName() + ")";
+    private void handleImportZipUri(Uri uri) {
+        File extDir = getExternalFilesDir(null);
+        if (extDir == null) return;
+
+        File targetDir = new File(extDir, pendingImportTitle.defaultFolderName);
+        showImportProgress(true, "Mengekstrak berkas game " + pendingImportTitle.displayName + "...");
+
+        GameFileImporter.extractZipUri(this, uri, targetDir, new GameFileImporter.ProgressListener() {
+            @Override
+            public void onProgress(int percent, String currentFileName) {
+                runOnUiThread(() -> {
+                    if (importProgressText != null) {
+                        importProgressText.setText("Mengekstrak: " + currentFileName);
+                    }
+                });
+            }
+
+            @Override
+            public void onComplete(boolean success, String message) {
+                runOnUiThread(() -> {
+                    showImportProgress(false, "");
+                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+                    refreshInstalledGamesStatus();
+                });
+            }
+        });
+    }
+
+    private void handleImportFolderUri(Uri uri) {
+        File extDir = getExternalFilesDir(null);
+        if (extDir == null) return;
+
+        File targetDir = new File(extDir, pendingImportTitle.defaultFolderName);
+        showImportProgress(true, "Menyalin folder game " + pendingImportTitle.displayName + "...");
+
+        GameFileImporter.copyFolderUri(this, uri, targetDir, new GameFileImporter.ProgressListener() {
+            @Override
+            public void onProgress(int percent, String currentFileName) {
+                runOnUiThread(() -> {
+                    if (importProgressText != null) {
+                        importProgressText.setText("Menyalin: " + currentFileName);
+                    }
+                });
+            }
+
+            @Override
+            public void onComplete(boolean success, String message) {
+                runOnUiThread(() -> {
+                    showImportProgress(false, "");
+                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+                    refreshInstalledGamesStatus();
+                });
+            }
+        });
+    }
+
+    private void scanDownloadFolder() {
+        List<File> zips = GameFileImporter.scanDownloadFolderForGameZips();
+        if (zips.isEmpty()) {
+            Toast.makeText(this, "Tidak ada file ZIP Overcooked ditemukan di folder Download.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        String[] zipNames = new String[zips.size()];
+        for (int i = 0; i < zips.size(); i++) {
+            zipNames[i] = zips.get(i).getName() + " (" + (zips.get(i).length() / (1024 * 1024)) + " MB)";
         }
 
         new AlertDialog.Builder(this)
-                .setTitle("Pilih Game untuk Dimainkan")
-                .setItems(titles, (dialog, which) -> {
-                    launchGame(games.get(which));
+                .setTitle("Pilih File ZIP dari Folder Download")
+                .setItems(zipNames, (dialog, which) -> {
+                    File selected = zips.get(which);
+                    GameStorageVerifier.GameTitle title = selected.getName().toLowerCase().contains("2")
+                            ? GameStorageVerifier.GameTitle.OVERCOOKED_2
+                            : GameStorageVerifier.GameTitle.OVERCOOKED_1;
+                    pendingImportTitle = title;
+                    handleImportZipUri(Uri.fromFile(selected));
                 })
-                .setCancelable(false)
                 .show();
+    }
+
+    private void showImportProgress(boolean show, String text) {
+        if (importProgressBar != null) importProgressBar.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (importProgressText != null) {
+            importProgressText.setVisibility(show ? View.VISIBLE : View.GONE);
+            importProgressText.setText(text);
+        }
+    }
+
+    private void onStartGameClicked() {
+        File extDir = getExternalFilesDir(null);
+        if (extDir == null) return;
+
+        List<GameStorageVerifier.VerificationResult> games = GameStorageVerifier.detectInstalledGames(extDir);
+        if (games.isEmpty()) {
+            Toast.makeText(this, "Silakan impor data game PC terlebih dahulu.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        if (games.size() > 1) {
+            String[] titles = new String[games.size()];
+            for (int i = 0; i < games.size(); i++) {
+                titles[i] = games.get(i).gameTitle.displayName;
+            }
+            new AlertDialog.Builder(this)
+                    .setTitle("Pilih Versi Game")
+                    .setItems(titles, (dialog, which) -> launchGame(games.get(which)))
+                    .show();
+        } else {
+            launchGame(games.get(0));
+        }
     }
 
     private void launchGame(GameStorageVerifier.VerificationResult game) {
         activeGameTitle = game.gameTitle;
+        if (setupOverlayView != null) {
+            setupOverlayView.setVisibility(View.GONE);
+        }
+
         Log.i(TAG, "Meluncurkan " + game.gameTitle.displayName + " dari: " + game.dataDir.getAbsolutePath());
         nativeInitEngine(game.dataDir.getAbsolutePath(), game.backendType.ordinal(), game.gameTitle.id);
         engineInitialized = true;
         Toast.makeText(this, "Memuat " + game.gameTitle.displayName + "...", Toast.LENGTH_SHORT).show();
-        Log.i(TAG, "Native Engine aktif.\n" + nativeGetGraphicsSummary());
+    }
+
+    private void showGraphicsSettingsDialog() {
+        String[] options = {
+                "Preset: Rendah (Low - SD845 / 30 FPS)",
+                "Preset: Sedang (Medium - Seimbang)",
+                "Preset: Tinggi (High - Layar Asli HP / 60 FPS)",
+                "Preset: Ultra (Flagship MSAA 4x)",
+                "Mode Resolusi Layar...",
+                "Ringkasan Profil Grafik"
+        };
+
+        new AlertDialog.Builder(this)
+                .setTitle("Pengaturan Grafik & Resolusi HP")
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0:
+                            nativeSetGraphicsPreset(0);
+                            Toast.makeText(this, "Preset Rendah diterapkan", Toast.LENGTH_SHORT).show();
+                            break;
+                        case 1:
+                            nativeSetGraphicsPreset(1);
+                            Toast.makeText(this, "Preset Sedang diterapkan", Toast.LENGTH_SHORT).show();
+                            break;
+                        case 2:
+                            nativeSetGraphicsPreset(2);
+                            Toast.makeText(this, "Preset Tinggi diterapkan", Toast.LENGTH_SHORT).show();
+                            break;
+                        case 3:
+                            nativeSetGraphicsPreset(3);
+                            Toast.makeText(this, "Preset Ultra diterapkan", Toast.LENGTH_SHORT).show();
+                            break;
+                        case 4:
+                            showResolutionModeDialog();
+                            break;
+                        case 5:
+                            new AlertDialog.Builder(this)
+                                    .setTitle("Profil Grafik Aktif")
+                                    .setMessage(nativeGetGraphicsSummary())
+                                    .setPositiveButton("OK", null)
+                                    .show();
+                            break;
+                    }
+                })
+                .show();
+    }
+
+    private void showResolutionModeDialog() {
+        String[] modes = {
+                "Resolusi Asli Layar HP (100% Native)",
+                "Adaptif (Otomatis sesuai suhu & termal Snapdragon)",
+                "Skala 1080p (FHD)",
+                "Skala 720p (Hemat Daya)",
+                "Skala 540p (Performa Tinggi)"
+        };
+
+        new AlertDialog.Builder(this)
+                .setTitle("Pilih Mode Resolusi Layar")
+                .setItems(modes, (dialog, which) -> {
+                    nativeSetResolutionMode(which, 1.0f);
+                    Toast.makeText(this, "Mode resolusi diubah", Toast.LENGTH_SHORT).show();
+                })
+                .show();
     }
 
     private void detectAndApplyDeviceDisplaySettings() {
@@ -110,7 +551,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         float dpi = metrics.densityDpi;
         float refreshRate = display.getRefreshRate();
 
-        // Deteksi total RAM sistem
         ActivityManager actManager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
         ActivityManager.MemoryInfo memInfo = new ActivityManager.MemoryInfo();
         long totalRamMb = 4096;
@@ -118,9 +558,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             actManager.getMemoryInfo(memInfo);
             totalRamMb = memInfo.totalMem / (1024 * 1024);
         }
-
-        Log.i(TAG, String.format("Layar HP terdeteksi: %dx%d @ %.1fHz, %.0f dpi, RAM %d MB",
-                width, height, refreshRate, dpi, totalRamMb));
 
         nativeInitDisplayInfo(width, height, dpi, refreshRate, (int) totalRamMb);
     }
@@ -177,7 +614,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_HOME) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (setupOverlayView != null && setupOverlayView.getVisibility() != View.VISIBLE) {
+                setupOverlayView.setVisibility(View.VISIBLE);
+                refreshInstalledGamesStatus();
+                return true;
+            }
+            return super.dispatchKeyEvent(event);
+        }
+        if (keyCode == KeyEvent.KEYCODE_HOME) {
             return super.dispatchKeyEvent(event);
         }
 
