@@ -30,29 +30,76 @@ permissions:
   contents: read
 
 jobs:
-  build-runtime:
-    name: Assemble ARM64 glibc + Box64 + Wine + DXVK + Android PRoot
+  build-proot:
+    name: Build Android ARM64 PRoot (NDK x86_64 host)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PROOT_REF: ${{ inputs.proot_ref || 'main' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install Android NDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'ndk;28.2.13676358'
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y git make python3 file binutils
+      - name: Build static Android ARM64 PRoot and loaders
+        run: |
+          set -euo pipefail
+          git clone https://github.com/berilevi/proot-static.git proot-src
+          git -C proot-src checkout --detach "$PROOT_REF"
+          git -C proot-src rev-parse HEAD > proot-upstream-commit.txt
+          cd proot-src
+          NDK="$ANDROID_HOME/ndk/28.2.13676358" \
+          OUT="$RUNNER_TEMP/proot-static-build" \
+          REPO_ARTIFACT_DIR="$GITHUB_WORKSPACE/proot-src/dist/aarch64" \
+            tools/build-static-aarch64.sh
+          cd "$GITHUB_WORKSPACE"
+          SRC="proot-src/dist/aarch64"
+          OUT="proot-artifact"
+          mkdir -p "$OUT/root/bin" "$OUT/root/libexec/proot" "$OUT/provenance"
+          install -m 0755 "$SRC/proot" "$OUT/root/bin/proot"
+          install -m 0755 "$SRC/loader" "$OUT/root/libexec/proot/loader"
+          install -m 0755 "$SRC/loader32" "$OUT/root/libexec/proot/loader32"
+          for f in "$OUT/root/bin/proot" "$OUT/root/libexec/proot/loader"; do
+            readelf -h "$f" | grep -q 'Class:.*ELF64'
+            readelf -h "$f" | grep -q 'Machine:.*AArch64'
+            if readelf -l "$f" | grep -q 'Requesting program interpreter'; then exit 1; fi
+          done
+          readelf -h "$OUT/root/libexec/proot/loader32" | grep -q 'Class:.*ELF32'
+          readelf -h "$OUT/root/libexec/proot/loader32" | grep -q 'Machine:.*ARM'
+          if readelf -l "$OUT/root/libexec/proot/loader32" | grep -q 'Requesting program interpreter'; then exit 1; fi
+          cp proot-src/COPYING "$OUT/provenance/PROOT-COPYING"
+          cp proot-upstream-commit.txt "$OUT/provenance/"
+          printf 'source=https://github.com/berilevi/proot-static\nabi=arm64-v8a\nloader32=arm-eabi\nlinkage=static\nndk=28.2.13676358\n' > "$OUT/provenance/PROOT-BUILD-INFO.txt"
+          (cd "$OUT" && sha256sum root/bin/proot root/libexec/proot/loader root/libexec/proot/loader32 > provenance/PROOT-SHA256SUMS)
+      - name: Upload PRoot component
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-proot-android-arm64
+          path: proot-artifact/
+          if-no-files-found: error
+          retention-days: 3
+
+  build-rootfs:
+    name: Build ARM64 glibc rootfs and Windows runtime components
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     env:
       DEBIAN_SUITE: ${{ inputs.debian_suite || 'bookworm' }}
       BOX64_REF: ${{ inputs.box64_ref || 'main' }}
-      PROOT_REF: ${{ inputs.proot_ref || 'main' }}
       WINE_SHA256: 40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e
       DXVK_SHA256: 40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install host build tools and Android NDK
+      - name: Install host build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y debootstrap schroot qemu-user-static             git cmake ninja-build build-essential file binutils             libcapstone-dev curl xz-utils tar zstd python3 pax-utils
-      - name: Set up Android NDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'ndk;28.2.13676358'
-
+          sudo apt-get install -y debootstrap git cmake ninja-build build-essential \
+            file binutils libcapstone-dev curl xz-utils tar python3 pax-utils
       - name: Build Box64 for ARM64 glibc
         run: |
           set -euo pipefail
@@ -67,33 +114,10 @@ jobs:
             -DNO_LIB_INSTALL=ON \
             -DNO_CONF_INSTALL=ON
           cmake --build box64-build --parallel 2
-          find box64-build -type f -name box64 -perm -111 -print -quit | grep .
           install -D -m 0755 "$(find box64-build -type f -name box64 -perm -111 -print -quit)" box64-install/usr/local/bin/box64
           file box64-install/usr/local/bin/box64
-          readelf -h box64-install/usr/local/bin/box64 | grep -q AArch64
+          readelf -h box64-install/usr/local/bin/box64 | grep -q 'Machine:.*AArch64'
           ldd box64-install/usr/local/bin/box64 | tee box64-ldd.txt
-
-      - name: Build static Android ARM64 PRoot
-        run: |
-          set -euo pipefail
-          git clone https://github.com/berilevi/proot-static.git proot-src
-          git -C proot-src checkout --detach "$PROOT_REF"
-          git -C proot-src rev-parse HEAD > proot-upstream-commit.txt
-          cd proot-src
-          NDK="$ANDROID_HOME/ndk/28.2.13676358" \
-          OUT="$RUNNER_TEMP/proot-static-build" \
-          REPO_ARTIFACT_DIR="$GITHUB_WORKSPACE/proot-src/dist/aarch64" \
-            tools/build-static-aarch64.sh
-          cd "$GITHUB_WORKSPACE"
-          test -s proot-src/dist/aarch64/proot
-          test -s proot-src/dist/aarch64/loader
-          test -s proot-src/dist/aarch64/loader32
-          for f in proot-src/dist/aarch64/proot proot-src/dist/aarch64/loader; do
-            readelf -h "$f" | grep -q 'Class:.*ELF64'
-            readelf -h "$f" | grep -q 'Machine:.*AArch64'
-          done
-          readelf -h proot-src/dist/aarch64/loader32 | grep -q 'Class:.*ELF32'
-          readelf -h proot-src/dist/aarch64/loader32 | grep -q 'Machine:.*ARM'
 
       - name: Download and verify pinned Wine and DXVK
         run: |
@@ -107,7 +131,7 @@ jobs:
       - name: Bootstrap Debian ARM64 glibc rootfs and amd64 Wine libraries
         run: |
           set -euo pipefail
-          ROOTFS="$GITHUB_WORKSPACE/runtime-bundle/rootfs"
+          ROOTFS="$GITHUB_WORKSPACE/rootfs-artifact/rootfs"
           mkdir -p "$ROOTFS"
           sudo debootstrap --arch=arm64 --variant=minbase \
             --include=ca-certificates,locales,libstdc++6,libgcc-s1,libcapstone4 \
@@ -123,66 +147,84 @@ jobs:
             libxi6:amd64 libxcursor1:amd64 libxinerama1:amd64 \
             libxcomposite1:amd64 libxdamage1:amd64 libxfixes3:amd64 \
             libxkbcommon0:amd64 libxss1:amd64 libxtst6:amd64 \
-            libxinerama1:amd64 libxmu6:amd64 libxpm4:amd64 \
+            libxmu6:amd64 libxpm4:amd64 \
             libwayland-client0:amd64 libwayland-egl1:amd64 \
             libvulkan1:amd64 libgl1:amd64 libegl1:amd64 libgbm1:amd64 \
             libunwind8:amd64 libatomic1:amd64 libglib2.0-0:amd64 \
             libgstreamer1.0-0:amd64 libgstreamer-plugins-base1.0-0:amd64 \
             libkrb5-3:amd64 libldap-2.5-0:amd64
           sudo install -D -m 0755 box64-install/usr/local/bin/box64 "$ROOTFS/usr/local/bin/box64"
-
-      - name: Install Wine and DXVK payload into rootfs
-        run: |
-          set -euo pipefail
-          ROOTFS="$GITHUB_WORKSPACE/runtime-bundle/rootfs"
-          mkdir -p wine-extract dxvk-extract "$ROOTFS/opt/wine" "$ROOTFS/opt/dxvk"
+          mkdir -p "$ROOTFS/opt/wine" "$ROOTFS/opt/dxvk"
+          mkdir wine-extract dxvk-extract
           tar -xJf downloads/wine.tar.xz -C wine-extract --strip-components=1
-          WINE_ROOT="$(find wine-extract -type f -path '*/bin/wine' -print -quit)"
-          test -n "$WINE_ROOT"
-          WINE_DIR="$(dirname "$(dirname "$WINE_ROOT")")"
-          cp -a "$WINE_DIR/." "$ROOTFS/opt/wine/"
+          WINE_BIN="$(find wine-extract -type f -path '*/bin/wine' -print -quit)"
+          test -n "$WINE_BIN"
+          WINE_DIR="$(dirname "$(dirname "$WINE_BIN")")"
+          sudo cp -a "$WINE_DIR/." "$ROOTFS/opt/wine/"
           tar -xzf downloads/dxvk.tar.gz -C dxvk-extract --strip-components=1
-          test -d dxvk-extract/x64
-          test -d dxvk-extract/x32
-          cp -a dxvk-extract/. "$ROOTFS/opt/dxvk/"
+          test -d dxvk-extract/x64 && test -d dxvk-extract/x32
+          sudo cp -a dxvk-extract/. "$ROOTFS/opt/dxvk/"
           test -x "$ROOTFS/opt/wine/bin/wine"
           test -x "$ROOTFS/usr/local/bin/box64"
           test -s "$ROOTFS/opt/dxvk/x64/d3d11.dll"
           test -s "$ROOTFS/opt/dxvk/x64/dxgi.dll"
-          set +e
+          sudo readelf -h "$ROOTFS/opt/wine/bin/wine" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
           sudo lddtree -R "$ROOTFS" /opt/wine/bin/wine | tee wine-lddtree.txt
-          LDDTREE_STATUS=${PIPESTATUS[0]}
-          set -e
-          if [ "$LDDTREE_STATUS" -ne 0 ] || grep -Eq '=> None|could not locate library|not found' wine-lddtree.txt; then
+          if grep -Eq '=> None|could not locate library|not found' wine-lddtree.txt; then
             echo "Wine has unresolved x86_64 shared-library dependencies." >&2
             exit 1
           fi
           sudo chroot "$ROOTFS" /usr/bin/apt-get clean
           sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/doc/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/locale/"*
+          sudo dpkg-query --admindir="$ROOTFS/var/lib/dpkg" -W -f='${Package}:${Architecture}=${Version}\n' > rootfs-package-manifest.txt
+          mkdir -p rootfs-artifact/provenance
+          cp box64-upstream-commit.txt box64-ldd.txt wine-lddtree.txt rootfs-package-manifest.txt downloads/wine.tar.xz downloads/dxvk.tar.gz rootfs-artifact/provenance/
+          printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=3.1.1\n' "$DEBIAN_SUITE" > rootfs-artifact/provenance/ROOTFS-BUILD-INFO.txt
+          cp -a "$ROOTFS" rootfs-artifact/
+      - name: Upload glibc rootfs and Wine components
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-rootfs-arm64-bookworm
+          path: rootfs-artifact/
+          if-no-files-found: error
+          retention-days: 3
 
-      - name: Assemble app-private runtime bundle and provenance
+  assemble:
+    name: Assemble installable app-private runtime archive
+    runs-on: ubuntu-24.04
+    needs: [build-proot, build-rootfs]
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download PRoot component
+        uses: actions/download-artifact@v4
+        with:
+          name: runtime-proot-android-arm64
+          path: proot-artifact
+      - name: Download glibc rootfs component
+        uses: actions/download-artifact@v4
+        with:
+          name: runtime-rootfs-arm64-bookworm
+          path: rootfs-artifact
+      - name: Assemble archive and checksums
         run: |
           set -euo pipefail
           OUT="$GITHUB_WORKSPACE/runtime-bundle"
-          mkdir -p "$OUT/bin" "$OUT/libexec/proot" "$OUT/provenance"
-          install -m 0755 proot-src/dist/aarch64/proot "$OUT/bin/proot"
-          install -m 0755 proot-src/dist/aarch64/loader "$OUT/libexec/proot/loader"
-          install -m 0755 proot-src/dist/aarch64/loader32 "$OUT/libexec/proot/loader32"
-          cp proot-src/COPYING "$OUT/provenance/PROOT-COPYING"
-          cp box64-upstream-commit.txt proot-upstream-commit.txt "$OUT/provenance/"
-          cp box64-ldd.txt wine-lddtree.txt "$OUT/provenance/"
-          cp downloads/wine.tar.xz downloads/dxvk.tar.gz "$OUT/provenance/"
-          printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=3.1.1\nproot_abi=arm64-v8a\n' "$DEBIAN_SUITE" > "$OUT/provenance/BUILD-INFO.txt"
+          mkdir -p "$OUT"
+          cp -a proot-artifact/root/. "$OUT/"
+          cp -a rootfs-artifact/rootfs "$OUT/rootfs"
+          cp -a rootfs-artifact/provenance "$OUT/provenance"
+          cp -a proot-artifact/provenance/. "$OUT/provenance/"
           cp runtime/rootfs/README.md "$OUT/README.md"
-          (cd "$OUT" && sha256sum bin/proot libexec/proot/loader libexec/proot/loader32 rootfs/usr/local/bin/box64 > provenance/SHA256SUMS)
+          (cd "$OUT" && sha256sum bin/proot libexec/proot/loader libexec/proot/loader32 rootfs/usr/local/bin/box64 > provenance/RUNTIME-SHA256SUMS)
           tar --numeric-owner --xattrs --acls -czf ghost-town-wine-runtime-arm64.tar.gz -C "$OUT" .
           sha256sum ghost-town-wine-runtime-arm64.tar.gz > ghost-town-wine-runtime-arm64.tar.gz.sha256
           du -h ghost-town-wine-runtime-arm64.tar.gz
-
       - name: Upload complete runtime bundle
         uses: actions/upload-artifact@v4
         with:
-          name: ghost-town-wine-runtime-arm64-debian-${{ env.DEBIAN_SUITE }}
+          name: ghost-town-wine-runtime-arm64-debian-bookworm
           path: |
             ghost-town-wine-runtime-arm64.tar.gz
             ghost-town-wine-runtime-arm64.tar.gz.sha256
