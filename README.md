@@ -43,7 +43,15 @@
   - Full support for Android 10 (API 29), Android 12 (HarmonyOS 4), and modern Android 14/15.
   - **16 KB page-size aligned** (`-Wl,-z,max-page-size=16384`) for next-gen Android kernels.
   - Scoped storage & SAF file importer with zip extraction safeguards.
-- 🌡️ **Smart Thermal Governor**: Automatically adjusts resolution scale (`0.75x` – `1.0x`) during long gaming sessions to keep your device cool and battery healthy.
+- 🌡️ **Experimental thermal policy**: Applies conservative frame pacing/resolution policy to the current native prototype loop. This is not yet a measured game-runtime governor; device behavior must be validated on physical hardware.
+
+---
+
+## 📱 Snapdragon device targeting
+
+The Android app uses a generic `arm64-v8a` build rather than one APK per Snapdragon generation. Vulkan capability detection reads the actual Adreno model, Vulkan API/driver versions, and device limits at runtime, then refreshes the initial graphics preset after GPU discovery.
+
+The initial policy targets Snapdragon 845 / Adreno 630 and newer Qualcomm devices with conservative Low-to-Ultra presets. These are unverified starting profiles, not performance guarantees. See [Snapdragon compatibility](docs/SNAPDRAGON_COMPATIBILITY.md) and [Wine + Box64 integration plan](docs/WINE_BOX64_INTEGRATION.md).
 
 ---
 
