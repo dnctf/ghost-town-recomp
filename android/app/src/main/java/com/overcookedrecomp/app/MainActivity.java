@@ -386,6 +386,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         installRuntimeParams.topMargin = dp(8);
         container.addView(installRuntimeBtn, installRuntimeParams);
 
+        Button managedRuntimeBtn = createDashboardButton("DOWNLOAD & INSTALL RUNTIME (MANAGED)", "#24513D");
+        managedRuntimeBtn.setOnClickListener(v -> downloadAndInstallManagedRuntime());
+        LinearLayout.LayoutParams managedRuntimeParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
+        managedRuntimeParams.topMargin = dp(8);
+        container.addView(managedRuntimeBtn, managedRuntimeParams);
+
         Button diagnosticsBtn = createDashboardButton("BAGIKAN LOG DIAGNOSTIK", "#493018");
         diagnosticsBtn.setOnClickListener(v -> shareDiagnosticReport());
         LinearLayout.LayoutParams diagnosticsParams = new LinearLayout.LayoutParams(
@@ -530,6 +537,44 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setEnabled(selectedGame != null));
         dialog.show();
+    }
+
+    private void downloadAndInstallManagedRuntime() {
+        new AlertDialog.Builder(this)
+                .setTitle("DOWNLOAD RUNTIME 0.4.0-ALPHA.1")
+                .setMessage("Aplikasi akan mengunduh paket runtime resmi dari GitHub Release Ghost Town Recomp, memverifikasi SHA-256, lalu memasangnya ke penyimpanan privat. Koneksi internet dan ruang kosong yang cukup diperlukan. Ini belum mengaktifkan game launch atau membuktikan kompatibilitas Vulkan.")
+                .setNegativeButton("BATAL", null)
+                .setPositiveButton("LANJUTKAN", (dialog, which) -> {
+                    showImportProgress(true, "Mengunduh runtime terkelola...");
+                    new Thread(() -> {
+                        try {
+                            RuntimeBundleDownloader.downloadAndInstall(this, message ->
+                                    runOnUiThread(() -> {
+                                        if (importProgressText != null) importProgressText.setText(message);
+                                    }));
+                            runOnUiThread(() -> {
+                                showImportProgress(false, "Runtime 0.4.0-alpha.1 berhasil diunduh, diverifikasi, dan dipasang.");
+                                new AlertDialog.Builder(this)
+                                        .setTitle("RUNTIME TERPASANG")
+                                        .setMessage("Checksum SHA-256 cocok dan struktur runtime lolos validasi. Berikutnya jalankan Wine version probe. Game launch tetap menunggu prefix, display/Vulkan, audio, dan input backend.")
+                                        .setPositiveButton("PERIKSA STATUS", (d, w) -> showWineRuntimeStatus())
+                                        .setNegativeButton("TUTUP", null)
+                                        .show();
+                            });
+                        } catch (Throwable error) {
+                            Log.e(TAG, "Managed runtime download/install failed", error);
+                            runOnUiThread(() -> {
+                                showImportProgress(false, "Download runtime gagal.");
+                                new AlertDialog.Builder(this)
+                                        .setTitle("DOWNLOAD RUNTIME GAGAL")
+                                        .setMessage(error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())
+                                        .setPositiveButton("OK", null)
+                                        .show();
+                            });
+                        }
+                    }, "managed-runtime-download").start();
+                })
+                .show();
     }
 
     private void installRuntimeBundle(Uri uri) {
