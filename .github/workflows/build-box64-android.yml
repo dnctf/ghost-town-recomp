@@ -1,6 +1,13 @@
 name: Build Box64 Android ARM64 (experimental)
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/box64/**'
+      - 'runtime/manifest.json'
+      - 'docs/BOX64_ANDROID_RUNTIME.md'
+      - '.github/workflows/build-box64-android.yml'
   workflow_dispatch:
     inputs:
       box64_ref:
