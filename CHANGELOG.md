@@ -3,6 +3,7 @@
 ### Fixed
 - Changed the runtime workflow to upload the privileged Debian rootfs as a checksummed tar archive, avoiding upload-artifact directory traversal failures on restricted paths such as `/lib/ssl/private`.
 - Verify the rootfs component archive checksum before extracting it for final runtime assembly.
+- Exclude rootfs `/dev` device nodes from the portable archive; PRoot bind-mounts the Android `/dev` tree at runtime, so privileged `mknod` entries are unnecessary.
 - Align Android and runtime assets with the `v0.3.3` tester release.
 
 ### Added

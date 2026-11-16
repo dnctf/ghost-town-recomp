@@ -188,7 +188,10 @@ jobs:
           sha256sum downloads/wine.tar.xz downloads/dxvk.tar.gz > rootfs-artifact/provenance/UPSTREAM-ARCHIVE-SHA256SUMS
           printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=3.1.1\n' "$DEBIAN_SUITE" > rootfs-artifact/provenance/ROOTFS-BUILD-INFO.txt
           # Upload one root-owned archive instead of traversing restricted Debian paths.
-          sudo tar --numeric-owner --xattrs --acls -czf "$GITHUB_WORKSPACE/rootfs-component.tar.gz" \
+          # /dev is bind-mounted from Android by PRoot; omit Linux device nodes because
+          # unprivileged artifact extraction cannot recreate mknod entries.
+          sudo tar --numeric-owner --xattrs --acls --exclude='rootfs/dev/*' \
+            -czf "$GITHUB_WORKSPACE/rootfs-component.tar.gz" \
             -C "$GITHUB_WORKSPACE/rootfs-artifact" rootfs provenance
           sudo chown "$(id -u):$(id -g)" "$GITHUB_WORKSPACE/rootfs-component.tar.gz"
           sha256sum rootfs-component.tar.gz > rootfs-component.tar.gz.sha256
