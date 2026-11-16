@@ -88,10 +88,10 @@ bool VulkanContext::SelectPhysicalDevice() {
     const char* adreno = std::strstr(props.deviceName, "Adreno");
     if (adreno != nullptr) {
         gpu_caps_.is_adreno = true;
-        while (*adreno != '\\0' && !std::isdigit(static_cast<unsigned char>(*adreno))) {
+        while (*adreno != '\0' && !std::isdigit(static_cast<unsigned char>(*adreno))) {
             ++adreno;
         }
-        if (*adreno != '\\0') {
+        if (*adreno != '\0') {
             char* end = nullptr;
             const unsigned long parsed = std::strtoul(adreno, &end, 10);
             if (end != adreno && parsed <= UINT32_MAX) {
