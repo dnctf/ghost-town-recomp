@@ -128,7 +128,7 @@ object RuntimeBundleInstaller {
                 throw IOException("Tidak dapat mengaktifkan runtime baru.")
             }
             deleteTree(backup)
-            progress?.invoke("Runtime berhasil dipasang (${totalBytes / (1024 * 1024)} MiB).")
+            progress?.accept("Runtime berhasil dipasang (${totalBytes / (1024 * 1024)} MiB).")
         } catch (t: Throwable) {
             deleteTree(stage)
             if (!target.exists() && backup.exists()) backup.renameTo(target)
