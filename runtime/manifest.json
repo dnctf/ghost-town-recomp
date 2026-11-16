@@ -1,31 +1,41 @@
 {
   "schema_version": 2,
   "target": "android-arm64-via-glibc-userspace",
-  "status": "experimental-components-not-yet-app-integrated",
+  "status": "android-probe-adapter-integrated-runtime-provisioning-and-graphics-pending",
   "components": {
     "box64": {
       "upstream": "https://github.com/ptitSeb/box64",
       "build_workflow": ".github/workflows/build-box64-android.yml",
       "abi": "aarch64-linux-gnu",
       "profile": "Snapdragon 888",
-      "status": "Linux ARM64 glibc artifact build pipeline; device validation pending"
+      "status": "Linux ARM64 glibc artifact pipeline; runtime adapter expects it inside ARM64 glibc rootfs; device execution pending"
     },
     "wine": {
       "upstream": "https://github.com/Kron4ek/Wine-Builds",
       "version": "11.19-amd64",
       "sha256": "40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e",
-      "status": "downloaded and packaged by workflow; requires Box64 + glibc userspace; not APK-integrated"
+      "status": "Pinned amd64 payload packaged; adapter expects it at rootfs/opt/wine; process execution not yet validated"
     },
     "dxvk": {
       "upstream": "https://github.com/doitsujin/DXVK",
       "version": "3.1.1",
       "sha256": "40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608",
-      "status": "Windows DLL payload packaged for Wine prefix; Vulkan validation pending"
+      "status": "Pinned DLL payload packaged; adapter checks x64 d3d11/dxgi files; Wine prefix install and Vulkan bridge validation pending"
     },
     "unity_player": {
       "status": "user-provided",
       "reason": "Unity Player and game assets are build-specific proprietary game files; do not redistribute"
+    },
+    "proot": {
+      "upstream": "https://github.com/termux/proot",
+      "status": "required Android ARM64 Bionic executable; not yet packaged or provisioned"
+    },
+    "rootfs": {
+      "status": "required ARM64 glibc Linux userspace with Wine x86_64 dependencies; not yet packaged or provisioned"
+    },
+    "graphics_bridge": {
+      "status": "not integrated; DXVK cannot render through Android Vulkan without a compatible translation/display backend"
     }
   },
-  "playable_claim_policy": "No game is playable until verified on target Android hardware through menu, gameplay, input, audio, and stability tests."
+  "playable_claim_policy": "No game is playable until Wine launches a Windows PE under Box64 on target hardware and graphics, input, audio, lifecycle, and stability pass gameplay tests."
 }
