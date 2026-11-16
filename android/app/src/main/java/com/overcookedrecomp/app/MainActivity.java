@@ -673,8 +673,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         File wineProbeLog = new File(getFilesDir(), "runtime/wine/wine-version-probe.log");
         if (wineProbeLog.isFile()) {
             try {
-                String probeOutput = java.nio.file.Files.readString(
-                        wineProbeLog.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+                String probeOutput = new String(java.nio.file.Files.readAllBytes(
+                        wineProbeLog.toPath()), java.nio.charset.StandardCharsets.UTF_8);
                 if (probeOutput.length() > 30000) probeOutput = probeOutput.substring(probeOutput.length() - 30000);
                 report.append(probeOutput).append("\n");
             } catch (Throwable error) {
@@ -687,8 +687,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (runtimeChecksums.isFile()) {
             report.append("\nRUNTIME PAYLOAD CHECKSUM MANIFEST\n");
             try {
-                report.append(java.nio.file.Files.readString(
-                        runtimeChecksums.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+                report.append(new String(java.nio.file.Files.readAllBytes(
+                        runtimeChecksums.toPath()), java.nio.charset.StandardCharsets.UTF_8));
             } catch (Throwable error) {
                 report.append("Unable to read checksum manifest: ").append(error.getMessage()).append("\n");
             }
@@ -718,7 +718,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 return "logcat collection timed out after 8 seconds.\n";
             }
             String content = output.isFile()
-                    ? java.nio.file.Files.readString(output.toPath(), java.nio.charset.StandardCharsets.UTF_8) : "";
+                    ? new String(java.nio.file.Files.readAllBytes(output.toPath()), java.nio.charset.StandardCharsets.UTF_8) : "";
             if (content.length() > 60000) content = content.substring(content.length() - 60000);
             return "logcat exit code: " + process.exitValue() + "\n"
                     + (content.isEmpty() ? "(No app logcat output captured.)\n" : content);
