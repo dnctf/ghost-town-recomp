@@ -36,6 +36,7 @@ object WineRuntimeBridge {
     private data class Layout(
         val root: File,
         val proot: File,
+        val prootLoader: File,
         val rootfs: File,
         val box64: String,
         val wine: String,
@@ -54,6 +55,7 @@ object WineRuntimeBridge {
         return Layout(
             root = root,
             proot = File(root, "bin/proot"),
+            prootLoader = File(root, "libexec/proot/loader"),
             rootfs = rootfs,
             box64 = "/$box64",
             wine = "/opt/wine/bin/wine",
@@ -68,13 +70,14 @@ object WineRuntimeBridge {
             return RuntimeStatus(
                 State.NOT_INSTALLED,
                 "Wine/Box64 runtime belum dipasang.",
-                listOf("Android ARM64 PRoot", "glibc rootfs ARM64", "Box64 ARM64", "Wine x86_64", "DXVK DLL"),
+                listOf("Android ARM64 PRoot + loader", "glibc rootfs ARM64", "Box64 ARM64", "Wine x86_64", "DXVK DLL"),
                 l.root.absolutePath
             )
         }
 
         val missing = mutableListOf<String>()
         if (!l.proot.isFile || !l.proot.canExecute()) missing += "bin/proot (executable Android ARM64)"
+        if (!l.prootLoader.isFile) missing += "libexec/proot/loader (PRoot companion loader)"
         if (!File(l.rootfs, "etc/os-release").isFile) missing += "rootfs/etc/os-release (glibc Linux userspace)"
         if (!File(l.rootfs, l.box64.removePrefix("/")).isFile) missing += "Box64 ARM64/glibc"
         if (!File(l.rootfs, l.wine.removePrefix("/")).isFile) missing += "Wine x86_64"
