@@ -106,9 +106,10 @@ Ghost Town Recomp is an open-source project and we welcome contributions of all 
 ```bash
 git clone --recursive https://github.com/dnctf/ghost-town-recomp.git
 cd ghost-town-recomp/android
-./gradlew assembleDebug
+gradle assembleDebug
+gradle lint
 ```
-The output APK will be generated at `android/app/build/outputs/apk/debug/app-debug.apk`.
+The output APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`. This repository currently does not include the Gradle wrapper scripts/JAR, so use an installed Gradle 8.5+ or add a verified wrapper before using `./gradlew`.
 
 ---
 
