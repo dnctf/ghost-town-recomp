@@ -43,6 +43,10 @@ For an unmodified Windows PC build, investigate a compatible Wine + Box64 path o
 
 Primary target: Huawei MatePad Air 2023, Snapdragon 888 / Adreno 660, ARM64, HarmonyOS 4.2.
 
+The native graphics capability probe now parses the Adreno model from Vulkan's physical-device name and records Vulkan API/driver versions and selected device limits. It refreshes the automatic graphics preset after Vulkan discovery so the initial pre-surface profile does not remain stuck on the unknown-GPU fallback. See [Snapdragon compatibility](SNAPDRAGON_COMPATIBILITY.md).
+
+The intended hardware range is Snapdragon 845 / Adreno 630 through newer Qualcomm Adreno generations. This is a runtime-detection and conservative-preset target, **not** a claim that every device in that range has been tested. Wine + Box64 integration is tracked separately in [WINE_BOX64_INTEGRATION.md].
+
 A playable milestone requires all of the following on a real device:
 1. Identify one exact game build and its executable architecture, Unity version, graphics API, and Mono/IL2CPP backend.
 2. Import the complete legitimate installation, not only the _Data directory if the selected execution path needs the .exe, DLLs, and adjacent files.
