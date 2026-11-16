@@ -21,14 +21,14 @@
 
 | Game / Engine | Runtime Path | Status |
 | :--- | :--- | :--- |
-| Overcooked! | Unity Mono/CIL shim + Vulkan-facing native layer | 🧪 Prototype scaffolding; gameplay not verified |
-| Overcooked! 2 | Unity runtime/asset path + Vulkan-facing native layer | 🧪 Prototype scaffolding; gameplay not verified |
-| Moving Out | Title-specific launcher/compiler scaffolding | 🧪 Prototype; gameplay not verified |
-| Moving Out 2 | Title-specific launcher/compiler scaffolding | 🧪 Prototype; gameplay not verified |
-| Wine / Box64 (.exe) | Separate external compatibility runtime | 📄 Evaluation only; not integrated |
-| Source Engine (HL2 / mods) | Separate SDK-based fork/port | 📄 Feasibility research only |
+| Overcooked! | Unity Mono/CIL placeholder + Vulkan-facing native layer | 🧪 Prototype only; no verified gameplay |
+| Overcooked! 2 | Unity metadata/asset scaffolding + Vulkan-facing native layer | 🧪 Prototype only; no verified gameplay |
+| Moving Out | Title-specific launcher/compiler scaffolding | 🧪 Prototype only; no verified gameplay |
+| Moving Out 2 | Title-specific launcher/compiler scaffolding | 🧪 Prototype only; no verified gameplay |
+| Wine / Box64 (.exe) | Optional external Windows compatibility runtime | 📄 Evaluation + inactive bridge stub; not integrated |
+| Source Engine (HL2 / mods) | Separate SDK-based fork/port | 📄 Feasibility research; separate project |
 
-See [Runtime Audit](RUNTIME_AUDIT.md), [Wine/Box64 Evaluation](docs/WINE_BOX64_EVALUATION.md), and [Source Engine Feasibility](docs/SOURCE_ENGINE_FEASIBILITY.md) for evidence and limitations.
+See [Runtime Audit](RUNTIME_AUDIT.md), [Multi-Runtime Architecture](docs/MULTI_RUNTIME_ARCHITECTURE.md), [Wine/Box64 Evaluation](docs/WINE_BOX64_EVALUATION.md), and [Source Engine Feasibility](docs/SOURCE_ENGINE_FEASIBILITY.md) for evidence and limitations.
 
 ---
 
@@ -69,8 +69,8 @@ Copy the `_Data` folder from your legitimate PC game installation to your device
 
 > 💡 **Tip:** You can also simply zip the folder on your PC, send it to your phone's **Download** folder, and tap **"⚡ Deteksi Otomatis dari Folder Download"** or **"📁 Impor .ZIP PC"** inside the app!
 
-### 3. Launch & Play!
-Open **Ghost Town Recomp**, select your game, connect your Bluetooth controller (or use the touch controls), and enjoy!
+### 3. Inspect runtime status
+Open **Ghost Town Recomp** and inspect the imported game data. The current Unity and Vulkan components are experimental scaffolding; successful import or metadata detection does **not** mean the PC game is playable. Wine/Box64 execution is not yet available in this APK.
 
 ---
 
@@ -109,7 +109,7 @@ cd ghost-town-recomp/android
 gradle assembleDebug
 gradle lint
 ```
-The output APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`. This repository currently does not include the Gradle wrapper scripts/JAR, so use an installed Gradle 8.5+ or add a verified wrapper before using `./gradlew`.
+The output APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`. This repository currently does not include `gradlew` or the Gradle wrapper JAR/properties; use installed Gradle 8.5+ as CI does, or add a verified wrapper before using `./gradlew`.
 
 ---
 
