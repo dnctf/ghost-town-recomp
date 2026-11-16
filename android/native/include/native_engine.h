@@ -30,7 +30,7 @@ public:
     GraphicsSettingsManager& GetGraphicsSettings() { return GraphicsSettingsManager::Instance(); }
 
 private:
-    NativeEngine() = default;
+    NativeEngine();
     void RenderLoop();
 
     std::string data_dir_;

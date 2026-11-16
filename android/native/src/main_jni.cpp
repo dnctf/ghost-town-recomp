@@ -13,6 +13,10 @@
 
 namespace overcooked {
 
+NativeEngine::NativeEngine() {
+    arena_ = std::make_unique<LinearMemoryArena>(32ULL * 1024ULL * 1024ULL);
+}
+
 NativeEngine& NativeEngine::Instance() {
     static NativeEngine instance;
     return instance;
@@ -22,8 +26,9 @@ void NativeEngine::Initialize(const std::string& data_dir, int backend_ordinal, 
     data_dir_ = data_dir;
     backend_ordinal_ = backend_ordinal;
 
-    // Scratch arena 32 MB (ringan, cepat, dan aman dari OOM Killer di semua perangkat Android / HarmonyOS)
-    arena_ = std::make_unique<LinearMemoryArena>(32ULL * 1024ULL * 1024ULL);
+    if (!arena_) {
+        arena_ = std::make_unique<LinearMemoryArena>(32ULL * 1024ULL * 1024ULL);
+    }
     thermal_.Initialize();
     audio_.Initialize(48000, 2);
     runtime_host_.Initialize(data_dir_, backend_ordinal_, game_version);
@@ -105,7 +110,9 @@ void NativeEngine::RenderLoop() {
         // Hitung skala resolusi render aktif
         float active_scale = std::clamp(budget.resolution_scale * gfx_cfg.custom_resolution_scale, 0.4f, 1.25f);
         vulkan_.RenderClearFrame(r, g, b, active_scale);
-        arena_->ResetFrameScratch();
+        if (arena_) {
+            arena_->ResetFrameScratch();
+        }
 
         // Thermal-aware frame pacing & spin-wait sleep
         auto target_duration = std::chrono::microseconds(1000000 / target_fps);

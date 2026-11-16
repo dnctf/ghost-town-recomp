@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Chef Hat (Top Puffs) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,24 C40,24 36,27 36,32 C33,32 30,35 30,39 C30,43 32,46 35,47 L73,47 C76,46 78,43 78,39 C78,35 75,32 72,32 C72,27 68,24 64,24 C60,24 57,26 54,29 C51,26 48,24 44,24 Z" />
+    <!-- Chef Hat Base Band -->
+    <path
+        android:fillColor="#E0E1DD"
+        android:pathData="M34,46 L74,46 L72,52 L36,52 Z" />
+    <path
+        android:fillColor="#E76F51"
+        android:pathData="M35,51 L73,51 L72,53 L36,53 Z" />
+
+    <!-- Ghost Body (Ghost Town Games Style) -->
+    <path
+        android:fillColor="#F8F9FA"
+        android:pathData="M54,49 C41,49 33,59 33,72 C33,83 38,87 40,84 C42,81 44,81 46,84 C48,87 52,87 54,84 C56,81 60,81 62,84 C64,87 66,87 68,84 C70,81 75,83 75,72 C75,59 67,49 54,49 Z" />
+
+    <!-- Cute Eyes (Dark) -->
+    <path
+        android:fillColor="#1B263B"
+        android:pathData="M45,63m-3.5,0a3.5,4.5 0,1,1 7,0a3.5,4.5 0,1,1 -7,0" />
+    <path
+        android:fillColor="#1B263B"
+        android:pathData="M63,63m-3.5,0a3.5,4.5 0,1,1 7,0a3.5,4.5 0,1,1 -7,0" />
+
+    <!-- Eye Highlights (Glow) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,61.5m-1.2,0a1.2,1.5 0,1,1 2.4,0a1.2,1.5 0,1,1 -2.4,0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M64,61.5m-1.2,0a1.2,1.5 0,1,1 2.4,0a1.2,1.5 0,1,1 -2.4,0" />
+
+    <!-- Rosy Cheeks (Ghost Town Games Warm Charm) -->
+    <path
+        android:fillColor="#FFAAA6"
+        android:pathData="M38,68m-2.5,0a2.5,1.5 0,1,1 5,0a2.5,1.5 0,1,1 -5,0" />
+    <path
+        android:fillColor="#FFAAA6"
+        android:pathData="M70,68m-2.5,0a2.5,1.5 0,1,1 5,0a2.5,1.5 0,1,1 -5,0" />
+
+    <!-- Smile -->
+    <path
+        android:fillColor="#1B263B"
+        android:strokeColor="#1B263B"
+        android:strokeWidth="1"
+        android:pathData="M51,69 Q54,72 57,69 Z" />
+
+    <!-- Tiny Wooden Spoon in Ghost Hand -->
+    <path
+        android:fillColor="#E9C46A"
+        android:pathData="M68,69 L78,61 C79,60 81,61 80,63 L72,73 Z" />
+    <path
+        android:fillColor="#E9C46A"
+        android:pathData="M79,62m-2.5,0a2.5,3.5 35,1,1 5,0a2.5,3.5 35,1,1 -5,0" />
+
+</vector>
