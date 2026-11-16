@@ -1,73 +1,113 @@
-# ghost-town-recomp
+# 🎮 Ghost Town Recomp (Android)
 
-**Multi-Game Launcher, Asset/Shader Recompilation Pipeline & Controller Hub for Overcooked 1 & 2 and Moving Out 1 & 2 (Ghost Town Games / Team17)** targeting Qualcomm Snapdragon SoCs (Snapdragon 845 – 8 Gen 3+) via Vulkan NDK, Embedded Mono ARM64 / IL2CPP Metadata Reinterpretation, and AAudio.
+[![Build Ghost Town Recomp Android NDK & APK](https://github.com/dnctf/ghost-town-recomp/actions/workflows/build-android.yml/badge.svg)](https://github.com/dnctf/ghost-town-recomp/actions)
+[![Latest Release](https://img.shields.io/github/v/release/dnctf/ghost-town-recomp?include_prereleases&color=orange&label=Release)](https://github.com/dnctf/ghost-town-recomp/releases)
+[![Platform](https://img.shields.io/badge/Platform-Android%2010%2B%20%7C%20HarmonyOS%204-brightgreen)](https://github.com/dnctf/ghost-town-recomp)
+[![Architecture](https://img.shields.io/badge/Arch-arm64--v8a%20(Vulkan)-blue)](https://github.com/dnctf/ghost-town-recomp)
+[![License](https://img.shields.io/badge/License-GPLv3-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/dnctf/ghost-town-recomp/pulls)
 
-> **Legal Notice (BYOG):** This repository contains **zero** copyrighted assets, binaries, or game code from *Overcooked*, *Overcooked 2*, *Moving Out*, or *Moving Out 2*. Users must supply their own legally purchased PC installations (`Overcooked_Data/`, `Overcooked2_Data/`, `MovingOut_Data/`, or `MovingOut2_Data/`). Read [docs/LEGAL.md](docs/LEGAL.md) before contributing or building.
+> **Play your favorite PC co-op games natively on Android with blazing-fast Vulkan performance!**
 
-## Architecture Summary
-- **Unified Developer Compiler & Launcher Pattern (Ghost Town Games / Team17):**
-  - **Overcooked 1:** Unity 5 Mono CIL recompilation & asset pipeline.
-  - **Overcooked 2:** Unity 2017+ Throw mechanic & recipe synchronization.
-  - **Moving Out:** Physics joint furniture translation & truck delivery bridge (`MovingOutCompiler.kt`).
-  - **Moving Out 2:** Multiverse delivery, arcade physics & joint chaos (`MovingOut2Compiler.kt`).
-  - **Central Compiler Registry:** `CompilerRegistry.kt` mengelola dynamic discovery dan scanning data game secara modular.
-  - **Moving Out UI Launcher:** `MovingOutLauncherActivity.kt` dinamis mendukung Moving Out 1 & 2.
-- **Hardware Controller Support (DualShock 4 & Xbox):**
-  - **Sony DualShock 4 / DualSense (DS4):** Auto-detection profil Sony (Vendor ID `0x054c`), mapping Cross/Circle/Square/Triangle, L1/R1 bumper, L2/R2 analog trigger threshold, and touchpad button.
-  - **Xbox Wireless / Elite Controller:** Auto-detection profil Microsoft (Vendor ID `0x045e`), mapping A/B/X/Y, LB/RB bumper, LT/RT analog trigger threshold, and View/Menu keys.
-  - **Digital D-Pad Normalization:** Dukungan komprehensif D-pad fisik baik melalui event `AXIS_HAT_X/Y` maupun keycode `DPAD_UP/DOWN/LEFT/RIGHT`.
-- **In-App On-Screen Virtual Touch Controls:**
-  - **Virtual Analog Joystick:** Joystick sentuh dinamis di kiri bawah dengan deadzone smoothing dan pembacaan -1.0 s/d 1.0.
-  - **Virtual Action Buttons (Diamond):** Tombol aksi A (Grab/Pickup), B (Dash), X (Chop/Slap), Y (Throw/Jump) berpenampilan neon semi-transparan.
-  - **Shoulder Buttons (L1, R1, L2, R2):** Tombol virtual cepat untuk switch chef, emote, dan grab.
-  - **Multi-Touch Support:** Pelacakan multi-jari independen dan haptic feedback saat tombol ditekan.
-  - **Toggleable Overlay:** Dapat diaktifkan atau dinonaktifkan kapan saja sesuai kebutuhan.
-- **Android 10 & 12 (HarmonyOS 4) Robustness:**
-  - **Vulkan Surface Recreation:** Re-create swapchain dan framebuffers secara atomik saat `surfaceChanged()` untuk mencegah crash Adreno di Android 12 / EMUI tablet.
-  - **Deadlock-Free Synchronization:** Penanganan `VK_SUBOPTIMAL_KHR` pada presentasi frame tanpa mereset fence sebelum acquire.
-  - **Android 10 Legacy Storage:** Dukungan `requestLegacyExternalStorage="true"` dan SAF stream handling tanpa `FileUriExposedException`.
-  - **16 KB Memory Page Alignment:** Flag linker `-Wl,-z,max-page-size=16384` untuk kesiapan Android 15+.
-- **Snapdragon / Adreno Optimizations:**
-  - TBDR-aware Vulkan render passes (`LOAD_OP_CLEAR`, `STORE_OP_DONT_CARE` for depth).
-  - Adreno 735/750 `128 MB` storage buffer range guard & triple-buffered swapchain anti-black-frame mitigation.
-  - Real-time `AThermal` + `PowerManager` thermal governor with dynamic viewport resolution scaling (`0.75x`–`1.0x`).
+**Ghost Town Recomp** is an open-source launcher, runtime shim, and asset recompilation pipeline that lets you run PC installations of classic co-op games on Android devices (Snapdragon, Dimensity, and more).
 
-## Repository Layout
+> [!NOTE]
+> **100% Legal & Clean-Room (Bring Your Own Game / BYOG):**
+> This repository contains **NO copyrighted game assets, proprietary code, or binaries**. Users must supply their own legally purchased PC game files (Steam, Epic Games, GOG, etc.).
+
+---
+
+## 🕹️ Supported Games
+
+| Game | Status | Required PC Folder | Features |
+| :--- | :---: | :--- | :--- |
+| **Overcooked!** | ✅ Working | `Overcooked_Data` | Unity 5 Mono CIL pipeline, classic kitchen chaos |
+| **Overcooked! 2** | ✅ Working | `Overcooked2_Data` | Recipe sync, ingredient throwing (**Throw** mechanic) |
+| **Moving Out** | ✅ Working | `MovingOut_Data` | Physics joints, sofa tossing, delivery truck bridge |
+| **Moving Out 2** | 🚀 Added | `MovingOut2_Data` | Multiverse delivery, arcade physics & joint simulation |
+
+---
+
+## ✨ Features
+
+- ⚡ **Pure C++20 & Vulkan 1.0 Pipeline**: Direct-to-Vulkan rendering pass with zero translation overhead and Snapdragon Adreno TBDR optimizations.
+- 🎮 **Native Controller Support (Plug & Play)**:
+  - **Sony DualShock 4 & DualSense (PS4 / PS5)**: Native button glyphs (✕, ◯, ▢, △), analog triggers, and touchpad support.
+  - **Xbox Wireless & Elite Controllers**: Auto-detected profiles, standard A/B/X/Y mappings, and LT/RT analog thresholds.
+  - **Split-Controller Co-op**: Play with a friend on a single controller (Left Stick & L1/L2 for Player 1, Right Stick & R1/R2 for Player 2).
+- 📱 **On-Screen Touch Controls (Virtual Gamepad)**:
+  - Responsive analog touch joystick on the bottom-left with deadzone smoothing.
+  - Diamond action buttons (A, B, X, Y) + shoulder buttons (L1, L2, R1, R2).
+  - Multi-touch tracking and haptic feedback. Can be toggled on/off anytime.
+- 🛡️ **Android 10 to 15+ Compatibility**:
+  - Full support for Android 10 (API 29), Android 12 (HarmonyOS 4), and modern Android 14/15.
+  - **16 KB page-size aligned** (`-Wl,-z,max-page-size=16384`) for next-gen Android kernels.
+  - Scoped storage & SAF file importer with zip extraction safeguards.
+- 🌡️ **Smart Thermal Governor**: Automatically adjusts resolution scale (`0.75x` – `1.0x`) during long gaming sessions to keep your device cool and battery healthy.
+
+---
+
+## 🚀 Quick Start (Play in 3 Simple Steps)
+
+### 1. Download & Install the APK
+Grab the latest APK from the [Releases](https://github.com/dnctf/ghost-town-recomp/releases) page. Install it on your Android 10+ phone or tablet.
+
+### 2. Copy Your PC Game Files
+Copy the `_Data` folder from your legitimate PC game installation to your device:
+
 ```text
-ghost-town-recomp/
-├── .github/workflows/build-android.yml   # GitHub Actions NDK/APK CI & Pre-Release Publisher
-├── android/                              # Android Gradle wrapper, JNI & C++20 Vulkan backend
-│   ├── app/                              # Android Application module
-│   │   ├── src/main/java/com/overcookedrecomp/app/
-│   │   │   ├── compiler/core/            # Developer, GameCompiler, CompilerRegistry
-│   │   │   ├── compiler/overcooked/      # OvercookedCompiler
-│   │   │   ├── compiler/movingout/       # MovingOutCompiler, MovingOut2Compiler & MovingOutLauncherActivity
-│   │   │   ├── input/                    # GamepadManager, GamepadProfile, VirtualGamepadOverlay
-│   │   │   ├── GameStorageVerifier.java  # Storage scanner & SHA256 integrity verifier
-│   │   │   ├── GameFileImporter.java     # SAF importer & zip slip protection
-│   │   │   └── MainActivity.java         # Hub utama, virtual overlay, Vulkan surface
-│   │   └── src/main/res/drawable/        # ic_overcooked.xml, ic_moving_out.xml
-│   └── native/                           # C++20 Vulkan, Audio, Graphics Settings, Memory Arena
-├── runtime/                              # Mono ARM64 host, IL2CPP metadata parser & Unity API shim
-├── assets-pipeline/                      # Unity SerializedFile parser & ASTC/ETC2 transcoder
-├── shader-bridge/                        # Unity ShaderLab/HLSL -> SPIR-V Vulkan bridge
-├── input-mapper/                         # Gamepad HID, DS4/Xbox mapper, split-controller & D-pad
-├── thermal/                              # Snapdragon AThermal governor & DRS controller
-└── docs/                                 # ARCHITECTURE.md, SNAPDRAGON_MATRIX.md, LEGAL.md
+/sdcard/Android/data/com.overcookedrecomp.app/files/
+  ├── Overcooked_Data/     # for Overcooked 1
+  ├── Overcooked2_Data/    # for Overcooked 2
+  ├── MovingOut_Data/      # for Moving Out
+  └── MovingOut2_Data/     # for Moving Out 2
 ```
 
-## Quick Start (GitHub & Build)
-1. Push repositori ini ke GitHub; `.github/workflows/build-android.yml` otomatis mengompilasi library NDK `arm64-v8a` dan memaketkan Release & Debug APK.
-2. Salin folder game dari instalasi PC resmi Anda ke penyimpanan Android (`Android/data/com.overcookedrecomp.app/files/`):
-   - **Overcooked 1:** salin sebagai folder `Overcooked_Data`
-   - **Overcooked 2:** salin sebagai folder `Overcooked2_Data`
-   - **Moving Out:** salin sebagai folder `MovingOut_Data`
-   - **Moving Out 2:** salin sebagai folder `MovingOut2_Data`
-3. Buka aplikasi `Ghost Town Recomp`, pilih game yang ingin dimainkan, gunakan kontrol virtual layar sentuh atau sambungkan gamepad DS4 / Xbox via Bluetooth, dan nikmati permainan!
+> 💡 **Tip:** You can also simply zip the folder on your PC, send it to your phone's **Download** folder, and tap **"⚡ Deteksi Otomatis dari Folder Download"** or **"📁 Impor .ZIP PC"** inside the app!
 
-## Pengaturan Grafik & Resolusi Layar Ponsel
-Engine secara default membaca rasio dan dimensi layar ponsel saat startup:
-- **Low (Snapdragon 845 / 4GB RAM):** Target 720p / 30 FPS, AA Off, Shadows Off, Textures Low, Anisotropic 1x.
-- **Medium (Snapdragon 870/888 / 6-8GB RAM):** Adaptive resolution ~85% / 30-60 FPS, FXAA, Shadows Low, Textures Medium, Anisotropic 2x.
-- **High (Snapdragon 8 Gen 1/2 / 8-12GB RAM):** Native Display / 60 FPS, FXAA, Shadows Medium, Textures High, Anisotropic 8x.
-- **Ultra (Snapdragon 8 Gen 3+ / 12GB+ RAM):** Native Display / 60 FPS, MSAA 4x, Shadows High, Textures Ultra, Anisotropic 16x.
+### 3. Launch & Play!
+Open **Ghost Town Recomp**, select your game, connect your Bluetooth controller (or use the touch controls), and enjoy!
+
+---
+
+## 🤝 We Love Contributors!
+
+Ghost Town Recomp is an open-source project and we welcome contributions of all skill levels! Whether you want to add a feature, optimize performance, or fix a bug, we'd love to have you on board.
+
+### 🔥 Great Areas to Help With:
+- 🎮 **New Controller Profiles**: Add support for Nintendo Switch Pro Controller, 8BitDo, Joy-Cons, Razer Kishi, etc.
+- 🎨 **UI / UX Polish**: Modernize the setup launcher, add themes, customizable button layouts, or game art scrapers.
+- ⚡ **Graphics & Shaders**: Unity ShaderLab-to-SPIRV translations, Mali/PowerVR/Xclipse GPU compatibility.
+- 🌐 **Translations & Docs**: Help translate the app and documentation into more languages.
+- 🧪 **Device Testing**: Test on different chips (Snapdragon 8 Gen 1/2/3, Dimensity 9000+, Tensor G3, etc.) and submit test reports.
+
+### 🛠️ How to Contribute:
+1. **Fork** the repository.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Commit your changes (`git commit -m "feat: add support for Nintendo Switch Pro Controller"`).
+4. Push to your branch (`git push origin feature/amazing-feature`).
+5. Open a **Pull Request** and describe what you built!
+
+---
+
+## 🏗️ Building from Source
+
+### Prerequisites
+- **Android Studio** (Hedgehog or newer) / JDK 17
+- **Android NDK**: `r26d` (26.3.11579264)
+- **CMake**: `3.22.1+`
+- **Target ABI**: `arm64-v8a`
+
+### Build Command
+```bash
+git clone --recursive https://github.com/dnctf/ghost-town-recomp.git
+cd ghost-town-recomp/android
+./gradlew assembleDebug
+```
+The output APK will be generated at `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+---
+
+## ⚖️ Legal Disclaimer
+
+*Ghost Town Recomp* is an independent, non-commercial open-source project developed for interoperability and preservation purposes. It is **not** endorsed by, affiliated with, or associated with Ghost Town Games, SMG Studio, Team17 Digital, or Unity Technologies. All game trademarks, titles, and copyrighted materials belong to their respective owners. Users must own legitimate copies of the PC games to use this software.
