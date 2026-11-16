@@ -123,6 +123,6 @@ The output APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`.
 - [Contributor guide](CONTRIBUTING.md)
 - [Game installation and Android tester guide](docs/CONTRIBUTOR_TESTING.md)
 - Run the host-side installation probe: `python3 tools/game_installation_probe.py /path/to/Game --json report.json`
-- Run probe tests: `python3 -m unittest discover -s tools/tests -v`
+- Run probe tests: `python3 -m unittest discover -s tools/tests -v`\n- Run Android launcher smoke test: `tools/android_device_smoke_test.sh /path/to/app-debug.apk`
 
 A complete Windows folder layout is not proof of Android compatibility. This project does not bundle Wine/Box64 or proprietary game files.
