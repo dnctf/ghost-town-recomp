@@ -489,11 +489,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 .setPositiveButton("EXECUTION STATUS", (d, which) -> {
                     if (selectedGame != null) showExecutionRequirements(selectedGame);
                 })
-                .setNeutralButton("IMPORT ZIP", (d, which) -> {
+                .setNeutralButton("IMPORT FULL PC ZIP", (d, which) -> {
                     pendingImportTitle = title;
                     openZipLauncher.launch(new String[]{"application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*"});
                 })
-                .setNegativeButton("PILIH FOLDER", (d, which) -> {
+                .setNegativeButton("PILIH FOLDER INSTALASI PC", (d, which) -> {
                     pendingImportTitle = title;
                     openFolderLauncher.launch(null);
                 })
@@ -595,7 +595,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
                 if (oc2StatusText != null) {
                     if (fHasOC2) {
-                        oc2StatusText.setText("DATA DETECTED  •  RUNTIME UNVERIFIED");
+                        oc2StatusText.setText("DATA FOUND  •  RUNTIME REQUIRED");
                         oc2StatusText.setTextColor(Color.parseColor("#2EC4B6"));
                     } else {
                         oc2StatusText.setText("NOT INSTALLED  •  IMPORT DATA");
@@ -631,7 +631,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         File extDir = getExternalFilesDir(null);
         if (extDir == null) return;
 
-        File targetDir = new File(extDir, pendingImportTitle.defaultFolderName);
+        File targetDir = new File(extDir, pendingImportTitle.name() + "_PC");
         showImportProgress(true, "Mengekstrak berkas game " + pendingImportTitle.displayName + "...");
 
         GameFileImporter.extractZipUri(this, uri, targetDir, new GameFileImporter.ProgressListener() {
