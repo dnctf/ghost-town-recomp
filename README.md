@@ -21,11 +21,11 @@
 
 | Game / Engine | Runtime Path | Status |
 | :--- | :--- | :--- |
-| Overcooked! | Unity Mono/CIL placeholder + Vulkan-facing native layer | 🧪 Prototype only; no verified gameplay |
-| Overcooked! 2 | Unity metadata/asset scaffolding + Vulkan-facing native layer | 🧪 Prototype only; no verified gameplay |
-| Moving Out | Title-specific launcher/compiler scaffolding | 🧪 Prototype only; no verified gameplay |
-| Moving Out 2 | Title-specific launcher/compiler scaffolding | 🧪 Prototype only; no verified gameplay |
-| Wine / Box64 (.exe) | Optional external Windows compatibility runtime | 📄 Evaluation + inactive bridge stub; not integrated |
+| Overcooked! | Data verifier + Mono/CIL inspection scaffold | 🧪 Data detection only; no execution |
+| Overcooked! 2 | IL2CPP metadata inspection scaffold | 🧪 Metadata detection only; no execution |
+| Moving Out | Title-specific inspection scaffold | 🧪 No verified execution |
+| Moving Out 2 | Title-specific inspection scaffold | 🧪 No verified execution |
+| Wine / Box64 (.exe) | Required candidate path for Windows PC builds | 📄 Research only; not integrated or tested |
 | Source Engine (HL2 / mods) | Separate SDK-based fork/port | 📄 Feasibility research; separate project |
 
 See [Runtime Audit](RUNTIME_AUDIT.md), [Multi-Runtime Architecture](docs/MULTI_RUNTIME_ARCHITECTURE.md), [Wine/Box64 Evaluation](docs/WINE_BOX64_EVALUATION.md), and [Source Engine Feasibility](docs/SOURCE_ENGINE_FEASIBILITY.md) for evidence and limitations.
@@ -51,12 +51,12 @@ See [Runtime Audit](RUNTIME_AUDIT.md), [Multi-Runtime Architecture](docs/MULTI_R
 
 ---
 
-## 🚀 Quick Start (Play in 3 Simple Steps)
+## 🚧 Current Status (0.3.0-alpha)
 
-### 1. Download & Install the APK
-Grab the latest APK from the [Releases](https://github.com/dnctf/ghost-town-recomp/releases) page. Install it on your Android 10+ phone or tablet.
+### 1. Install the experimental launcher
+Install the APK from the [Releases](https://github.com/dnctf/ghost-town-recomp/releases) page on an Android 10+ device. This release is a launcher and runtime-readiness preview, not a playable Unity runtime.
 
-### 2. Copy Your PC Game Files
+### 2. Import game data for inspection
 Copy the `_Data` folder from your legitimate PC game installation to your device:
 
 ```text
@@ -69,8 +69,8 @@ Copy the `_Data` folder from your legitimate PC game installation to your device
 
 > 💡 **Tip:** You can also simply zip the folder on your PC, send it to your phone's **Download** folder, and tap **"⚡ Deteksi Otomatis dari Folder Download"** or **"📁 Impor .ZIP PC"** inside the app!
 
-### 3. Inspect runtime status
-Open **Ghost Town Recomp** and inspect the imported game data. The current Unity and Vulkan components are experimental scaffolding; successful import or metadata detection does **not** mean the PC game is playable. Wine/Box64 execution is not yet available in this APK.
+### 3. Inspect execution requirements
+Open **Ghost Town Recomp** and inspect the imported game data. The app reports detected data separately from execution readiness. Press **EXECUTION STATUS** on a game card to see the missing runtime components. The orange clear-only renderer has been removed. Mono hosting, IL2CPP recompilation, Unity rendering, and Wine/Box64 integration are not yet implemented; therefore no PC game is claimed playable.
 
 ---
 
