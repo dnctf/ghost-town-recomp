@@ -2,7 +2,7 @@
 
 ## Current integration
 
-The 0.4.0-alpha.1 launcher still exposes **WINE / BOX64 STATUS** and **INSTALL WINE RUNTIME BUNDLE (.TAR.GZ)**. The single-APK managed first-run downloader is not yet implemented. A user-selected runtime archive is extracted into app-private storage at `Context.getFilesDir()/runtime/wine/`. Extraction stages the new runtime, rejects absolute/traversal paths and symlinks escaping the staging directory, validates required files, and only then swaps it into place.
+The 0.4.0-alpha.1 launcher exposes **DOWNLOAD & INSTALL RUNTIME (MANAGED)** as well as the manual archive import fallback. The managed path downloads the project-owned alpha release asset over HTTPS, verifies its published SHA-256 sidecar, and then calls the same transactional safe installer. It requires internet on first install; the runtime payload remains a separately managed release asset rather than APK-embedded. A user-selected runtime archive is extracted into app-private storage at `Context.getFilesDir()/runtime/wine/`. Extraction stages the new runtime, rejects absolute/traversal paths and symlinks escaping the staging directory, validates required files, and only then swaps it into place.
 
 The optional Wine probe runs only the fixed headless command `box64 wine --version` through PRoot. It is not a game launch path. Wine prefix creation, per-title DXVK installation, and a guarded game launch entry point are now scaffolded under `wine-runtime/scripts/`, but are not yet wired to a device-tested graphics session.
 
