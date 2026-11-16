@@ -1,35 +1,49 @@
-# Wine / Box64 Feasibility Evaluation
+# Wine + Box64 Evaluation
 
-**Status: external-runtime evaluation only. No Wine/Box64 code or binary is integrated by this document.**
+**Status:** architecture evaluation only. No Wine/Box64 code or binary is integrated in this repository.
 
 ## Feasibility
 
-Wine combined with Box64 can provide a route for running supported **x86-64 Windows applications** on ARM64 Linux-based environments: Wine implements Windows APIs, while Box64 translates x86-64 Linux user-mode code needed by the Wine stack. On Android, this generally requires a compatible Android runtime/userspace arrangement (for example, a PRoot-based Linux root filesystem), an ARM64 Box64 build, a compatible Wine build, filesystem/process setup, and a graphics stack.
+Wine combined with Box64 can provide a route for running supported **x86-64 Windows applications** on ARM64 Linux-based environments. Wine implements Windows API compatibility; Box64 translates x86-64 Linux user-mode instructions needed by the Wine stack.
 
-This is not equivalent to dropping `box64` into an Android APK. Box64 is not itself a Windows PE loader and does not supply Wine, Windows APIs, a Linux root filesystem, or DirectX translation. Compatibility varies by application, CPU features, Wine version, libc/userspace, GPU driver, graphics API, DRM, and dependencies.
+On Android this normally requires a compatible Android runtime/userspace arrangement, ARM64 Box64, a compatible Wine build, process/filesystem setup, and a graphics stack. It is not enough to place a Box64 executable inside an APK: Box64 is not itself a Windows PE loader and does not provide Wine, Windows APIs, a Linux root filesystem, or DirectX translation.
 
-## Why this is separate from the Unity path
+This does not guarantee arbitrary game compatibility. Executable architecture, Wine version, CPU features, libc/userspace, game dependencies, DRM/anti-cheat, graphics API, and GPU driver all matter. A 32-bit x86 executable also needs a separately validated WoW64/Box32/Box86 strategy; Box64 alone must not be advertised as sufficient.
 
-The current repository has a Unity-oriented native shim and asset metadata helpers. Wine/Box64 instead executes a Windows program in a compatibility environment. It does not convert Unity CIL or IL2CPP game code into this repository's native object model, nor does it make the current Vulkan surface a Unity renderer.
+## Why it is separate from Unity recompilation
 
-The screenshot supplied for the Overcooked 2 installation preflight reports PE machine `0x014C` (x86 / 32-bit), twice. That is **not** an x86-64 executable. A Box64-only x86-64 configuration cannot be assumed to run it. A compatible 32-bit path (for example, a validated WoW64 setup or Box86-based stack) must be selected and tested. The preflight's reported zero-byte sizes also mean file inventory/metadata should be rechecked against the complete installation folder before attempting execution.
+The current Unity-oriented path is Android-native C++ with metadata and asset inspection scaffolding. Wine + Box64 hosts a Windows process in a compatibility environment. It does not convert Unity CIL or IL2CPP code into this repository's native object model, and it does not turn the current Vulkan surface into a Unity renderer.
+
+Combining Wine/Box64 directly into `overcooked_native` would mix different process models, dependency graphs, filesystem assumptions, and graphics responsibilities. Keep the Windows runtime as an independently versioned module.
 
 ## Integration options
 
-1. **Separate runtime app/module (preferred for evaluation):** maintain a standalone `wine-runtime/` project or companion Android app that owns the rootfs, Wine prefix, Box64/Box86, graphics translation, and runtime updates. The Ghost Town launcher can later expose an explicit "Open in external runtime" hand-off if a stable and permission-safe interface exists.
-2. **Termux/PRoot-assisted workflow:** use a user-installed Termux-compatible Linux userspace with Box64 and Wine. This can be useful for a proof of concept, but process hand-off, storage permissions, graphics/Vulkan access, and device-specific behavior must be validated. Do not assume that an arbitrary Termux installation exposes a supported public API for another app.
-3. **Embedded runtime bundle:** only consider after a reproducible build, legal review, ABI/userspace validation, storage sizing, update strategy, and security review. Do not embed opaque binaries or extract another app's private data.
+1. **Separate `wine-runtime/` module or companion app (preferred):** own the Linux userspace, Wine prefixes, Box64/Box86, graphics translation, runtime downloads/updates, and logs. The launcher can later hand off a selected game to a supported external runtime interface.
+2. **User-managed Termux/PRoot:** useful for an early proof of concept. However, inter-app process hand-off, Android storage permissions, Vulkan access, lifecycle, and environment setup require explicit validation. Do not assume arbitrary Termux installations expose a stable public API for other apps.
+3. **Embedded runtime bundle (defer):** only after reproducible builds, license/provenance review, ABI/userspace validation, security review, storage sizing, and update strategy.
+
+## Graphics path
+
+- Use the Android device's Vulkan implementation as the host driver.
+- DXVK translates supported Direct3D 9/10/11 workloads to Vulkan.
+- Direct3D 12 needs a VKD3D-family path.
+- Do not bundle or replace the Android GPU driver as part of this initial integration.
+- Select graphics components per title and test them on physical devices.
 
 ## Required proof-of-concept gates
 
-- Select and pin an upstream Android Wine/Box64 implementation; record exact commit, licenses, notices, patches, and source obligations.
-- Confirm 32-bit and 64-bit architecture strategy separately. The supplied Overcooked 2 preflight currently identifies x86 32-bit PE files.
-- Build or obtain a reproducible ARM64 userspace and verify loader/libc compatibility.
-- Start Box64/Box86 and the corresponding Wine loader in the intended Android process model.
-- Run a small, redistributable Windows test program and capture exit code/stdout/stderr.
-- Test Vulkan availability and the chosen DXVK/VKD3D path independently on target devices.
-- Only then attempt one user-owned game installation; verify DRM, dependencies, audio, controller, save path, menu, and actual gameplay.
+1. Pin upstream source revisions and record licenses, notices, patches, checksums, and source-distribution obligations.
+2. Decide and validate x86-64 and 32-bit x86 support separately.
+3. Establish a reproducible ARM64 userspace and verify loader/libc compatibility.
+4. Start Box64 (and the 32-bit counterpart if required) plus the corresponding Wine loader in the intended Android process model.
+5. Run a small redistributable Windows test executable and capture exit code and logs.
+6. Test Vulkan and the chosen DXVK/VKD3D path independently.
+7. Test a user-owned game installation, including DRM/dependencies, audio, input, save paths, menus, and actual gameplay.
+
+## Stub in this PR
+
+`WineRuntimeBridge.kt` is a deliberately inactive boundary for future integration. It reports the backend as unavailable. It does not download runtime files, create Wine prefixes, invoke shell commands, or launch executables. The launcher must not expose a functional Run EXE action until a real backend passes the proof-of-concept gates.
 
 ## Recommendation
 
-Keep Wine/Box64 out of the Unity native build and APK for now. Prototype it as a separately maintained runtime module/app. The supplied x86 32-bit executable result makes the 32-bit compatibility decision the first blocker—not simply adding Box64.
+Keep Wine/Box64 optional and separate from the Unity native library. Start with a separately maintained runtime module/companion app; only consider embedding after a reproducible and legally reviewed Android runtime is demonstrated.
