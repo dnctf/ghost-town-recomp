@@ -1,25 +1,26 @@
 {
-  "schema_version": 1,
-  "target": "android-arm64",
-  "status": "experimental-source-build",
+  "schema_version": 2,
+  "target": "android-arm64-via-glibc-userspace",
+  "status": "experimental-components-not-yet-app-integrated",
   "components": {
     "box64": {
       "upstream": "https://github.com/ptitSeb/box64",
       "build_workflow": ".github/workflows/build-box64-android.yml",
-      "abi": "arm64-v8a",
-      "android_api": 29,
-      "ndk": "26.3.11579264",
-      "status": "build-on-demand; not bundled in APK; device validation pending"
+      "abi": "aarch64-linux-gnu",
+      "profile": "Snapdragon 888",
+      "status": "Linux ARM64 glibc artifact build pipeline; device validation pending"
     },
     "wine": {
-      "upstream": "https://gitlab.winehq.org/wine/wine",
-      "status": "not integrated",
-      "reason": "Requires a validated Android-compatible Wine build and Linux userspace integration"
+      "upstream": "https://github.com/Kron4ek/Wine-Builds",
+      "version": "11.19-amd64",
+      "sha256": "40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e",
+      "status": "downloaded and packaged by workflow; requires Box64 + glibc userspace; not APK-integrated"
     },
     "dxvk": {
-      "upstream": "https://github.com/doitsujin/dxvk",
-      "status": "not integrated",
-      "reason": "Requires a compatible Wine/Vulkan runtime path and device validation"
+      "upstream": "https://github.com/doitsujin/DXVK",
+      "version": "3.1.1",
+      "sha256": "40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608",
+      "status": "Windows DLL payload packaged for Wine prefix; Vulkan validation pending"
     },
     "unity_player": {
       "status": "user-provided",
