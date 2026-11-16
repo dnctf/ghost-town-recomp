@@ -77,7 +77,8 @@ object WineRuntimeBridge {
 
         val missing = mutableListOf<String>()
         if (!l.proot.isFile || !l.proot.canExecute()) missing += "bin/proot (executable Android ARM64)"
-        if (!l.prootLoader.isFile) missing += "libexec/proot/loader (PRoot companion loader)"
+        if (!l.prootLoader.isFile) missing += "libexec/proot/loader (PRoot AArch64 companion loader)"
+        if (!File(l.root, "libexec/proot/loader32").isFile) missing += "libexec/proot/loader32 (PRoot ARM32 companion loader)"
         if (!File(l.rootfs, "etc/os-release").isFile) missing += "rootfs/etc/os-release (glibc Linux userspace)"
         if (!File(l.rootfs, l.box64.removePrefix("/")).isFile) missing += "Box64 ARM64/glibc"
         if (!File(l.rootfs, l.wine.removePrefix("/")).isFile) missing += "Wine x86_64"
