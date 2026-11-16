@@ -180,6 +180,34 @@ jobs:
           sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/locale/"*
           sudo find "$ROOTFS/usr/share/doc" -type f ! -name copyright -delete
           sudo find "$ROOTFS/usr/share/doc" -mindepth 1 -type d -empty -delete
+          # The Android installer rejects absolute/escaping symlinks. In a chroot,
+          # absolute links resolve from the guest root; rewrite them as equivalent
+          # relative links that remain inside this rootfs before packaging.
+          sudo python3 - "$ROOTFS" <<'PY'
+          import os
+          import sys
+
+          root = os.path.abspath(sys.argv[1])
+          rewritten = 0
+          for current, directories, files in os.walk(root, followlinks=False):
+              for name in list(directories) + files:
+                  path = os.path.join(current, name)
+                  if not os.path.islink(path):
+                      continue
+                  target = os.readlink(path)
+                  if os.path.isabs(target):
+                      mapped = os.path.normpath(os.path.join(root, target.lstrip(os.sep)))
+                  else:
+                      mapped = os.path.normpath(os.path.join(current, target))
+                  if os.path.commonpath((root, mapped)) != root:
+                      raise SystemExit("Symlink escapes guest rootfs: %s -> %s" % (path, target))
+                  if os.path.isabs(target):
+                      relative = os.path.relpath(mapped, current)
+                      os.unlink(path)
+                      os.symlink(relative, path)
+                      rewritten += 1
+          print("Rewrote %d absolute symlinks; all symlinks remain rootfs-confined." % rewritten)
+          PY
           sudo dpkg-query --admindir="$ROOTFS/var/lib/dpkg" -W -f='${Package}:${Architecture}=${Version}\n' > rootfs-package-manifest.txt
           mkdir -p rootfs-artifact/provenance/licenses
           cp box64-src/LICENSE rootfs-artifact/provenance/licenses/BOX64-LICENSE
