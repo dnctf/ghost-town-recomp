@@ -8,6 +8,8 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.IOException
+import java.io.FileInputStream
+import java.security.MessageDigest
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
@@ -181,6 +183,51 @@ object RuntimeBundleInstaller {
             if (!File(root, it).setExecutable(true, false) && !File(root, it).canExecute()) {
                 throw IOException("Tidak dapat memberi izin executable: $it")
             }
+        }
+        verifyRuntimeChecksums(root)
+    }
+
+    private fun verifyRuntimeChecksums(root: File) {
+        val checksumFile = File(root, "provenance/RUNTIME-SHA256SUMS")
+        if (!checksumFile.isFile) throw IOException("Manifest checksum runtime tidak ditemukan.")
+        val required = setOf(
+            "bin/proot",
+            "libexec/proot/loader",
+            "libexec/proot/loader32",
+            "rootfs/usr/local/bin/box64",
+            "rootfs/opt/wine/bin/wine",
+            "rootfs/opt/dxvk/x64/d3d11.dll",
+            "rootfs/opt/dxvk/x64/dxgi.dll"
+        )
+        val verified = mutableSetOf<String>()
+        checksumFile.forEachLine { line ->
+            val parts = line.trim().split(Regex("\\s+"), limit = 2)
+            if (parts.size != 2 || !parts[0].matches(Regex("[0-9a-fA-F]{64}"))) {
+                throw IOException("Format checksum runtime tidak valid.")
+            }
+            val relative = safeRelativePath(parts[1])
+                ?: throw IOException("Path checksum tidak valid.")
+            val name = relative.toString()
+            val file = File(root, name)
+            if (!file.isFile) throw IOException("File checksum tidak ditemukan: $name")
+            val digest = MessageDigest.getInstance("SHA-256")
+            FileInputStream(file).use { input ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            val actual = digest.digest().joinToString("") { "%02x".format(it) }
+            if (!actual.equals(parts[0], ignoreCase = true)) {
+                throw IOException("Checksum tidak cocok: $name")
+            }
+            verified += name
+        }
+        val missing = required - verified
+        if (missing.isNotEmpty()) {
+            throw IOException("Checksum wajib belum diverifikasi: ${missing.joinToString()}")
         }
     }
 
