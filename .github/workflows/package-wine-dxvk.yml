@@ -65,6 +65,9 @@ jobs:
           fi
 
       - name: Extract and validate runtime components
+        env:
+          WINE_VERSION: ${{ inputs.wine_version || '11.19' }}
+          DXVK_VERSION: ${{ inputs.dxvk_version || '3.1.1' }}
         run: |
           set -euo pipefail
           tar -xJf "downloads/$WINE_FILE" -C bundle/wine --strip-components=1
