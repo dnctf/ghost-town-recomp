@@ -10,10 +10,15 @@ namespace overcooked {
 
 struct AdrenoDeviceCaps {
     bool is_adreno = false;
-    uint32_t adreno_series = 0; // 630, 730, 735, 740, 750
-    VkDeviceSize safe_max_storage_buffer_range = 128ULL * 1024ULL * 1024ULL; // 128 MB Adreno cap
+    uint32_t adreno_series = 0; // Parsed from the runtime Vulkan device name.
+    uint32_t vendor_id = 0;
+    uint32_t device_id = 0;
+    uint32_t vulkan_api_version = VK_API_VERSION_1_0;
+    uint32_t driver_version = 0;
+    VkDeviceSize safe_max_storage_buffer_range = 0;
     VkDeviceSize min_ubo_offset_alignment = 256;
-    uint32_t max_anisotropy = 4;
+    float max_sampler_anisotropy = 1.0f;
+    bool supports_sampler_anisotropy = false;
     bool supports_dynamic_rendering = false;
 };
 
