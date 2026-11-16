@@ -48,3 +48,19 @@ The reference repository describes its modified code as GPL-3.0 and upstream cod
 ## Current status
 
 No graphics backend is integrated. The launcher must continue to show runtime status/probe only and must not claim that Windows games are playable. The next graphics milestone is a minimal X11 window rendered into the Android surface with a known test client; only after that should DXVK be enabled.
+
+
+## v0.3.3 target-device gate — Huawei MatePad Air 2023
+
+Target profile supplied for this project: Snapdragon 888 / Adreno 660 / HarmonyOS 4.2 / Android ARM64. The repository currently has no physical-device evidence proving a Wine window can be presented on this profile.
+
+Required checks before selecting a graphics stack:
+
+- Record the exact HarmonyOS build, Vulkan API version, supported extensions, driver strings, and device feature limits from the device itself.
+- Confirm whether the device's system Vulkan loader and Adreno ICD can be reached from a guest ARM64/glibc process. Do not assume Android Bionic libraries can be loaded directly into Debian/glibc.
+- Evaluate a Turnip/adrenotools route only after pinning a compatible Adreno 660 build, checking extension requirements, Android API compatibility, and license/provenance.
+- Choose one first graphics transport (for example, an X11 server with a known test client and a defined surface bridge) and make it pass a simple display test before adding DXVK.
+- Validate surface creation, resize, rotation, pause/resume, teardown, frame pacing, and lifecycle recovery independently from Wine.
+- After a display backend is proven, validate Vulkan instance/device creation, DXVK D3D11 device creation, a minimal Direct3D sample, and first-frame presentation in that order.
+
+A Vulkan capability query from the Android app, an installed DXVK DLL, or a successful Wine version probe is not evidence that DXVK has initialized on Adreno 660. Keep the game launch action disabled until these gates and input/audio tests pass.

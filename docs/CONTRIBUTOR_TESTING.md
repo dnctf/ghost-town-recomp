@@ -2,39 +2,40 @@
 
 This is an experimental Android ARM64 launcher and Windows-game runtime research project. APK compilation, runtime installation, Wine startup, DXVK initialization, and playable gameplay are separate validation gates.
 
-## What build 0.3.2 contains
+## What build 0.3.3 contains
 
 - Android launcher, game-library UI, storage importer, touch/gamepad input scaffolding, and native C++/Vulkan scaffolding.
 - Unity Windows installation inspection for PE architecture, adjacent UnityPlayer.dll, matching `*_Data`, and Mono/IL2CPP metadata hints.
 - Wine/Box64 status diagnostics and a fixed headless `wine --version` probe.
-- App-private runtime bundle installer for a gzip-compressed tar archive. It stages extraction, checks required files, validates SHA-256 digests for key binaries/DXVK DLLs, rejects path traversal and escaping symlinks, and preserves the previous runtime until the new one validates.
-- A separate CI workflow to assemble Android PRoot, Debian ARM64/glibc rootfs, Box64, Wine 11.19, and DXVK 3.1.1.
+- Version-matched HTTPS GitHub Release manifest downloader with retry/resume, archive-size validation, and SHA-256 verification before installation.
+- App-private runtime installer with staging, required-file validation, traversal and escaping-link checks, guest-rooted absolute-symlink normalization, core-file checksum validation, and rollback.
+- CI workflow assembling Android PRoot, Debian Bookworm ARM64/glibc rootfs, Box64, Wine 11.19, and DXVK 3.1.1.
 
 The APK does not embed the large Wine runtime bundle, Unity Player, or proprietary game files. The X11/display server, Vulkan presentation bridge, audio bridge, and Wine game-launch lifecycle are not integrated yet.
 
 ## Obtain the Android APK
 
-Open the GitHub **Releases** page and select **Ghost Town Recomp 0.3.2 - Contributor Tester Candidate** (`v0.3.2`). Download `app-debug.apk` for debugging or `app-release.apk` for release-mode smoke tests. If the release is not published yet, use the successful **Ghost Town Recomp Android Build and Tester Release** workflow on `main` and download artifact `ghost-town-recomp-0.3.2-arm64`:
-- `app-debug.apk` for debugging
-- `app-release.apk` for release-mode smoke tests
+Open [GitHub Releases](https://github.com/dnctf/ghost-town-recomp/releases) and select **Ghost Town Recomp 0.3.3 - Contributor Tester Candidate** (`v0.3.3`). Download `app-debug.apk` for debugging or `app-release.apk` for release-mode smoke tests. The release APK is CI/debug-signed and is not production-signed.
 
-The current release APK is CI/debug-signed and is a tester build, not a production-signed release.
+If the release assets are not yet available, open the successful **Ghost Town Recomp Android Build and Tester Release** workflow on `main` and download artifact `ghost-town-recomp-0.3.3-arm64`.
 
-## Install the optional Wine runtime bundle
+## Install the optional Wine runtime
 
-1. Open the GitHub **Releases** page and select release `v0.3.2`.
-2. Download both `ghost-town-wine-runtime-arm64.tar.gz` and `ghost-town-wine-runtime-arm64.tar.gz.sha256` from the release assets. The SHA-256 file is provided for independent integrity verification.
-3. If the runtime assets have not appeared yet, wait for **Build Complete ARM64 Wine Runtime Bundle** to finish successfully; the workflow attaches them to the same release automatically.
-4. Keep enough free internal storage for the expanded rootfs plus temporary staging space. The installer creates a new staging directory before replacing an existing runtime.
-5. Install the APK, open Ghost Town Recomp, and choose **INSTALL WINE RUNTIME BUNDLE (.TAR.GZ)**.
-6. Select `ghost-town-wine-runtime-arm64.tar.gz`. Wait for the app to report that installation and payload checksums completed.
-7. Open **WINE / BOX64 STATUS**. If the runtime is complete, run **TEST WINE VERSION** and save the displayed output/log.
+1. Install the APK and connect to the internet.
+2. Open Ghost Town Recomp and choose **DOWNLOAD & INSTALL WINE RUNTIME v0.3.3**.
+3. The app retrieves `runtime-manifest.json` from the matching GitHub Release over HTTPS.
+4. It checks the runtime version, ARM64 architecture, HTTPS GitHub asset URL, declared archive size, and SHA-256.
+5. Interrupted transfers are retried and resumed when the release server supports HTTP Range. The old runtime is not changed during download.
+6. After the archive digest matches, the app extracts into an app-private staging directory, validates required files and their SHA-256 entries, then activates the runtime while retaining rollback capability.
+7. Open **WINE / BOX64 STATUS** and choose **TEST WINE VERSION**. Save the output and exit code for device testing.
 
-The archive is a separate runtime payload, not an APK expansion file. The installer does not download it automatically. Install the APK first, then import the `.tar.gz` file from the release assets.
+Manual installation remains available through **IMPORT WINE RUNTIME BUNDLE (.TAR.GZ)**. Download `ghost-town-wine-runtime-arm64.tar.gz` from the same release and select it through Android's document picker.
+
+Keep sufficient internal storage for the downloaded archive, expanded rootfs, and staging copy. The downloader stores its partial archive in app cache. A failed download or installation should leave the previously active runtime intact.
 
 ## What a successful Wine probe means
 
-A successful probe means the app found the required runtime files and the fixed headless command `box64 wine --version` returned exit code 0 through PRoot. It does not verify:
+A successful probe means the fixed headless command `box64 wine --version` returned exit code 0 through PRoot. It does not verify:
 - PRoot ptrace behavior under the target HarmonyOS kernel policy
 - Wine prefix initialization or Windows PE execution
 - DXVK DLL loading or Vulkan device creation
@@ -46,7 +47,7 @@ Do not mark a Windows game playable based on this probe.
 
 ## Prepare a legally obtained PC game installation
 
-Copy the complete game installation from a source you are authorized to use. A typical Unity Windows build may contain:
+A typical Unity Windows installation may contain:
 
 ```text
 Game/
@@ -59,11 +60,11 @@ Game/
   GameAssembly.dll
 ```
 
-The exact layout varies by Unity version and title. Mono and IL2CPP files are alternatives, not all required together. Do not upload game files, keys, saves, or copyrighted assets to this public repository.
+The exact layout varies by Unity version and title. Mono and IL2CPP files are alternatives. Do not upload game files, keys, saves, or copyrighted assets to this public repository.
 
-In the game card, choose **PILIH FOLDER INSTALASI PC** and select the top-level folder containing the EXE, UnityPlayer.dll, and matching `*_Data` directory. Importing only `*_Data` is not a complete PC installation.
+Select **PILIH FOLDER INSTALASI PC** and choose the top-level folder containing the EXE, UnityPlayer.dll, and matching `*_Data` directory. Importing only `*_Data` is not a complete PC installation.
 
-## Static installation probe (Linux/macOS/Windows with Python 3)
+## Static installation probe
 
 ```sh
 python3 tools/game_installation_probe.py /path/to/Game --json game-report.json
@@ -87,13 +88,13 @@ This installs and launches the APK and captures startup logcat. It does not run 
 For the target Huawei MatePad Air 2023 (Snapdragon 888 / Adreno 660 / HarmonyOS 4.2), record:
 
 1. APK version, device model, OS build, ABI, GPU driver, and available storage.
-2. Whether runtime bundle installation completed; include the bundle SHA-256.
+2. Runtime download/install result and the bundle SHA-256.
 3. Wine probe output, exit code, and `wine-version-probe.log`.
-4. Any PRoot/Box64/Wine errors from `adb logcat`.
+4. PRoot/Box64/Wine errors from `adb logcat`.
 5. Separate outcomes for import, Wine startup, PE startup, first frame, menu, gameplay, input, audio, save/load, crash, FPS, temperature, memory, and at least 15 minutes of stability.
 
-Attach the probe JSON, logs, screenshots/video, and exact reproduction steps to a GitHub issue.
+Attach probe JSON, logs, screenshots/video, and exact reproduction steps to a GitHub issue.
 
 ## Current playable status
 
-No Windows Unity game is currently claimed playable on Android. The graphics/display backend and Android audio/input integration remain outstanding. The next milestone after a successful Wine probe is a harmless Windows PE test, followed by a minimal Direct3D/Vulkan presentation test. Only then should a game be launched.
+No Windows Unity game is currently claimed playable on Android. Graphics/display and Android audio/input integration remain outstanding. The next milestone after a successful Wine probe is a harmless Windows PE test, followed by a minimal Direct3D/Vulkan presentation test. Only then should a game be launched.

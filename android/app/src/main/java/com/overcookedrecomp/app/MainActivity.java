@@ -45,6 +45,7 @@ import com.overcookedrecomp.app.input.GamepadManager;
 import com.overcookedrecomp.app.input.VirtualGamepadOverlay;
 import java.io.File;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
     private static final String TAG = "OvercookedRecomp";
@@ -376,7 +377,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         wineRuntimeParams.topMargin = dp(8);
         container.addView(wineRuntimeBtn, wineRuntimeParams);
 
-        Button installRuntimeBtn = createDashboardButton("INSTALL WINE RUNTIME BUNDLE (.TAR.GZ)", "#203A2C");
+        Button downloadRuntimeBtn = createDashboardButton("DOWNLOAD & INSTALL WINE RUNTIME v0.3.3", "#0878D1");
+        downloadRuntimeBtn.setOnClickListener(v -> downloadAndInstallRuntime());
+        LinearLayout.LayoutParams downloadRuntimeParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
+        downloadRuntimeParams.topMargin = dp(8);
+        container.addView(downloadRuntimeBtn, downloadRuntimeParams);
+
+        Button installRuntimeBtn = createDashboardButton("IMPORT WINE RUNTIME BUNDLE (.TAR.GZ)", "#203A2C");
         installRuntimeBtn.setOnClickListener(v -> runtimeBundleLauncher.launch(new String[]{
                 "application/gzip", "application/x-gzip", "application/octet-stream", "*/*"
         }));
@@ -401,7 +409,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(importProgressBar);
 
         TextView footer = new TextView(this);
-        footer.setText("GHOST TOWN RECOMP  •  BUILD 0.3.2  •  EXPERIMENTAL RUNTIME / BYOG");
+        footer.setText("GHOST TOWN RECOMP  •  BUILD 0.3.3  •  EXPERIMENTAL RUNTIME / BYOG");
         footer.setTextSize(9);
         footer.setTextColor(Color.parseColor("#63748B"));
         footer.setLetterSpacing(0.08f);
@@ -522,6 +530,41 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setEnabled(selectedGame != null));
         dialog.show();
+    }
+
+    private void downloadAndInstallRuntime() {
+        showImportProgress(true, "Menghubungi GitHub Release untuk runtime v0.3.3...");
+        new Thread(() -> {
+            try {
+                RuntimeBundleDownloader.downloadAndInstall(this, new Consumer<String>() {
+                    @Override
+                    public void accept(String message) {
+                        runOnUiThread(() -> {
+                            if (importProgressText != null) importProgressText.setText(message);
+                        });
+                    }
+                });
+                runOnUiThread(() -> {
+                    showImportProgress(false, "");
+                    new AlertDialog.Builder(this)
+                            .setTitle("RUNTIME v0.3.3 TERPASANG")
+                            .setMessage("Manifest release dan SHA-256 arsip telah diverifikasi sebelum instalasi. Runtime berhasil diekstrak ke penyimpanan privat aplikasi. Jalankan TEST WINE VERSION untuk memeriksa probe headless; ini belum membuktikan DXVK/Vulkan atau game dapat berjalan.")
+                            .setPositiveButton("PERIKSA STATUS", (dialog, which) -> showWineRuntimeStatus())
+                            .setNegativeButton("TUTUP", null)
+                            .show();
+                });
+            } catch (Throwable error) {
+                Log.e(TAG, "Automatic runtime download/install failed", error);
+                runOnUiThread(() -> {
+                    showImportProgress(false, "");
+                    new AlertDialog.Builder(this)
+                            .setTitle("DOWNLOAD RUNTIME GAGAL")
+                            .setMessage(error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())
+                            .setPositiveButton("OK", null)
+                            .show();
+                });
+            }
+        }, "runtime-download-installer").start();
     }
 
     private void installRuntimeBundle(Uri uri) {

@@ -5,6 +5,7 @@
     <uses-feature android:name="android.hardware.vulkan.version" android:value="0x401000" android:required="false" />
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
 
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 
@@ -32,7 +33,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Compiler / Launcher untuk SMG Studio (Moving Out) -->
         <activity
             android:name=".compiler.movingout.MovingOutLauncherActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|navigation"

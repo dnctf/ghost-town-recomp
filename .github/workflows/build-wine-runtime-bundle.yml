@@ -180,9 +180,9 @@ jobs:
           sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/locale/"*
           sudo find "$ROOTFS/usr/share/doc" -type f ! -name copyright -delete
           sudo find "$ROOTFS/usr/share/doc" -mindepth 1 -type d -empty -delete
-          # upload-artifact runs as the unprivileged runner user; make rootfs traversable
-          # without changing executable bits or following symlinks.
-          sudo find "$ROOTFS" -type d -exec chmod 0755 {} +
+          # Keep Debian private-key directories private; upload one tar file instead
+          # of recursively traversing root-only directories as the runner user.
+          sudo find "$ROOTFS" -type d ! -path "$ROOTFS/etc/ssl/private" -exec chmod 0755 {} +
           sudo find "$ROOTFS" -type f -exec chmod a+r {} +
           sudo dpkg-query --admindir="$ROOTFS/var/lib/dpkg" -W -f='${Package}:${Architecture}=${Version}\n' > rootfs-package-manifest.txt
           mkdir -p rootfs-artifact/provenance/licenses
@@ -195,8 +195,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: runtime-rootfs-arm64-bookworm
-          path: rootfs-artifact/
+          path: |
+            rootfs-artifact/rootfs-arm64.tar.gz
+            rootfs-artifact/provenance/
           if-no-files-found: error
+          compression-level: 0
           retention-days: 3
 
   assemble:
@@ -217,13 +220,17 @@ jobs:
         with:
           name: runtime-rootfs-arm64-bookworm
           path: rootfs-artifact
-      - name: Assemble archive and checksums
+      - name: Assemble archive, checksums, and release manifest
         run: |
           set -euo pipefail
+          APP_VERSION="$(sed -n 's/.*versionName "\([^"]*\)".*/\1/p' android/app/build.gradle)"
+          test -n "$APP_VERSION"
           OUT="$GITHUB_WORKSPACE/runtime-bundle"
-          mkdir -p "$OUT"
+          mkdir -p "$OUT" rootfs-artifact/rootfs
+          tar -xzf rootfs-artifact/rootfs-arm64.tar.gz -C rootfs-artifact/rootfs
           cp -a proot-artifact/root/. "$OUT/"
-          cp -a rootfs-artifact/rootfs "$OUT/rootfs"
+          mkdir -p "$OUT/rootfs"
+          cp -a rootfs-artifact/rootfs/. "$OUT/rootfs/"
           cp -a rootfs-artifact/provenance "$OUT/provenance"
           cp -a proot-artifact/provenance/. "$OUT/provenance/"
           mkdir -p "$OUT/provenance/licenses"
@@ -232,30 +239,64 @@ jobs:
           cp runtime/rootfs/README.md "$OUT/README.md"
           (cd "$OUT" && sha256sum bin/proot libexec/proot/loader libexec/proot/loader32 rootfs/usr/local/bin/box64 rootfs/opt/wine/bin/wine rootfs/opt/dxvk/x64/d3d11.dll rootfs/opt/dxvk/x64/dxgi.dll > provenance/RUNTIME-SHA256SUMS)
           tar --numeric-owner --xattrs --acls -czf ghost-town-wine-runtime-arm64.tar.gz -C "$OUT" .
+          ARCHIVE_SHA256="$(sha256sum ghost-town-wine-runtime-arm64.tar.gz | awk '{print $1}')"
+          ARCHIVE_SIZE="$(stat -c '%s' ghost-town-wine-runtime-arm64.tar.gz)"
+          ARCHIVE_URL="https://github.com/dnctf/ghost-town-recomp/releases/download/v${APP_VERSION}/ghost-town-wine-runtime-arm64.tar.gz"
+          export APP_VERSION ARCHIVE_SHA256 ARCHIVE_SIZE ARCHIVE_URL
+          python3 - <<'PY'
+          import json, os
+          manifest = {
+              "schema_version": 1,
+              "runtime_version": os.environ["APP_VERSION"],
+              "archive_file": "ghost-town-wine-runtime-arm64.tar.gz",
+              "archive_url": os.environ["ARCHIVE_URL"],
+              "sha256": os.environ["ARCHIVE_SHA256"],
+              "size_bytes": int(os.environ["ARCHIVE_SIZE"]),
+              "architecture": "arm64-v8a",
+              "rootfs_architecture": "arm64",
+              "foreign_architecture": "amd64",
+              "debian_suite": "bookworm",
+              "box64_commit": open("rootfs-artifact/provenance/box64-upstream-commit.txt", encoding="utf-8").read().strip(),
+              "proot_commit": open("proot-artifact/provenance/proot-upstream-commit.txt", encoding="utf-8").read().strip(),
+              "wine_version": "11.19-amd64",
+              "dxvk_version": "3.1.1",
+              "validation": "archive-build-and-static-layout-only; device-runtime-and-graphics-validation-pending"
+          }
+          with open("runtime-manifest.json", "w", encoding="utf-8") as f:
+              json.dump(manifest, f, indent=2)
+              f.write("\n")
+          PY
+          sha256sum runtime-manifest.json > runtime-manifest.json.sha256
           sha256sum ghost-town-wine-runtime-arm64.tar.gz > ghost-town-wine-runtime-arm64.tar.gz.sha256
+          cp runtime-manifest.json "$OUT/provenance/runtime-manifest.json"
           du -h ghost-town-wine-runtime-arm64.tar.gz
       - name: Upload complete runtime bundle
         uses: actions/upload-artifact@v4
         with:
-          name: ghost-town-wine-runtime-arm64-debian-bookworm
+          name: ghost-town-wine-runtime-arm64-debian-bookworm-0.3.3
           path: |
             ghost-town-wine-runtime-arm64.tar.gz
             ghost-town-wine-runtime-arm64.tar.gz.sha256
+            runtime-manifest.json
+            runtime-manifest.json.sha256
           if-no-files-found: error
+          compression-level: 0
           retention-days: 30
-      - name: Attach runtime bundle to v0.3.2 tester release
+      - name: Attach runtime bundle to v0.3.3 tester release
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, 'release-v0.3.3')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.3.2
+          tag_name: v0.3.3
           target_commitish: main
-          name: Ghost Town Recomp 0.3.2 - Contributor Tester Candidate
+          name: Ghost Town Recomp 0.3.3 - Contributor Tester Candidate
           prerelease: true
           body: |
-            Android ARM64 tester build plus separately downloadable Debian Bookworm / Box64 / Wine 11.19 / DXVK 3.1.1 runtime bundle.
-            Install the APK first, then import ghost-town-wine-runtime-arm64.tar.gz from the app's runtime installer.
-            See docs/CONTRIBUTOR_TESTING.md for installation and validation steps.
-            This is a headless runtime probe candidate; Windows Unity gameplay, display/Vulkan presentation, audio and input are not yet verified.
+            Android ARM64 tester build plus a separately downloadable Debian Bookworm / Box64 / Wine 11.19 / DXVK 3.1.1 runtime bundle.
+            Download and install the runtime from the app dashboard or import the archive manually.
+            This remains a headless runtime candidate; Wine execution, Vulkan presentation, audio/input, and gameplay require physical-device validation.
           files: |
             ghost-town-wine-runtime-arm64.tar.gz
             ghost-town-wine-runtime-arm64.tar.gz.sha256
+            runtime-manifest.json
+            runtime-manifest.json.sha256
           fail_on_unmatched_files: true

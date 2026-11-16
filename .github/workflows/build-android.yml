@@ -75,25 +75,25 @@ jobs:
       - name: Upload APKs and native library
         uses: actions/upload-artifact@v4
         with:
-          name: ghost-town-recomp-0.3.2-arm64
+          name: ghost-town-recomp-0.3.3-arm64
           path: |
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
             build-native-arm64/**/*.so
           if-no-files-found: error
-      - name: Publish v0.3.2 tester pre-release
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, 'release-v0.3.2')
+      - name: Publish v0.3.3 tester pre-release
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, 'release-v0.3.3')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.3.2
+          tag_name: v0.3.3
           target_commitish: main
-          name: Ghost Town Recomp 0.3.2 - Contributor Tester Candidate
+          name: Ghost Town Recomp 0.3.3 - Contributor Tester Candidate
           prerelease: true
           body: |
             See CHANGELOG.md, docs/CONTRIBUTOR_TESTING.md, and runtime/ANDROID_RUNTIME_LAYOUT.md.
-            Includes app-private Wine runtime bundle import with path-safety checks and runtime payload checksum validation.
-            Runtime bundle is a separate Actions artifact and is not embedded in the APK.
-            Does not bundle proprietary Unity Player/game files. Wine/Box64/DXVK and Vulkan gameplay compatibility remain unverified on physical Android hardware.
+            Includes version-matched HTTPS Wine runtime download, SHA-256 verification, and app-private staged installation.
+            Runtime bundle is a separate release asset and is not embedded in the APK.
+            Does not bundle proprietary Unity Player/game files. PRoot/Wine execution, DXVK/Vulkan presentation, audio/input, and gameplay remain separate physical-device validation gates.
           files: |
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
