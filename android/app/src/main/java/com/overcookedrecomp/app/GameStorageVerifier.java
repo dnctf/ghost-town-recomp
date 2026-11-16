@@ -71,28 +71,28 @@ public final class GameStorageVerifier {
         }
 
         // Cek Overcooked 1 (Overcooked_Data)
-        File oc1Dir = new File(baseDir, GameTitle.OVERCOOKED_1.defaultFolderName);
+        File oc1Dir = importedRoot(baseDir, GameTitle.OVERCOOKED_1);
         if (oc1Dir.exists() && oc1Dir.isDirectory()) {
             VerificationResult res = verifyDataDir(oc1Dir, GameTitle.OVERCOOKED_1);
             if (res.valid) results.add(res);
         }
 
         // Cek Overcooked 2 (Overcooked2_Data)
-        File oc2Dir = new File(baseDir, GameTitle.OVERCOOKED_2.defaultFolderName);
+        File oc2Dir = importedRoot(baseDir, GameTitle.OVERCOOKED_2);
         if (oc2Dir.exists() && oc2Dir.isDirectory()) {
             VerificationResult res = verifyDataDir(oc2Dir, GameTitle.OVERCOOKED_2);
             if (res.valid) results.add(res);
         }
 
         // Cek Moving Out (MovingOut_Data)
-        File moDir = new File(baseDir, GameTitle.MOVING_OUT.defaultFolderName);
+        File moDir = importedRoot(baseDir, GameTitle.MOVING_OUT);
         if (moDir.exists() && moDir.isDirectory()) {
             VerificationResult res = verifyDataDir(moDir, GameTitle.MOVING_OUT);
             if (res.valid) results.add(res);
         }
 
         // Cek Moving Out 2 (MovingOut2_Data)
-        File mo2Dir = new File(baseDir, GameTitle.MOVING_OUT_2.defaultFolderName);
+        File mo2Dir = importedRoot(baseDir, GameTitle.MOVING_OUT_2);
         if (mo2Dir.exists() && mo2Dir.isDirectory()) {
             VerificationResult res = verifyDataDir(mo2Dir, GameTitle.MOVING_OUT_2);
             if (res.valid) results.add(res);
@@ -128,6 +128,12 @@ public final class GameStorageVerifier {
     /**
      * Memvalidasi direktori data game untuk Overcooked 1 atau Overcooked 2.
      */
+    private static File importedRoot(File baseDir, GameTitle title) {
+        File completeInstall = new File(baseDir, title.name() + "_PC");
+        if (completeInstall.isDirectory()) return completeInstall;
+        return new File(baseDir, title.defaultFolderName);
+    }
+
     public static VerificationResult verifyDataDir(File dataDir, GameTitle hint) {
         if (dataDir == null || !dataDir.exists() || !dataDir.isDirectory()) {
             return new VerificationResult(false, hint, RuntimeBackendType.UNKNOWN,
