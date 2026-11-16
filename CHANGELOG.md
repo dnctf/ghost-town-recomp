@@ -1,3 +1,15 @@
+## Unreleased — Runtime provisioning
+
+### Added
+- Added a full ARM64 glibc runtime bundle workflow assembling Android PRoot, Debian Bookworm ARM64 userspace, amd64 Wine dependencies, Box64, Wine 11.19, and DXVK 3.1.1.
+- Added an app-private runtime bundle installer for gzip-compressed tar archives, with staging, required-file validation, traversal/symlink checks, and rollback to the previous runtime.
+- Added dashboard action to import the runtime bundle through Android's document picker.
+- Added explicit PRoot companion loader environment paths to the Wine probe.
+
+### Validation boundary
+- CI bundle creation, Android APK compilation, runtime archive import, PRoot execution on HarmonyOS, Wine startup, DXVK/Vulkan initialization, and actual game compatibility are separate gates.
+- The graphics/display bridge, Wine prefix bootstrap, Android audio/input bridge, and physical-device gameplay tests are still pending.
+
 ## Unreleased — Runtime component groundwork
 
 ## Unreleased
