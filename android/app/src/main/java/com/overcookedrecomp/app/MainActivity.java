@@ -480,9 +480,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         final GameStorageVerifier.VerificationResult selectedGame = installed;
         String statusMessage = selectedGame == null
-                ? "DATA NOT FOUND\\nImpor data game ini terlebih dahulu."
-                : "DATA FOUND\\n" + selectedGame.message
-                    + "\\n\\nEXECUTION BLOCKED: build ini belum menyertakan Unity Player runtime atau Windows compatibility layer. Folder _Data dan metadata saja tidak dapat menjalankan game PC.\\n\\nImpor lengkap game PC (EXE, UnityPlayer.dll, folder _Data, dan runtime files) tetap diperlukan untuk tahap integrasi berikutnya.";
+                ? "DATA NOT FOUND\nImpor data game ini terlebih dahulu."
+                : "DATA FOUND\n" + selectedGame.message
+                    + "\n\nEXECUTION BLOCKED: build ini belum menyertakan Unity Player runtime atau Windows compatibility layer. Folder _Data dan metadata saja tidak dapat menjalankan game PC.\n\nImpor lengkap game PC (EXE, UnityPlayer.dll, folder _Data, dan runtime files) tetap diperlukan untuk tahap integrasi berikutnya.";
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(cardTitle)
                 .setMessage(statusMessage)
@@ -726,15 +726,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     private void showExecutionRequirements(GameStorageVerifier.VerificationResult game) {
         String message = "Selected: " + game.gameTitle.displayName
-                + "\\nData folder: " + game.dataDir.getAbsolutePath()
-                + "\\nDetected backend: " + game.backendType
-                + "\\n\\nCurrent status: DATA DETECTED, GAME NOT EXECUTABLE."
-                + "\\n\\nWhy Play is unavailable:"
-                + "\\n• The APK does not contain a Unity Player implementation."
-                + "\\n• Mono CIL validation is only a PE-header check; it does not host or execute managed Unity code."
-                + "\\n• IL2CPP metadata parsing is not native recompilation."
-                + "\\n• Windows PC builds need a compatible execution layer (for example, a validated Wine + Box64 path) or a genuine native port."
-                + "\\n\\nNext integration target: verify the complete PC installation, identify CPU/Unity build requirements, then integrate and test the matching runtime on ARM64 Vulkan.";
+                + "\nData folder: " + game.dataDir.getAbsolutePath()
+                + "\nDetected backend: " + game.backendType
+                + "\n\nCurrent status: DATA DETECTED, GAME NOT EXECUTABLE."
+                + "\n\nWhy Play is unavailable:"
+                + "\n• The APK does not contain a Unity Player implementation."
+                + "\n• Mono CIL validation is only a PE-header check; it does not host or execute managed Unity code."
+                + "\n• IL2CPP metadata parsing is not native recompilation."
+                + "\n• Windows PC builds need a compatible execution layer (for example, a validated Wine + Box64 path) or a genuine native port."
+                + "\n\nNext integration target: verify the complete PC installation, identify CPU/Unity build requirements, then integrate and test the matching runtime on ARM64 Vulkan.";
         new AlertDialog.Builder(this)
                 .setTitle("Execution Readiness")
                 .setMessage(message)
