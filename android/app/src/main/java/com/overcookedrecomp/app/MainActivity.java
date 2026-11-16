@@ -669,6 +669,31 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             report.append("Runtime probe error: ").append(error.getClass().getSimpleName()).append(": ").append(error.getMessage()).append("\n");
         }
 
+        report.append("\nWINE VERSION PROBE OUTPUT\n");
+        File wineProbeLog = new File(getFilesDir(), "runtime/wine/wine-version-probe.log");
+        if (wineProbeLog.isFile()) {
+            try {
+                String probeOutput = java.nio.file.Files.readString(
+                        wineProbeLog.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+                if (probeOutput.length() > 30000) probeOutput = probeOutput.substring(probeOutput.length() - 30000);
+                report.append(probeOutput).append("\n");
+            } catch (Throwable error) {
+                report.append("Unable to read Wine probe log: ").append(error.getMessage()).append("\n");
+            }
+        } else {
+            report.append("Wine version probe has not produced a log yet.\n");
+        }
+        File runtimeChecksums = new File(getFilesDir(), "runtime/wine/provenance/RUNTIME-SHA256SUMS");
+        if (runtimeChecksums.isFile()) {
+            report.append("\nRUNTIME PAYLOAD CHECKSUM MANIFEST\n");
+            try {
+                report.append(java.nio.file.Files.readString(
+                        runtimeChecksums.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+            } catch (Throwable error) {
+                report.append("Unable to read checksum manifest: ").append(error.getMessage()).append("\n");
+            }
+        }
+
         report.append("\nAPP LOGCAT (last 1200 lines, this app process only)\n");
         report.append(collectAppLogcat());
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
