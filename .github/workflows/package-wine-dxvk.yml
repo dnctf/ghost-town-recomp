@@ -1,6 +1,6 @@
 name: Package Wine and DXVK runtime components
 
-on:
+"on":
   push:
     branches: [main]
     paths:
