@@ -23,7 +23,7 @@ Copy the contents of `root/` into the app-private runtime root. This is only the
 ## Important
 
 - The binary is compiled for Android ARM64/Bionic, not Linux/glibc.
-- The companion loader files must remain at the relative runtime paths.
+- The 64-bit `loader` is AArch64; `loader32` is a separate ELF32 ARM EABI companion. Both must remain at the relative runtime paths.
 - CI validates ELF architecture and static linkage metadata; it does not execute PRoot on an Android device.
 - PRoot is GPL-2.0-or-later; preserve the supplied license notice when redistributing.
 - This is a build artifact, not yet an installable Android runtime by itself.
