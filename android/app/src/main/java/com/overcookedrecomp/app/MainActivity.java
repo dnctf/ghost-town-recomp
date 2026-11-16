@@ -364,6 +364,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         settingsRow.addView(gfxBtn, new LinearLayout.LayoutParams(0, dp(44), 1f));
         container.addView(settingsRow);
 
+        Button wineRuntimeBtn = createDashboardButton("WINE / BOX64 STATUS", "#172B42");
+        wineRuntimeBtn.setOnClickListener(v -> showWineRuntimeStatus());
+        LinearLayout.LayoutParams wineRuntimeParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
+        wineRuntimeParams.topMargin = dp(8);
+        container.addView(wineRuntimeBtn, wineRuntimeParams);
+
         importProgressText = new TextView(this);
         importProgressText.setText("");
         importProgressText.setTextSize(11);
@@ -501,6 +508,36 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setEnabled(selectedGame != null));
         dialog.show();
+    }
+
+    private void showWineRuntimeStatus() {
+        WineRuntimeBridge.RuntimeStatus status = WineRuntimeBridge.probe(this);
+        StringBuilder message = new StringBuilder(status.message);
+        message.append("\\n\\nRuntime path: ").append(status.runtimeRoot);
+        if (!status.missing.isEmpty()) {
+            message.append("\\n\\nKomponen yang belum tersedia:");
+            for (String item : status.missing) message.append("\\n• ").append(item);
+        }
+        message.append("\\n\\nCatatan: DXVK membutuhkan Vulkan bridge yang kompatibel. Status ini hanya memeriksa struktur file, bukan kompatibilitas GPU atau kemampuan menjalankan game.");
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle("WINE / BOX64 RUNTIME")
+                .setMessage(message.toString())
+                .setPositiveButton("TUTUP", null);
+        if (status.state == WineRuntimeBridge.State.READY_FOR_HEADLESS_PROBE) {
+            builder.setNeutralButton("TEST WINE VERSION", (dialog, which) -> {
+                Toast.makeText(this, "Menjalankan probe Wine...", Toast.LENGTH_SHORT).show();
+                new Thread(() -> {
+                    WineRuntimeBridge.ProbeResult result = WineRuntimeBridge.runWineVersionProbe(this);
+                    runOnUiThread(() -> new AlertDialog.Builder(this)
+                            .setTitle(result.success ? "WINE PROBE BERHASIL" : "WINE PROBE GAGAL")
+                            .setMessage((result.output.isEmpty() ? "Tidak ada output." : result.output)
+                                    + (result.exitCode == null ? "" : "\\nExit code: " + result.exitCode))
+                            .setPositiveButton("OK", null)
+                            .show());
+                }).start();
+            });
+        }
+        builder.show();
     }
 
     private Button createDashboardButton(String label, String backgroundColor) {
