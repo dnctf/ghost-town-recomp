@@ -1,49 +1,56 @@
-name: Build Ghost Town Recomp Android NDK & APK
+name: Ghost Town Recomp Android Build and Tester Release
 
 on:
   push:
-    branches: [ main, master ]
-    tags: [ 'v*' ]
+    branches:
+      - main
+      - master
   pull_request:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-android:
-    name: Compile C++20 NDK (arm64-v8a) & Package APK
+  probe-tests:
+    name: Game installation probe tests
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run probe unit tests
+        run: python -m unittest discover -s tools/tests -v
+
+  android-build:
+    name: Build Android ARM64 APK
+    runs-on: ubuntu-latest
+    needs: probe-tests
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
-
-      - name: Setup Android SDK & NDK r26d
+      - name: Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
         with:
           packages: 'platforms;android-34 build-tools;34.0.0 ndk;26.3.11579264 cmake;3.22.1'
-
-      - name: Setup Gradle
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.5'
-
-      - name: Test game installation probe
-        run: |
-          python3 --version
-          python3 -m unittest discover -s tools/tests -v
-
-      - name: Verify Native CMake Configuration (arm64-v8a)
+      - name: Configure and build native ARM64 library
         run: |
           $ANDROID_HOME/cmake/3.22.1/bin/cmake \
             -S android/native \
@@ -55,40 +62,35 @@ jobs:
             -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384" \
             -DCMAKE_BUILD_TYPE=Release
           $ANDROID_HOME/cmake/3.22.1/bin/cmake --build build-native-arm64 -j$(nproc)
-
-      - name: Build Release and Debug APK via Gradle
-        working-directory: ./android
-        run: gradle assembleRelease assembleDebug --no-daemon --stacktrace
-
+      - name: Build debug and release APK
+        working-directory: android
+        run: gradle assembleDebug assembleRelease --no-daemon --stacktrace
       - name: Run Android lint
-        working-directory: ./android
+        working-directory: android
         run: gradle lint --no-daemon --stacktrace
-
-      - name: Upload Built APKs & Native Symbols
+      - name: Upload APKs and native library
         uses: actions/upload-artifact@v4
         with:
-          name: ghost-town-recomp-arm64-apks
+          name: ghost-town-recomp-0.3.1-arm64
           path: |
-            android/app/build/outputs/apk/release/*.apk
             android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/release/*.apk
             build-native-arm64/**/*.so
-            android/app/build/intermediates/cxx/Debug/**/obj/arm64-v8a/*.so
-          if-no-files-found: warn
-
-      - name: Publish Ghost Town Recomp v0.3.1 Tester Pre-Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'release: publish Ghost Town Recomp v0.3.1 tester candidate')
+          if-no-files-found: error
+      - name: Publish v0.3.1 tester pre-release
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, 'release-v0.3.1')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v0.3.1
           target_commitish: main
-          name: "Ghost Town Recomp 0.3.1 (Contributor Tester Candidate)"
+          name: Ghost Town Recomp 0.3.1 - Contributor Tester Candidate
           prerelease: true
           body: |
             See CHANGELOG.md and docs/CONTRIBUTOR_TESTING.md.
-            Includes a host-side Unity Windows installation probe and tester workflow.
-            This is not a claim of Android gameplay compatibility. No proprietary game files or Wine/Box64 binaries are bundled.
+            Includes host-side Unity installation inspection, Android import-layout preservation, and ADB launcher smoke testing.
+            Does not bundle proprietary game files or Wine/Box64. Android gameplay compatibility is not yet verified.
           files: |
-            android/app/build/outputs/apk/release/*.apk
             android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/release/*.apk
             build-native-arm64/**/*.so
           generate_release_notes: true
