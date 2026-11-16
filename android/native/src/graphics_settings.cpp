@@ -41,7 +41,20 @@ void GraphicsSettingsManager::Initialize(uint32_t width, uint32_t height, float 
          display_.aspect_ratio, adreno_series_, total_ram_mb_);
 }
 
+void GraphicsSettingsManager::UpdateGpuCapabilities(uint32_t adreno_series) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    adreno_series_ = adreno_series;
+    current_preset_ = AutoDetectPreset(adreno_series_, total_ram_mb_);
+    ApplyPreset(current_preset_);
+    LOGI("GPU profile refreshed after Vulkan discovery: Adreno %u, RAM %u MB, preset %s",
+         adreno_series_, total_ram_mb_, GetPresetString().c_str());
+}
+
 GraphicsPreset GraphicsSettingsManager::AutoDetectPreset(uint32_t adreno_series, uint32_t total_ram_mb) const {
+    // Conservative starting presets: GPU identity and RAM are read at runtime.
+    // Unknown GPUs stay LOW rather than being assigned an unverified profile.
+    // Adreno 630 covers Snapdragon 845; 640/650/660 cover later pre-8-series
+    // flagships; 7xx/8xx generations use progressively higher defaults.
     if (adreno_series >= 750 && total_ram_mb >= 12000) {
         return GraphicsPreset::ULTRA;
     }
@@ -345,6 +358,7 @@ std::string GraphicsSettingsManager::GetSummaryString() const {
     ss << "Layar Fisik: " << display_.native_width << "x" << display_.native_height
        << " @ " << display_.refresh_rate << "Hz (" << display_.density_dpi << " dpi)\n";
     ss << "Target FPS: " << config_.target_fps << " | V-Sync: " << (config_.vsync_enabled ? "ON" : "OFF") << "\n";
+    ss << "GPU profile: Adreno " << adreno_series_ << " | Device RAM: " << total_ram_mb_ << " MB\n";
 
     const char* aa_str[] = {"OFF", "FXAA", "MSAA 2x", "MSAA 4x"};
     ss << "Anti-Aliasing: " << aa_str[static_cast<int>(config_.anti_aliasing)] << "\n";

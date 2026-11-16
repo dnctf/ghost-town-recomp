@@ -185,7 +185,7 @@ public final class GameStorageVerifier {
         if (monoAssembly.exists()) {
             String hash = computeSha256(monoAssembly);
             return new VerificationResult(true, resolvedTitle, RuntimeBackendType.MONO_CIL,
-                    String.format("Terdeteksi %s Unity Mono CIL. Siap menjalankan Assembly-CSharp.dll.", resolvedTitle.displayName),
+                    String.format("Terdeteksi %s Unity Mono CIL. Metadata ditemukan; eksekusi game belum didukung.", resolvedTitle.displayName),
                     hash, dataDir);
         }
 
@@ -194,7 +194,7 @@ public final class GameStorageVerifier {
         if (il2cppMetadata.exists()) {
             String hash = computeSha256(il2cppMetadata);
             return new VerificationResult(true, resolvedTitle, RuntimeBackendType.IL2CPP_AOT,
-                    String.format("Terdeteksi %s Unity IL2CPP AOT. Siap mem-parsing global-metadata.dat.", resolvedTitle.displayName),
+                    String.format("Terdeteksi %s Unity IL2CPP AOT. Metadata ditemukan; runtime/gameplay belum tersedia.", resolvedTitle.displayName),
                     hash, dataDir);
         }
 

@@ -1,7 +1,10 @@
 #include "vulkan_context.h"
+#include "graphics_settings.h"
 #include <android/log.h>
 #include <algorithm>
 #include <cstring>
+#include <cctype>
+#include <cstdlib>
 
 #define LOG_TAG "OvercookedVulkan"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -68,30 +71,47 @@ bool VulkanContext::SelectPhysicalDevice() {
     LOGI("GPU Detected: %s (Vulkan %u.%u)", props.deviceName,
          VK_VERSION_MAJOR(props.apiVersion), VK_VERSION_MINOR(props.apiVersion));
 
+    gpu_caps_.vendor_id = props.vendorID;
+    gpu_caps_.device_id = props.deviceID;
+    gpu_caps_.vulkan_api_version = props.apiVersion;
+    gpu_caps_.driver_version = props.driverVersion;
     gpu_caps_.min_ubo_offset_alignment = props.limits.minUniformBufferOffsetAlignment;
+    gpu_caps_.safe_max_storage_buffer_range = props.limits.maxStorageBufferRange;
+    gpu_caps_.max_sampler_anisotropy = std::max(1.0f, props.limits.maxSamplerAnisotropy);
 
-    if (std::strstr(props.deviceName, "Adreno") != nullptr) {
+    VkPhysicalDeviceFeatures supported_features{};
+    vkGetPhysicalDeviceFeatures(physical_device_, &supported_features);
+    gpu_caps_.supports_sampler_anisotropy = supported_features.samplerAnisotropy == VK_TRUE;
+
+    // Parse the Adreno model from the Vulkan device name. This avoids a short
+    // allow-list that silently misses Adreno 640/650/660 and newer generations.
+    const char* adreno = std::strstr(props.deviceName, "Adreno");
+    if (adreno != nullptr) {
         gpu_caps_.is_adreno = true;
-        // Adreno 735/750 workaround (pes2017-recomp): batasi storage buffer range <= 128 MB
-        constexpr VkDeviceSize kAdrenoSafeLimit = 128ULL * 1024ULL * 1024ULL;
-        gpu_caps_.safe_max_storage_buffer_range =
-            std::min<VkDeviceSize>(props.limits.maxStorageBufferRange, kAdrenoSafeLimit);
-
-        if (std::strstr(props.deviceName, "630") != nullptr) {
-            gpu_caps_.adreno_series = 630;
-            gpu_caps_.max_anisotropy = 4;
-        } else if (std::strstr(props.deviceName, "730") != nullptr ||
-                   std::strstr(props.deviceName, "740") != nullptr) {
-            gpu_caps_.adreno_series = 740;
-            gpu_caps_.max_anisotropy = 8;
-        } else if (std::strstr(props.deviceName, "735") != nullptr ||
-                   std::strstr(props.deviceName, "750") != nullptr) {
-            gpu_caps_.adreno_series = 750;
-            gpu_caps_.max_anisotropy = 16;
+        while (*adreno != '\0' && !std::isdigit(static_cast<unsigned char>(*adreno))) {
+            ++adreno;
         }
-    } else {
-        gpu_caps_.safe_max_storage_buffer_range = props.limits.maxStorageBufferRange;
+        if (*adreno != '\0') {
+            char* end = nullptr;
+            const unsigned long parsed = std::strtoul(adreno, &end, 10);
+            if (end != adreno && parsed <= UINT32_MAX) {
+                gpu_caps_.adreno_series = static_cast<uint32_t>(parsed);
+            }
+        }
     }
+
+    LOGI("GPU capabilities: name=%s vendor=0x%04x device=0x%04x Vulkan=%u.%u driver=%u "
+         "Adreno=%u maxStorage=%llu maxAnisotropy=%.1f anisotropyFeature=%s",
+         props.deviceName, props.vendorID, props.deviceID,
+         VK_VERSION_MAJOR(props.apiVersion), VK_VERSION_MINOR(props.apiVersion),
+         props.driverVersion, gpu_caps_.adreno_series,
+         static_cast<unsigned long long>(gpu_caps_.safe_max_storage_buffer_range),
+         gpu_caps_.max_sampler_anisotropy,
+         gpu_caps_.supports_sampler_anisotropy ? "yes" : "no");
+
+    // Java reports display/RAM before the Surface exists. Refresh the automatic
+    // profile now that the real Vulkan GPU has been discovered.
+    GraphicsSettingsManager::Instance().UpdateGpuCapabilities(gpu_caps_.adreno_series);
 
     uint32_t queue_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device_, &queue_count, nullptr);
