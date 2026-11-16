@@ -1,4 +1,4 @@
-name: Build Box64 Android ARM64 (experimental)
+name: Build Box64 Linux ARM64 (glibc)
 
 on:
   push:
@@ -11,86 +11,60 @@ on:
   workflow_dispatch:
     inputs:
       box64_ref:
-        description: Box64 branch, tag, or commit to build
+        description: Upstream Box64 branch, tag, or commit
         required: true
         default: main
         type: string
-      target:
-        description: Android target profile
-        required: true
-        default: sd888
-        type: choice
-        options:
-          - sd888
-          - generic-arm64
 
 permissions:
   contents: read
 
 jobs:
   build-box64:
-    name: Build Box64 for Android Bionic ARM64
-    runs-on: ubuntu-24.04
+    name: Build Box64 Linux ARM64 for glibc userspace
+    runs-on: ubuntu-24.04-arm
     steps:
-      - name: Install host build dependencies
+      - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git cmake ninja-build python3 file binutils
+          sudo apt-get install -y git cmake ninja-build build-essential file binutils libcapstone-dev
 
-      - name: Set up Android NDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'ndk;26.3.11579264'
-
-      - name: Checkout Box64 upstream source
+      - name: Checkout Box64 upstream
         env:
-          BOX64_REF: ${{ inputs.box64_ref }}
+          BOX64_REF: ${{ inputs.box64_ref || 'main' }}
         run: |
           git clone https://github.com/ptitSeb/box64.git box64-src
           git -C box64-src checkout --detach "$BOX64_REF"
           git -C box64-src rev-parse HEAD | tee box64-upstream-commit.txt
-          git -C box64-src status --short
 
-      - name: Configure Android Bionic ARM64 build
-        env:
-          TARGET_PROFILE: ${{ inputs.target }}
+      - name: Configure Linux ARM64 glibc build
         run: |
-          NDK="$ANDROID_HOME/ndk/26.3.11579264"
-          TOOLCHAIN="$NDK/build/cmake/android.toolchain.cmake"
-          PROFILE_ARGS=()
-          if [ "$TARGET_PROFILE" = "sd888" ]; then
-            PROFILE_ARGS+=("-DSD888=ON")
-          else
-            PROFILE_ARGS+=("-DARM64=ON")
-          fi
           cmake -S box64-src -B box64-build -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-29 \
-            -DANDROID=ON \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$PWD/box64-install" \
+            -DSD888=ON \
+            -DARM_DYNAREC=ON \
             -DNO_LIB_INSTALL=ON \
-            -DNO_CONF_INSTALL=ON \
-            "${PROFILE_ARGS[@]}"
+            -DNO_CONF_INSTALL=ON
 
-      - name: Compile and stage Box64
+      - name: Compile and validate Box64
         run: |
           cmake --build box64-build --parallel 2
           cmake --install box64-build
           mkdir -p dist
-          find box64-build box64-install -type f -name 'box64' -perm -111 -print -exec cp {} dist/box64 ;
+          find box64-build box64-install -type f -name box64 -perm -111 -print -exec cp {} dist/box64 \;
           test -s dist/box64
-          file dist/box64
+          file dist/box64 | tee dist/file.txt
           readelf -h dist/box64 | tee dist/elf-header.txt
           readelf -h dist/box64 | grep -q 'AArch64'
+          ldd dist/box64 | tee dist/ldd.txt
           cp box64-upstream-commit.txt dist/
-          printf 'target=%s\nabi=arm64-v8a\nplatform=Android Bionic\n' "${{ inputs.target }}" > dist/build-info.txt
+          printf 'abi=aarch64-linux-gnu\nprofile=Snapdragon 888\nuserspace=glibc\n' > dist/build-info.txt
 
-      - name: Upload experimental Box64 artifact
+      - name: Upload Box64 Linux ARM64 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: box64-android-arm64-${{ inputs.target }}
+          name: box64-linux-arm64-glibc-sd888
           path: dist/*
           if-no-files-found: error
           retention-days: 30
