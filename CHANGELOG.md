@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.3.0-alpha] - 2026-11-16
+## [0.3.0] - 2026-11-16
 
 ### Added
 - Per-game execution-readiness details from the selected library tile.
