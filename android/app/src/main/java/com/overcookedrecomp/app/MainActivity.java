@@ -513,12 +513,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private void showWineRuntimeStatus() {
         WineRuntimeBridge.RuntimeStatus status = WineRuntimeBridge.probe(this);
         StringBuilder message = new StringBuilder(status.getMessage());
-        message.append("\\n\\nRuntime path: ").append(status.getRuntimeRoot());
+        message.append("\n\nRuntime path: ").append(status.getRuntimeRoot());
         if (!status.getMissing().isEmpty()) {
-            message.append("\\n\\nKomponen yang belum tersedia:");
-            for (String item : status.getMissing()) message.append("\\n• ").append(item);
+            message.append("\n\nKomponen yang belum tersedia:");
+            for (String item : status.getMissing()) message.append("\n• ").append(item);
         }
-        message.append("\\n\\nCatatan: DXVK membutuhkan Vulkan bridge yang kompatibel. Status ini hanya memeriksa struktur file, bukan kompatibilitas GPU atau kemampuan menjalankan game.");
+        message.append("\n\nCatatan: DXVK membutuhkan Vulkan bridge yang kompatibel. Status ini hanya memeriksa struktur file, bukan kompatibilitas GPU atau kemampuan menjalankan game.");
         AlertDialog.Builder builder = new AlertDialog.Builder(this)
                 .setTitle("WINE / BOX64 RUNTIME")
                 .setMessage(message.toString())
@@ -531,7 +531,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     runOnUiThread(() -> new AlertDialog.Builder(this)
                             .setTitle(result.getSuccess() ? "WINE PROBE BERHASIL" : "WINE PROBE GAGAL")
                             .setMessage((result.getOutput().isEmpty() ? "Tidak ada output." : result.getOutput())
-                                    + (result.getExitCode() == null ? "" : "\\nExit code: " + result.getExitCode()))
+                                    + (result.getExitCode() == null ? "" : "\nExit code: " + result.getExitCode()))
                             .setPositiveButton("OK", null)
                             .show());
                 }).start();
