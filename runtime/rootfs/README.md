@@ -13,7 +13,7 @@ The archive contains:
 - `rootfs/opt/dxvk`: pinned DXVK 3.1.1 DLL payload
 - `provenance/`: upstream commits, license, dependency report, hashes and build information
 
-The tar.zst archive is intended to be extracted into the app's private `filesDir/runtime/wine/` directory. The archive is a large external runtime payload; it is not embedded in the APK.
+The tar.gz archive is intended to be extracted into the app's private `filesDir/runtime/wine/` directory. The archive is a large external runtime payload; it is not embedded in the APK.
 
 ## Build inputs
 
