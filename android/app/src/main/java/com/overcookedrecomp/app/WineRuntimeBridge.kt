@@ -1,55 +1,152 @@
 package com.overcookedrecomp.app
 
+import android.content.Context
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 /**
- * Architectural boundary for an optional external Wine + Box64 runtime.
+ * Optional Wine/Box64 adapter.
  *
- * This class is intentionally inactive: this repository does not package Wine,
- * Box64/Box86, a Linux userspace, DXVK, or VKD3D-Proton. Do not expose a working
- * "Run EXE" action until a separately versioned backend is installed and its
- * process, ABI, graphics, security, and licensing gates have passed.
- *
- * This stub never starts a process and never executes user-provided commands.
+ * The Android APK does not embed the Linux runtime. A runtime must be provisioned
+ * under filesDir/runtime/wine using the layout documented in
+ * runtime/ANDROID_RUNTIME_LAYOUT.md. This adapter never invokes a shell and
+ * never accepts arbitrary command strings.
  */
 object WineRuntimeBridge {
-
-    enum class Availability {
-        AVAILABLE,
+    enum class State {
         NOT_INSTALLED,
+        INCOMPLETE,
+        READY_FOR_HEADLESS_PROBE,
         UNSUPPORTED
     }
 
     data class RuntimeStatus(
-        val availability: Availability,
-        val message: String
+        val state: State,
+        val message: String,
+        val missing: List<String>,
+        val runtimeRoot: String
     )
 
-    sealed class LaunchResult {
-        data class Rejected(val reason: String) : LaunchResult()
+    data class ProbeResult(
+        val success: Boolean,
+        val output: String,
+        val exitCode: Int?
+    )
+
+    private data class Layout(
+        val root: File,
+        val proot: File,
+        val rootfs: File,
+        val box64: String,
+        val wine: String,
+        val dxvk: File
+    )
+
+    private fun layout(context: Context): Layout {
+        val root = File(context.filesDir, "runtime/wine")
+        val rootfs = File(root, "rootfs")
+        val box64Candidates = listOf(
+            "usr/local/bin/box64",
+            "usr/bin/box64"
+        )
+        val box64 = box64Candidates.firstOrNull { File(rootfs, it).isFile }
+            ?: box64Candidates.first()
+        return Layout(
+            root = root,
+            proot = File(root, "bin/proot"),
+            rootfs = rootfs,
+            box64 = "/$box64",
+            wine = "/opt/wine/bin/wine",
+            dxvk = File(rootfs, "opt/dxvk")
+        )
+    }
+
+    @JvmStatic
+    fun probe(context: Context): RuntimeStatus {
+        val l = layout(context)
+        if (!l.root.exists()) {
+            return RuntimeStatus(
+                State.NOT_INSTALLED,
+                "Wine/Box64 runtime belum dipasang.",
+                listOf("Android ARM64 PRoot", "glibc rootfs ARM64", "Box64 ARM64", "Wine x86_64", "DXVK DLL"),
+                l.root.absolutePath
+            )
+        }
+
+        val missing = mutableListOf<String>()
+        if (!l.proot.isFile || !l.proot.canExecute()) missing += "bin/proot (executable Android ARM64)"
+        if (!File(l.rootfs, "etc/os-release").isFile) missing += "rootfs/etc/os-release (glibc Linux userspace)"
+        if (!File(l.rootfs, l.box64.removePrefix("/")).isFile) missing += "Box64 ARM64/glibc"
+        if (!File(l.rootfs, l.wine.removePrefix("/")).isFile) missing += "Wine x86_64"
+        if (!File(l.dxvk, "x64/dxgi.dll").isFile || !File(l.dxvk, "x64/d3d11.dll").isFile) {
+            missing += "DXVK x64 DLL payload"
+        }
+
+        return if (missing.isEmpty()) {
+            RuntimeStatus(
+                State.READY_FOR_HEADLESS_PROBE,
+                "Komponen dasar ditemukan. Ini belum membuktikan DXVK/Vulkan atau game dapat berjalan.",
+                emptyList(),
+                l.root.absolutePath
+            )
+        } else {
+            RuntimeStatus(
+                State.INCOMPLETE,
+                "Runtime belum lengkap; peluncuran game tetap dinonaktifkan.",
+                missing,
+                l.root.absolutePath
+            )
+        }
     }
 
     /**
-     * Reports the current repository state. A future external runtime adapter
-     * may replace this implementation after installation and validation.
+     * Runs only the fixed Wine version probe. It is intentionally headless and
+     * does not launch a game or enable a graphics session.
      */
     @JvmStatic
-    fun probe(): RuntimeStatus = RuntimeStatus(
-        availability = Availability.NOT_INSTALLED,
-        message = "Wine/Box64 runtime belum terpasang atau terintegrasi."
-    )
-
-    /**
-     * Safe placeholder: deliberately refuses execution. It does not invoke
-     * Runtime.exec, ProcessBuilder, a shell, Termux, or another application.
-     */
-    @JvmStatic
-    fun requestLaunch(executable: File): LaunchResult.Rejected {
-        val detail = if (executable.isFile) {
-            "Executable terdeteksi, tetapi backend Wine/Box64 belum tersedia."
-        } else {
-            "File executable tidak ditemukan."
+    fun runWineVersionProbe(context: Context): ProbeResult {
+        val status = probe(context)
+        if (status.state != State.READY_FOR_HEADLESS_PROBE) {
+            return ProbeResult(false, status.missing.joinToString("\n"), null)
         }
-        return LaunchResult.Rejected(detail)
+
+        val l = layout(context)
+        val log = File(l.root, "wine-version-probe.log")
+        return try {
+            val command = listOf(
+                l.proot.absolutePath,
+                "-0",
+                "-r", l.rootfs.absolutePath,
+                "-b", "/dev",
+                "-b", "/proc",
+                "-b", "/sys",
+                "-w", "/tmp",
+                l.box64,
+                l.wine,
+                "--version"
+            )
+            val process = ProcessBuilder(command)
+                .directory(l.root)
+                .redirectErrorStream(true)
+                .redirectOutput(log)
+                .apply {
+                    environment()["HOME"] = "/root"
+                    environment()["BOX64_LD_LIBRARY_PATH"] =
+                        "/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib"
+                    environment()["PROOT_NO_SECCOMP"] = "1"
+                }
+                .start()
+
+            if (!process.waitFor(45, TimeUnit.SECONDS)) {
+                process.destroy()
+                if (process.isAlive) process.destroyForcibly()
+                ProbeResult(false, "Wine version probe timeout (45s). Log: ${log.absolutePath}", null)
+            } else {
+                val output = if (log.isFile) log.readText().takeLast(12000) else ""
+                ProbeResult(process.exitValue() == 0, output, process.exitValue())
+            }
+        } catch (t: Throwable) {
+            ProbeResult(false, "${t.javaClass.simpleName}: ${t.message}", null)
+        }
     }
 }
