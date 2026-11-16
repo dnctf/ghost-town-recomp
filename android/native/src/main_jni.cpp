@@ -22,8 +22,8 @@ void NativeEngine::Initialize(const std::string& data_dir, int backend_ordinal, 
     data_dir_ = data_dir;
     backend_ordinal_ = backend_ordinal;
 
-    // Default arena 512 MB (aman untuk Snapdragon 845 4GB RAM)
-    arena_ = std::make_unique<LinearMemoryArena>(512ULL * 1024ULL * 1024ULL);
+    // Scratch arena 32 MB (ringan, cepat, dan aman dari OOM Killer di semua perangkat Android / HarmonyOS)
+    arena_ = std::make_unique<LinearMemoryArena>(32ULL * 1024ULL * 1024ULL);
     thermal_.Initialize();
     audio_.Initialize(48000, 2);
     runtime_host_.Initialize(data_dir_, backend_ordinal_, game_version);

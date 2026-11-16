@@ -3,6 +3,7 @@ package com.overcookedrecomp.app;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -22,6 +23,7 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.WindowMetrics;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -40,11 +42,18 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
     private static final String TAG = "OvercookedRecomp";
 
+    private static boolean nativeLoaded = false;
+    private static String nativeLoadError = null;
+
     static {
         try {
             System.loadLibrary("overcooked_native");
-        } catch (UnsatisfiedLinkError e) {
-            Log.e(TAG, "Gagal memuat pustaka native overcooked_native", e);
+            nativeLoaded = true;
+            Log.i(TAG, "Pustaka native overcooked_native berhasil dimuat.");
+        } catch (Throwable t) {
+            nativeLoaded = false;
+            nativeLoadError = t.getMessage();
+            Log.e(TAG, "Gagal memuat pustaka native overcooked_native: " + t.getMessage(), t);
         }
     }
 
@@ -61,7 +70,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private GameStorageVerifier.GameTitle activeGameTitle = GameStorageVerifier.GameTitle.UNKNOWN;
     private GameStorageVerifier.GameTitle pendingImportTitle = GameStorageVerifier.GameTitle.OVERCOOKED_1;
 
-    // File pickers untuk ZIP dan Folder
+    // File pickers untuk ZIP dan Folder PC
     private final ActivityResultLauncher<String[]> openZipLauncher =
             registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
                 if (uri != null) handleImportZipUri(uri);
@@ -77,7 +86,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-        // Deteksi spesifikasi layar ponsel (resolusi, dpi, refresh rate) dan RAM
+        // Deteksi spesifikasi layar ponsel / tablet HarmonyOS secara aman
         detectAndApplyDeviceDisplaySettings();
 
         // Buat root view dengan SurfaceView di belakang dan Overlay UI di depan
@@ -101,6 +110,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         setContentView(rootLayout);
 
+        // Peringatan jika pustaka native gagal dimuat (misal kendala ABI)
+        if (!nativeLoaded) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Peringatan Sistem HarmonyOS")
+                    .setMessage("Pustaka native C++ (" + nativeLoadError + ") tidak dapat dimuat secara dinamis. Silakan pastikan arsitektur arm64-v8a didukung.")
+                    .setPositiveButton("OK", null)
+                    .show();
+        }
+
         // Refresh status game yang terpasang
         refreshInstalledGamesStatus();
     }
@@ -109,7 +127,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         ScrollView scrollView = new ScrollView(this);
         scrollView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        scrollView.setBackgroundColor(Color.parseColor("#E6121418")); // Semi-transparent dark
+        scrollView.setBackgroundColor(Color.parseColor("#E6121418"));
         scrollView.setFillViewport(true);
 
         LinearLayout container = new LinearLayout(this);
@@ -119,7 +137,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         // Header Title
         TextView titleView = new TextView(this);
-        titleView.setText("🍳 Overcooked Recomp (Android)");
+        titleView.setText("🍳 Overcooked Recomp");
         titleView.setTextSize(24);
         titleView.setTextColor(Color.parseColor("#FF9F1C"));
         titleView.setTypeface(null, Typeface.BOLD);
@@ -127,7 +145,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(titleView);
 
         TextView subTitle = new TextView(this);
-        subTitle.setText("Jalankan game PC Overcooked 1 & 2 langsung di Android Snapdragon");
+        subTitle.setText("Jalankan game PC Overcooked 1 & 2 di Android / HarmonyOS Snapdragon");
         subTitle.setTextSize(13);
         subTitle.setTextColor(Color.parseColor("#CCCCCC"));
         subTitle.setGravity(Gravity.CENTER);
@@ -472,13 +490,28 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             setupOverlayView.setVisibility(View.GONE);
         }
 
-        Log.i(TAG, "Meluncurkan " + game.gameTitle.displayName + " dari: " + game.dataDir.getAbsolutePath());
-        nativeInitEngine(game.dataDir.getAbsolutePath(), game.backendType.ordinal(), game.gameTitle.id);
-        engineInitialized = true;
-        Toast.makeText(this, "Memuat " + game.gameTitle.displayName + "...", Toast.LENGTH_SHORT).show();
+        if (!nativeLoaded) {
+            Toast.makeText(this, "Pustaka native belum siap", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            Log.i(TAG, "Meluncurkan " + game.gameTitle.displayName + " dari: " + game.dataDir.getAbsolutePath());
+            nativeInitEngine(game.dataDir.getAbsolutePath(), game.backendType.ordinal(), game.gameTitle.id);
+            engineInitialized = true;
+            Toast.makeText(this, "Memuat " + game.gameTitle.displayName + "...", Toast.LENGTH_SHORT).show();
+        } catch (Throwable t) {
+            Log.e(TAG, "Gagal meluncurkan engine: " + t.getMessage(), t);
+            Toast.makeText(this, "Gagal memulai engine: " + t.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void showGraphicsSettingsDialog() {
+        if (!nativeLoaded) {
+            Toast.makeText(this, "Pustaka native belum dimuat", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         String[] options = {
                 "Preset: Rendah (Low - SD845 / 30 FPS)",
                 "Preset: Sedang (Medium - Seimbang)",
@@ -491,33 +524,37 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         new AlertDialog.Builder(this)
                 .setTitle("Pengaturan Grafik & Resolusi HP")
                 .setItems(options, (dialog, which) -> {
-                    switch (which) {
-                        case 0:
-                            nativeSetGraphicsPreset(0);
-                            Toast.makeText(this, "Preset Rendah diterapkan", Toast.LENGTH_SHORT).show();
-                            break;
-                        case 1:
-                            nativeSetGraphicsPreset(1);
-                            Toast.makeText(this, "Preset Sedang diterapkan", Toast.LENGTH_SHORT).show();
-                            break;
-                        case 2:
-                            nativeSetGraphicsPreset(2);
-                            Toast.makeText(this, "Preset Tinggi diterapkan", Toast.LENGTH_SHORT).show();
-                            break;
-                        case 3:
-                            nativeSetGraphicsPreset(3);
-                            Toast.makeText(this, "Preset Ultra diterapkan", Toast.LENGTH_SHORT).show();
-                            break;
-                        case 4:
-                            showResolutionModeDialog();
-                            break;
-                        case 5:
-                            new AlertDialog.Builder(this)
-                                    .setTitle("Profil Grafik Aktif")
-                                    .setMessage(nativeGetGraphicsSummary())
-                                    .setPositiveButton("OK", null)
-                                    .show();
-                            break;
+                    try {
+                        switch (which) {
+                            case 0:
+                                nativeSetGraphicsPreset(0);
+                                Toast.makeText(this, "Preset Rendah diterapkan", Toast.LENGTH_SHORT).show();
+                                break;
+                            case 1:
+                                nativeSetGraphicsPreset(1);
+                                Toast.makeText(this, "Preset Sedang diterapkan", Toast.LENGTH_SHORT).show();
+                                break;
+                            case 2:
+                                nativeSetGraphicsPreset(2);
+                                Toast.makeText(this, "Preset Tinggi diterapkan", Toast.LENGTH_SHORT).show();
+                                break;
+                            case 3:
+                                nativeSetGraphicsPreset(3);
+                                Toast.makeText(this, "Preset Ultra diterapkan", Toast.LENGTH_SHORT).show();
+                                break;
+                            case 4:
+                                showResolutionModeDialog();
+                                break;
+                            case 5:
+                                new AlertDialog.Builder(this)
+                                        .setTitle("Profil Grafik Aktif")
+                                        .setMessage(nativeGetGraphicsSummary())
+                                        .setPositiveButton("OK", null)
+                                        .show();
+                                break;
+                        }
+                    } catch (Throwable t) {
+                        Log.e(TAG, "Gagal mengubah pengaturan grafik: " + t.getMessage());
                     }
                 })
                 .show();
@@ -535,21 +572,49 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         new AlertDialog.Builder(this)
                 .setTitle("Pilih Mode Resolusi Layar")
                 .setItems(modes, (dialog, which) -> {
-                    nativeSetResolutionMode(which, 1.0f);
-                    Toast.makeText(this, "Mode resolusi diubah", Toast.LENGTH_SHORT).show();
+                    try {
+                        nativeSetResolutionMode(which, 1.0f);
+                        Toast.makeText(this, "Mode resolusi diubah", Toast.LENGTH_SHORT).show();
+                    } catch (Throwable t) {
+                        Log.e(TAG, "Gagal mengubah resolusi: " + t.getMessage());
+                    }
                 })
                 .show();
     }
 
     private void detectAndApplyDeviceDisplaySettings() {
-        DisplayMetrics metrics = new DisplayMetrics();
-        Display display = getWindowManager().getDefaultDisplay();
-        display.getRealMetrics(metrics);
+        int width = 1920;
+        int height = 1080;
+        float dpi = 320.0f;
+        float refreshRate = 60.0f;
 
-        int width = metrics.widthPixels;
-        int height = metrics.heightPixels;
-        float dpi = metrics.densityDpi;
-        float refreshRate = display.getRefreshRate();
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                WindowMetrics wm = getWindowManager().getCurrentWindowMetrics();
+                Rect bounds = wm.getBounds();
+                width = bounds.width();
+                height = bounds.height();
+                Display display = getDisplay();
+                if (display != null) {
+                    refreshRate = display.getRefreshRate();
+                }
+                dpi = getResources().getDisplayMetrics().densityDpi;
+            } else {
+                DisplayMetrics metrics = new DisplayMetrics();
+                Display display = getWindowManager().getDefaultDisplay();
+                display.getRealMetrics(metrics);
+                width = metrics.widthPixels;
+                height = metrics.heightPixels;
+                dpi = metrics.densityDpi;
+                refreshRate = display.getRefreshRate();
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Gagal membaca display metrics secara penuh: " + t.getMessage());
+            DisplayMetrics dm = getResources().getDisplayMetrics();
+            width = dm.widthPixels;
+            height = dm.heightPixels;
+            dpi = dm.densityDpi;
+        }
 
         ActivityManager actManager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
         ActivityManager.MemoryInfo memInfo = new ActivityManager.MemoryInfo();
@@ -559,54 +624,70 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             totalRamMb = memInfo.totalMem / (1024 * 1024);
         }
 
-        nativeInitDisplayInfo(width, height, dpi, refreshRate, (int) totalRamMb);
+        if (nativeLoaded) {
+            try {
+                nativeInitDisplayInfo(width, height, dpi, refreshRate, (int) totalRamMb);
+            } catch (Throwable t) {
+                Log.e(TAG, "Gagal memanggil nativeInitDisplayInfo: " + t.getMessage());
+            }
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        if (engineInitialized) {
-            nativePauseEngine();
+        if (engineInitialized && nativeLoaded) {
+            try { nativePauseEngine(); } catch (Throwable ignored) {}
         }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (engineInitialized) {
-            nativeResumeEngine();
+        if (engineInitialized && nativeLoaded) {
+            try { nativeResumeEngine(); } catch (Throwable ignored) {}
         }
     }
 
     @Override
     public void surfaceCreated(@NonNull SurfaceHolder holder) {
-        nativeOnSurfaceCreated(holder.getSurface());
+        if (nativeLoaded) {
+            try { nativeOnSurfaceCreated(holder.getSurface()); } catch (Throwable t) {
+                Log.e(TAG, "nativeOnSurfaceCreated error: " + t.getMessage());
+            }
+        }
     }
 
     @Override
     public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
-        nativeOnSurfaceChanged(width, height);
+        if (nativeLoaded) {
+            try { nativeOnSurfaceChanged(width, height); } catch (Throwable ignored) {}
+        }
     }
 
     @Override
     public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
-        nativeOnSurfaceDestroyed();
+        if (nativeLoaded) {
+            try { nativeOnSurfaceDestroyed(); } catch (Throwable ignored) {}
+        }
     }
 
     @Override
     public boolean dispatchGenericMotionEvent(MotionEvent event) {
-        if ((event.getSource() & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+        if (nativeLoaded && (event.getSource() & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
                 && event.getAction() == MotionEvent.ACTION_MOVE) {
-            nativeOnGamepadAxis(
-                    event.getDeviceId(),
-                    event.getAxisValue(MotionEvent.AXIS_X),
-                    event.getAxisValue(MotionEvent.AXIS_Y),
-                    event.getAxisValue(MotionEvent.AXIS_Z),
-                    event.getAxisValue(MotionEvent.AXIS_RZ),
-                    event.getAxisValue(MotionEvent.AXIS_HAT_X),
-                    event.getAxisValue(MotionEvent.AXIS_HAT_Y)
-            );
-            return true;
+            try {
+                nativeOnGamepadAxis(
+                        event.getDeviceId(),
+                        event.getAxisValue(MotionEvent.AXIS_X),
+                        event.getAxisValue(MotionEvent.AXIS_Y),
+                        event.getAxisValue(MotionEvent.AXIS_Z),
+                        event.getAxisValue(MotionEvent.AXIS_RZ),
+                        event.getAxisValue(MotionEvent.AXIS_HAT_X),
+                        event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+                );
+                return true;
+            } catch (Throwable ignored) {}
         }
         return super.dispatchGenericMotionEvent(event);
     }
@@ -626,10 +707,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             return super.dispatchKeyEvent(event);
         }
 
-        if ((event.getSource() & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD) {
+        if (nativeLoaded && (event.getSource() & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD) {
             boolean pressed = event.getAction() == KeyEvent.ACTION_DOWN;
-            nativeOnGamepadButton(event.getDeviceId(), keyCode, pressed);
-            return true;
+            try {
+                nativeOnGamepadButton(event.getDeviceId(), keyCode, pressed);
+                return true;
+            } catch (Throwable ignored) {}
         }
         return super.dispatchKeyEvent(event);
     }
@@ -638,7 +721,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
             if (pm != null) {
-                return pm.getCurrentThermalStatus();
+                try {
+                    return pm.getCurrentThermalStatus();
+                } catch (Throwable ignored) {}
             }
         }
         return 0;
@@ -646,8 +731,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     protected void onDestroy() {
-        if (engineInitialized) {
-            nativeShutdownEngine();
+        if (engineInitialized && nativeLoaded) {
+            try { nativeShutdownEngine(); } catch (Throwable ignored) {}
         }
         super.onDestroy();
     }
