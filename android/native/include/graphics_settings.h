@@ -87,6 +87,7 @@ public:
 
     void Initialize(uint32_t width, uint32_t height, float dpi, float refresh_rate,
                     uint32_t adreno_series, uint32_t total_ram_mb);
+    void UpdateGpuCapabilities(uint32_t adreno_series);
 
     // Deteksi otomatis preset terbaik untuk SoC HP
     GraphicsPreset AutoDetectPreset(uint32_t adreno_series, uint32_t total_ram_mb) const;
