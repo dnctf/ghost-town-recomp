@@ -1,0 +1,89 @@
+name: Build Android ARM64 PRoot (Bionic)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-proot-android.yml'
+      - 'runtime/proot/**'
+      - 'runtime/ANDROID_RUNTIME_LAYOUT.md'
+  workflow_dispatch:
+    inputs:
+      proot_ref:
+        description: Upstream berilevi/proot-static ref (branch, tag, or commit)
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-proot:
+    name: Build static Android ARM64 PRoot and loaders
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install Android NDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'ndk;28.2.13676358'
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git make python3 file binutils
+
+      - name: Checkout PRoot Android source
+        env:
+          PROOT_REF: ${{ inputs.proot_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          git clone https://github.com/berilevi/proot-static.git proot-src
+          git -C proot-src checkout --detach "$PROOT_REF"
+          git -C proot-src rev-parse HEAD | tee proot-upstream-commit.txt
+
+      - name: Build static ARM64 PRoot
+        run: |
+          set -euo pipefail
+          cd proot-src
+          NDK="$ANDROID_HOME/ndk/28.2.13676358" \
+          OUT="$RUNNER_TEMP/proot-static-build" \
+          REPO_ARTIFACT_DIR="$GITHUB_WORKSPACE/proot-src/dist/aarch64" \
+            tools/build-static-aarch64.sh
+
+      - name: Assemble and validate runtime layout
+        run: |
+          set -euo pipefail
+          SRC="proot-src/dist/aarch64"
+          OUT="bundle"
+          test -s "$SRC/proot"
+          test -s "$SRC/loader"
+          test -s "$SRC/loader32"
+          mkdir -p "$OUT/root/bin" "$OUT/root/libexec/proot" "$OUT/provenance"
+          install -m 0755 "$SRC/proot" "$OUT/root/bin/proot"
+          install -m 0755 "$SRC/loader" "$OUT/root/libexec/proot/loader"
+          install -m 0755 "$SRC/loader32" "$OUT/root/libexec/proot/loader32"
+          for f in "$OUT/root/bin/proot" "$OUT/root/libexec/proot/loader" "$OUT/root/libexec/proot/loader32"; do
+            file "$f"
+            readelf -h "$f" | grep -q 'AArch64'
+            if readelf -l "$f" | grep -q 'Requesting program interpreter'; then
+              echo "Expected a static Android binary without ELF interpreter: $f" >&2
+              exit 1
+            fi
+          done
+          cp proot-src/COPYING "$OUT/provenance/PROOT-COPYING"
+          cp proot-upstream-commit.txt "$OUT/provenance/"
+          printf 'source=https://github.com/berilevi/proot-static\nabi=arm64-v8a\nlinkage=static\nndk=28.2.13676358\n' > "$OUT/provenance/BUILD-INFO.txt"
+          (cd "$OUT" && sha256sum root/bin/proot root/libexec/proot/loader root/libexec/proot/loader32 > provenance/SHA256SUMS)
+          cp runtime/proot/README.md "$OUT/README.md"
+
+      - name: Upload PRoot Android ARM64 bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: proot-android-arm64-bionic-static
+          path: bundle/
+          if-no-files-found: error
+          retention-days: 30
