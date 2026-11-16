@@ -1,25 +1,19 @@
 # Changelog
 
-## [0.3.0] - 2026-11-16
+## [0.3.1] - 2026-11-16
 
 ### Added
-- Per-game execution-readiness details from the selected library tile.
-- Explicit explanation of the missing Unity Player / Windows compatibility runtime.
-- Automated GitHub pre-release publication for tag `v0.3.0`, gated behind successful APK build and Android lint.
+- Host-side Unity Windows installation probe: detects PE executable architecture, adjacent UnityPlayer.dll, matching Unity data folder, and Mono/IL2CPP metadata hints.
+- Optional explicit host-runner launch attempt for testers. It is opt-in, uses argument arrays without shell expansion, and records timeout/exit status.
+- Automated unit tests for data-only, Mono, and IL2CPP installation layouts.
+- Contributor guide and Android/game runtime tester checklist.
+- CI now runs the installation-probe unit tests before native/APK packaging.
 
 ### Changed
-- Game folder scanning is now reported as **data detected**, not as a playable or runnable installation.
-- Mono and IL2CPP verifier messages now describe inspection only.
-- App version is `0.3.0` (versionCode 5).
+- Android package version is 0.3.1 (versionCode 6).
+- Release notes distinguish a complete Windows installation layout from a verified runnable game.
 
-### Fixed
-- Removed the hard-coded orange Vulkan clear-only loop from the visible surface lifecycle.
-- Selecting a detected game no longer enters a placeholder render screen or launches a misleading title-specific stub.
-- Surface resize no longer attempts to resize an uninitialized Vulkan swapchain.
-
-### Known limitations
-- No complete Unity Player is included.
-- Mono runtime hosting and managed Unity execution are not implemented.
-- IL2CPP metadata parsing is not native recompilation.
-- Wine/Box64/DXVK integration is not included or validated on Android ARM64.
-- No title is currently verified as playable. A complete legal PC installation and a compatible execution runtime are still required.
+### Limitations
+- No Unity Player, Wine, Box64, DXVK, VKD3D-Proton, Linux userspace, or proprietary game data is bundled.
+- Host runner testing is not Android runtime testing.
+- No title is claimed playable until actual gameplay is demonstrated on the target Android device.
