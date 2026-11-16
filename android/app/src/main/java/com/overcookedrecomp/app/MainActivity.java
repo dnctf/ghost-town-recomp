@@ -398,6 +398,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(footer);
 
         scrollView.addView(container);
+        scrollView.post(() -> {
+            if (firstGameCard != null) firstGameCard.requestFocus();
+        });
         return scrollView;
     }
 
@@ -537,8 +540,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private GradientDrawable createCardDrawable(String bgHex, String borderHex) {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor(bgHex));
-        gd.setCornerRadius(18);
-        gd.setStroke(2, Color.parseColor(borderHex));
+        gd.setCornerRadius(dp(14));
+        gd.setStroke(dp(1), Color.parseColor(borderHex));
         return gd;
     }
 
@@ -904,6 +907,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     protected void onResume() {
         super.onResume();
+        if (!engineInitialized && setupOverlayView != null) {
+            setupOverlayView.setVisibility(View.VISIBLE);
+            if (virtualOverlay != null) virtualOverlay.setVisibility(View.GONE);
+        }
         if (engineInitialized && nativeLoaded) {
             try { nativeResumeEngine(); } catch (Throwable ignored) {}
         }
@@ -948,6 +955,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (setupOverlayView != null && setupOverlayView.getVisibility() != View.VISIBLE) {
                 setupOverlayView.setVisibility(View.VISIBLE);
+                if (virtualOverlay != null) virtualOverlay.setVisibility(View.GONE);
                 refreshInstalledGamesStatus();
                 return true;
             }
