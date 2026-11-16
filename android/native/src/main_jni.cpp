@@ -46,16 +46,20 @@ void NativeEngine::OnSurfaceCreated(ANativeWindow* window) {
         running_.store(false);
         render_thread_.join();
     }
-    window_ = window;
-    if (vulkan_.Initialize(window_)) {
-        running_.store(true);
-        paused_.store(false);
-        render_thread_ = std::thread(&NativeEngine::RenderLoop, this);
+    if (window_) {
+        ANativeWindow_release(window_);
+        window_ = nullptr;
     }
+    // Do not start the old orange clear-only demo loop. A Vulkan surface is not
+    // a Unity player; rendering stays disabled until a real game runtime exists.
+    window_ = window;
+    LOGI("Native surface acquired; Unity rendering is unavailable in this build.");
 }
 
 void NativeEngine::OnSurfaceChanged(uint32_t width, uint32_t height) {
-    vulkan_.Resize(width, height);
+    (void) width;
+    (void) height;
+    // No game renderer is active yet. Avoid resizing an uninitialized Vulkan swapchain.
 }
 
 void NativeEngine::OnSurfaceDestroyed() {
@@ -63,7 +67,6 @@ void NativeEngine::OnSurfaceDestroyed() {
     if (render_thread_.joinable()) {
         render_thread_.join();
     }
-    vulkan_.Shutdown();
     if (window_) {
         ANativeWindow_release(window_);
         window_ = nullptr;
