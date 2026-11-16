@@ -60,21 +60,16 @@ The initial policy targets Snapdragon 845 / Adreno 630 and newer Qualcomm device
 ### 1. Download & Install the APK
 Grab the latest APK from the [Releases](https://github.com/dnctf/ghost-town-recomp/releases) page. Install it on your Android 10+ phone or tablet.
 
-### 2. Copy Your PC Game Files
-Copy the `_Data` folder from your legitimate PC game installation to your device:
+### 2. Copy Your Complete PC Game Installation
+Copy the **complete installed game folder** from your legitimate PC installation to your device. Include the main `.exe`, adjacent DLL files, and the matching Unity `*_Data` directory. Copying only `*_Data` is insufficient for the planned Windows compatibility runtime.
 
-```text
-/sdcard/Android/data/com.overcookedrecomp.app/files/
-  ├── Overcooked_Data/     # for Overcooked 1
-  ├── Overcooked2_Data/    # for Overcooked 2
-  ├── MovingOut_Data/      # for Moving Out
-  └── MovingOut2_Data/     # for Moving Out 2
-```
+> 💡 You can zip the complete game folder on your PC, send it to your phone's **Download** folder, and use **Impor .ZIP PC** or **Pilih Folder** inside the relevant game card.
 
-> 💡 **Tip:** You can also simply zip the folder on your PC, send it to your phone's **Download** folder, and tap **"⚡ Deteksi Otomatis dari Folder Download"** or **"📁 Impor .ZIP PC"** inside the app!
+### 3. Inspect the imported game
+Use **Periksa & Pilih Game** to scan PE executable architecture and Unity data markers. This is a read-only preflight check; it does not launch the PC game.
 
-### 3. Inspect the imported game data
-Open **Ghost Town Recomp**, import the complete installation folder on the relevant game card, then use **Periksa Base Game** to list PE executable architectures and Unity data markers. This is a preflight check only; it does not launch the PC game. See [Runtime Status](docs/RUNTIME_STATUS.md) for current limitations and required implementation work.
+### 4. Windows execution status
+**Wine + Box64 are not integrated in this build.** The current APK cannot execute the selected `.exe`. The next engineering milestone is a separately validated Android Wine/Box64 bootstrap based on the [Winlator WB64 reference](https://github.com/winebox64/winlator), followed by a per-game launch profile. See [Runtime Status](docs/RUNTIME_STATUS.md) and [Wine + Box64 Integration Plan](docs/WINE_BOX64_INTEGRATION.md).
 
 ---
 
