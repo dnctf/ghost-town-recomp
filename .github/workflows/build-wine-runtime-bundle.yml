@@ -156,7 +156,7 @@ jobs:
             libgstreamer1.0-0:amd64 libgstreamer-plugins-base1.0-0:amd64 \
             libkrb5-3:amd64 libldap-2.5-0:amd64
           sudo install -D -m 0755 box64-install/usr/local/bin/box64 "$ROOTFS/usr/local/bin/box64"
-          mkdir -p "$ROOTFS/opt/wine" "$ROOTFS/opt/dxvk"
+          sudo mkdir -p "$ROOTFS/opt/wine" "$ROOTFS/opt/dxvk"
           mkdir wine-extract dxvk-extract
           tar -xJf downloads/wine.tar.xz -C wine-extract --strip-components=1
           WINE_BIN="$(find wine-extract -type f -path '*/bin/wine' -print -quit)"
