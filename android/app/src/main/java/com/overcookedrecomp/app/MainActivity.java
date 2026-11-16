@@ -667,8 +667,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
 
         GameInstallInspector.Inspection inspection = GameInstallInspector.inspect(importedRoot, title);
-        String runtimeStatus = "\\n\\nSTATUS EKSEKUSI: BELUM TERSEDIA. Build ini belum memuat Wine + Box64 atau renderer DirectX yang terintegrasi. Pemeriksaan ini hanya membaca struktur folder dan header PE; tidak menjalankan .exe.";
-        String hardwareNote = "\\n\\nTarget pengujian: Android ARM64. Untuk kandidat x86-64, tahap berikutnya adalah validasi Wine/Box64 dan jalur grafis pada perangkat fisik.";
+        String runtimeStatus = "\n\nSTATUS EKSEKUSI: BELUM TERSEDIA. Build ini belum memuat Wine + Box64 atau renderer DirectX yang terintegrasi. Pemeriksaan ini hanya membaca struktur folder dan header PE; tidak menjalankan .exe.";
+        String hardwareNote = "\n\nTarget pengujian: Android ARM64. Untuk kandidat x86-64, tahap berikutnya adalah validasi Wine/Box64 dan jalur grafis pada perangkat fisik.";
         new AlertDialog.Builder(this)
                 .setTitle(title.displayName + " • Base Game Preflight")
                 .setMessage(inspection.report + runtimeStatus + hardwareNote)
