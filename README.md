@@ -116,3 +116,13 @@ The output APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`.
 ## ⚖️ Legal Disclaimer
 
 *Ghost Town Recomp* is an independent, non-commercial open-source project developed for interoperability and preservation purposes. It is **not** endorsed by, affiliated with, or associated with Ghost Town Games, SMG Studio, Team17 Digital, or Unity Technologies. All game trademarks, titles, and copyrighted materials belong to their respective owners. Users must own legitimate copies of the PC games to use this software.
+
+
+## Contributor and tester tooling
+
+- [Contributor guide](CONTRIBUTING.md)
+- [Game installation and Android tester guide](docs/CONTRIBUTOR_TESTING.md)
+- Run the host-side installation probe: `python3 tools/game_installation_probe.py /path/to/Game --json report.json`
+- Run probe tests: `python3 -m unittest discover -s tools/tests -v`
+
+A complete Windows folder layout is not proof of Android compatibility. This project does not bundle Wine/Box64 or proprietary game files.
