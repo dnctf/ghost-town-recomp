@@ -40,3 +40,8 @@ This runtime is a foundation, not a playable Windows emulator. A successful arti
 Use the dashboard action **INSTALL WINE RUNTIME BUNDLE (.TAR.GZ)** and select the workflow's `ghost-town-wine-runtime-arm64.tar.gz` artifact after downloading it. The installer extracts into app-private storage and validates the required runtime files before activation. Keep at least the archive's expanded size plus temporary staging space free; installation stages a second copy before replacing an existing runtime.
 
 The installer does not make the runtime executable on a particular Android kernel/GPU. Run the headless Wine version probe after import and record its log and exit code.
+
+
+## License and attribution payload
+
+The runtime artifact includes upstream notices for PRoot (GPL-2.0-or-later), Box64 (MIT), Wine 11.19 (LGPL-2.1-or-later plus Wine third-party notices), and DXVK 3.1.1 (zlib/libpng). Debian package copyright files are retained under `rootfs/usr/share/doc/*/copyright`. Preserve the `provenance/licenses/` directory when redistributing the runtime.
