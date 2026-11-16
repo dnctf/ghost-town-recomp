@@ -88,6 +88,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 if (uri != null) handleImportZipUri(uri);
             });
 
+    private final ActivityResultLauncher<String[]> runtimeBundleLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
+                if (uri != null) installRuntimeBundle(uri);
+            });
+
     private final ActivityResultLauncher<Uri> openFolderLauncher =
             registerForActivityResult(new ActivityResultContracts.OpenDocumentTree(), uri -> {
                 if (uri != null) handleImportFolderUri(uri);
@@ -371,6 +376,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         wineRuntimeParams.topMargin = dp(8);
         container.addView(wineRuntimeBtn, wineRuntimeParams);
 
+        Button installRuntimeBtn = createDashboardButton("INSTALL WINE RUNTIME BUNDLE (.TAR.GZ)", "#203A2C");
+        installRuntimeBtn.setOnClickListener(v -> runtimeBundleLauncher.launch(new String[]{
+                "application/gzip", "application/x-gzip", "application/octet-stream", "*/*"
+        }));
+        LinearLayout.LayoutParams installRuntimeParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
+        installRuntimeParams.topMargin = dp(8);
+        container.addView(installRuntimeBtn, installRuntimeParams);
+
         importProgressText = new TextView(this);
         importProgressText.setText("");
         importProgressText.setTextSize(11);
@@ -508,6 +522,48 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setEnabled(selectedGame != null));
         dialog.show();
+    }
+
+    private void installRuntimeBundle(Uri uri) {
+        if (importProgressText != null) {
+            importProgressText.setText("Menyiapkan instalasi Wine runtime...");
+            importProgressText.setVisibility(View.VISIBLE);
+        }
+        if (importProgressBar != null) importProgressBar.setVisibility(View.VISIBLE);
+
+        new Thread(() -> {
+            try {
+                RuntimeBundleInstaller.install(this, uri,
+                        message -> runOnUiThread(() -> {
+                            if (importProgressText != null) importProgressText.setText(message);
+                        }));
+                runOnUiThread(() -> {
+                    if (importProgressBar != null) importProgressBar.setVisibility(View.GONE);
+                    if (importProgressText != null) {
+                        importProgressText.setText("Wine runtime berhasil dipasang ke penyimpanan privat aplikasi.");
+                    }
+                    new AlertDialog.Builder(this)
+                            .setTitle("RUNTIME TERPASANG")
+                            .setMessage("Komponen runtime berhasil diekstrak dan struktur dasarnya tervalidasi. Ini belum membuktikan PRoot/Wine berjalan pada perangkat atau DXVK dapat membuat Vulkan device.")
+                            .setPositiveButton("PERIKSA STATUS", (dialog, which) -> showWineRuntimeStatus())
+                            .setNegativeButton("TUTUP", null)
+                            .show();
+                });
+            } catch (Throwable error) {
+                Log.e(TAG, "Runtime bundle installation failed", error);
+                runOnUiThread(() -> {
+                    if (importProgressBar != null) importProgressBar.setVisibility(View.GONE);
+                    if (importProgressText != null) {
+                        importProgressText.setText("Instalasi runtime gagal.");
+                    }
+                    new AlertDialog.Builder(this)
+                            .setTitle("INSTALASI RUNTIME GAGAL")
+                            .setMessage(error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())
+                            .setPositiveButton("OK", null)
+                            .show();
+                });
+            }
+        }, "runtime-bundle-installer").start();
     }
 
     private void showWineRuntimeStatus() {
