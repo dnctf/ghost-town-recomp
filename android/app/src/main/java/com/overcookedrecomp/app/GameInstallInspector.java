@@ -74,7 +74,7 @@ public final class GameInstallInspector {
                                 List<File> exeFiles, boolean[] hasData) {
         if (dir == null || !dir.isDirectory() || depth > 6) return;
         String name = dir.getName().toLowerCase(Locale.ROOT);
-        if (name.equals(expectedDataFolder.toLowerCase(Locale.ROOT))
+        if ((depth > 0 && name.equals(expectedDataFolder.toLowerCase(Locale.ROOT)))
                 || new File(dir, "globalgamemanagers").isFile()
                 || new File(dir, "data.unity3d").isFile()) {
             hasData[0] = true;
