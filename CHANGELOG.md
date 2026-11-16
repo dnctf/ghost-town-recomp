@@ -73,3 +73,11 @@ Release candidate commit: CI publishes tag `v0.3.1` only after probe tests, ARM6
 - No Unity Player, Wine, Box64, DXVK, VKD3D-Proton, Linux userspace, or proprietary game data is bundled.
 - Host runner testing is not Android runtime testing.
 - No title is claimed playable until actual gameplay is demonstrated on the target Android device.
+
+
+## 0.4.0-alpha.1 — runtime architecture foundation
+
+- Start the transition toward a self-contained, app-managed Wine/Box64 runtime for BYOG Overcooked 2.
+- Add prefix, DXVK installation, and game launch scripts as isolated guest-side entry points.
+- Add component provenance and explicit device-verification gates.
+- Mark Turnip/adrenotools, Wine display/Vulkan bridge, audio/input integration, and physical gameplay validation as incomplete. This pre-release does not claim game execution or playability.

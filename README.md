@@ -126,3 +126,8 @@ The output APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`.
 - Run probe tests: `python3 -m unittest discover -s tools/tests -v`\n- Run Android launcher smoke test: `tools/android_device_smoke_test.sh /path/to/app-debug.apk`
 
 A complete Windows folder layout is not proof of Android compatibility. This project does not bundle Wine/Box64 or proprietary game files.
+
+
+## v0.4.0 runtime transition
+
+The `0.4.0-alpha.1` line starts the self-contained Android runtime migration. It is explicitly a **pre-release foundation**, not a playable Overcooked 2 build. The existing PRoot/Box64/Wine/DXVK payload is not sufficient by itself: a tested Android graphics-driver loading path, a glibc-visible Vulkan/Wine presentation backend, audio/input bridges, prefix creation, and target-device gameplay evidence remain required. See [`docs/V0.4.0_EXECUTION_GATES.md`](docs/V0.4.0_EXECUTION_GATES.md) and [`docs/PROVENANCE.md`](docs/PROVENANCE.md).

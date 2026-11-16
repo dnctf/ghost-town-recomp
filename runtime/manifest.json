@@ -1,54 +1,79 @@
 {
-  "schema_version": 3,
-  "target": "android-arm64-via-glibc-userspace",
-  "status": "android-runtime-bundle-pipeline-and-private-installer-added-ci-and-device-validation-pending",
+  "schema_version": 4,
+  "target": "android-arm64-snapdragon-888-adreno-660",
+  "release": "0.4.0-alpha.1",
+  "release_channel": "pre-release",
+  "status": "runtime-provisioning-foundation-only; no-game-launch-claim",
   "components": {
+    "proot": {
+      "upstream": "https://github.com/berilevi/proot-static",
+      "abi": "arm64-v8a",
+      "libc": "bionic",
+      "status": "existing v0.3.3 bundle build; device ptrace validation pending",
+      "license": "GPL-2.0-or-later"
+    },
+    "rootfs": {
+      "distribution": "Debian Bookworm",
+      "architecture": "arm64 + amd64 multiarch",
+      "status": "existing v0.3.3 runtime build; imagefs migration and first-run provisioning integration pending",
+      "license": "Debian package-specific; preserve copyright files"
+    },
     "box64": {
       "upstream": "https://github.com/ptitSeb/box64",
-      "build_workflow": ".github/workflows/build-box64-android.yml",
-      "abi": "aarch64-linux-gnu",
-      "profile": "Snapdragon 888",
-      "status": "Snapdragon 888 ARM64/glibc build integrated into complete runtime bundle workflow; app-private provisioning implemented; runtime execution pending",
+      "architecture": "aarch64 host / x86_64 guest",
+      "status": "existing workflow build; immutable source pin and on-device dynarec validation required",
       "license": "MIT"
     },
     "wine": {
       "upstream": "https://github.com/Kron4ek/Wine-Builds",
       "version": "11.19-amd64",
       "sha256": "40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e",
-      "status": "Pinned Wine 11.19 amd64 payload integrated into rootfs bundle workflow; dynamic dependency validation and device execution pending",
-      "license": "LGPL-2.1-or-later; Wine third-party notices included"
+      "status": "existing runtime bundle; prefix initialization and Overcooked2.exe execution not verified",
+      "license": "LGPL-2.1-or-later plus third-party notices"
     },
     "dxvk": {
       "upstream": "https://github.com/doitsujin/DXVK",
       "version": "3.1.1",
       "sha256": "40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608",
-      "status": "Pinned DXVK 3.1.1 payload integrated into rootfs bundle workflow; Wine prefix installation and Vulkan/display backend remain pending",
-      "license": "zlib/libpng"
+      "status": "existing DLL payload; D3D11/Vulkan device and presentation not verified",
+      "license": "zlib"
     },
-    "unity_player": {
-      "status": "user-provided",
-      "reason": "Unity Player and game assets are build-specific proprietary game files; do not redistribute"
+    "turnip": {
+      "upstream": "https://gitlab.freedesktop.org/mesa/mesa",
+      "driver": "libvulkan_freedreno.so",
+      "gpu_target": "Adreno 660 (a650 generation)",
+      "status": "NOT_BUNDLED; choose and pin Mesa commit, build Android/Bionic driver, test on target, and ship matching source/license bundle before enablement",
+      "license": "Mesa component licenses; see upstream"
     },
-    "proot": {
-      "upstream": "https://github.com/berilevi/proot-static",
-      "license": "GPL-2.0-or-later",
-      "build_workflow": ".github/workflows/build-proot-android.yml",
-      "abi": "arm64-v8a",
-      "linkage": "static Bionic",
-      "status": "Android ARM64/Bionic PRoot and companion-loader build included in full runtime workflow; explicit PROOT_LOADER paths configured; device ptrace validation pending"
+    "adrenotools": {
+      "upstream": "https://github.com/bylaws/libadrenotools",
+      "status": "NOT_INTEGRATED; BSD-2-Clause API reviewed; hook libraries and app-native loader still need to be built and tested",
+      "license": "BSD-2-Clause"
     },
-    "rootfs": {
-      "status": "Debian Bookworm ARM64/glibc with amd64 Wine dependencies; package copyright files retained in /usr/share/doc/*/copyright"
-    },
-    "graphics_bridge": {
-      "status": "not integrated; Android Vulkan presentation path for Box64/Wine/DXVK still required"
-    },
-    "runtime_installer": {
-      "status": "Android app imports gzip tar runtime to app-private storage with traversal/symlink protections and SHA-256 verification of PRoot, Box64, Wine and DXVK core files"
+    "display_backend": {
+      "status": "NOT_IMPLEMENTED; need Wine window/display driver plus X11/Wayland or validated direct Vulkan WSI path; Android SurfaceView alone is not enough"
     },
     "audio_input": {
-      "status": "Android audio/input bridge not integrated into Wine runtime"
+      "status": "NOT_IMPLEMENTED for Wine process; existing native app input is not automatically bridged into Wine"
+    },
+    "game": {
+      "status": "BYOG only; Overcooked2.exe and proprietary assets are not distributed"
     }
   },
-  "playable_claim_policy": "No game is playable until Wine launches a Windows PE under Box64 on target hardware and graphics, input, audio, lifecycle, and stability pass gameplay tests."
+  "runtime_layout": {
+    "host_install_dir": "filesDir/imagefs",
+    "staging_dir": "filesDir/imagefs.installing",
+    "legacy_v033_dir": "filesDir/runtime/wine",
+    "first_run": "managed-download-and-verified-extract planned; manual tar import remains in alpha"
+  },
+  "graphics_defaults": {
+    "render_width": 1280,
+    "render_height": 720,
+    "vsync": false,
+    "driver": "turnip",
+    "driver_fallback": "system-vulkan-with-warning",
+    "dxvk_async": false,
+    "dxvk_async_note": "Do not enable DXVK_ASYNC unless using a specifically pinned compatible fork; upstream DXVK 3.1.1 does not imply async patch support."
+  },
+  "release_gate": "Do not publish stable v0.4.0 until all physical-device evidence in docs/V0.4.0_EXECUTION_GATES.md is attached. Otherwise publish pre-release only."
 }
