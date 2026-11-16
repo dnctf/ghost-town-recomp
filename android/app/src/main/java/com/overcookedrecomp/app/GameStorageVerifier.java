@@ -16,7 +16,8 @@ public final class GameStorageVerifier {
         UNKNOWN(0, "Unknown Game", ""),
         OVERCOOKED_1(1, "Overcooked 1", "Overcooked_Data"),
         OVERCOOKED_2(2, "Overcooked 2", "Overcooked2_Data"),
-        MOVING_OUT(3, "Moving Out", "MovingOut_Data");
+        MOVING_OUT(3, "Moving Out", "MovingOut_Data"),
+        MOVING_OUT_2(4, "Moving Out 2", "MovingOut2_Data");
 
         public final int id;
         public final String displayName;
@@ -90,6 +91,13 @@ public final class GameStorageVerifier {
             if (res.valid) results.add(res);
         }
 
+        // Cek Moving Out 2 (MovingOut2_Data)
+        File mo2Dir = new File(baseDir, GameTitle.MOVING_OUT_2.defaultFolderName);
+        if (mo2Dir.exists() && mo2Dir.isDirectory()) {
+            VerificationResult res = verifyDataDir(mo2Dir, GameTitle.MOVING_OUT_2);
+            if (res.valid) results.add(res);
+        }
+
         // Cek alternatif huruf kecil jika ada
         if (results.isEmpty()) {
             File oc1Lower = new File(baseDir, "overcooked_data");
@@ -105,6 +113,11 @@ public final class GameStorageVerifier {
             File moLower = new File(baseDir, "movingout_data");
             if (moLower.exists()) {
                 VerificationResult res = verifyDataDir(moLower, GameTitle.MOVING_OUT);
+                if (res.valid) results.add(res);
+            }
+            File mo2Lower = new File(baseDir, "movingout2_data");
+            if (mo2Lower.exists()) {
+                VerificationResult res = verifyDataDir(mo2Lower, GameTitle.MOVING_OUT_2);
                 if (res.valid) results.add(res);
             }
         }
@@ -123,7 +136,9 @@ public final class GameStorageVerifier {
 
         GameTitle resolvedTitle = hint;
         String dirNameLower = dataDir.getName().toLowerCase();
-        if (dirNameLower.contains("movingout") || dirNameLower.contains("moving_out")) {
+        if (dirNameLower.contains("movingout2") || dirNameLower.contains("moving_out_2")) {
+            resolvedTitle = GameTitle.MOVING_OUT_2;
+        } else if (dirNameLower.contains("movingout") || dirNameLower.contains("moving_out")) {
             resolvedTitle = GameTitle.MOVING_OUT;
         } else if (dirNameLower.contains("overcooked2") || dirNameLower.contains("overcooked_2")) {
             resolvedTitle = GameTitle.OVERCOOKED_2;
@@ -148,6 +163,10 @@ public final class GameStorageVerifier {
             File sub3 = new File(dataDir, "MovingOut_Data");
             if (sub3.exists() && sub3.isDirectory()) {
                 return verifyDataDir(sub3, GameTitle.MOVING_OUT);
+            }
+            File sub4 = new File(dataDir, "MovingOut2_Data");
+            if (sub4.exists() && sub4.isDirectory()) {
+                return verifyDataDir(sub4, GameTitle.MOVING_OUT_2);
             }
             File[] subs = dataDir.listFiles(File::isDirectory);
             if (subs != null) {

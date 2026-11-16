@@ -1,6 +1,7 @@
 package com.overcookedrecomp.app.compiler.core
 
 import android.util.Log
+import com.overcookedrecomp.app.compiler.movingout.MovingOut2Compiler
 import com.overcookedrecomp.app.compiler.movingout.MovingOutCompiler
 import com.overcookedrecomp.app.compiler.overcooked.OvercookedCompiler
 import java.io.File
@@ -17,6 +18,7 @@ object CompilerRegistry {
         registerCompiler(OvercookedCompiler(titleVersion = 1))
         registerCompiler(OvercookedCompiler(titleVersion = 2))
         registerCompiler(MovingOutCompiler())
+        registerCompiler(MovingOut2Compiler())
         Log.i(TAG, "CompilerRegistry diinisialisasi dengan ${compilers.size} compiler terdaftar.")
     }
 

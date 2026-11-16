@@ -1,4 +1,4 @@
-name: Build overcooked-recomp Android NDK & APK
+name: Build Ghost Town Recomp Android NDK & APK
 
 on:
   push:
@@ -58,7 +58,7 @@ jobs:
       - name: Upload Built APKs & Native Symbols
         uses: actions/upload-artifact@v4
         with:
-          name: overcooked-recomp-arm64-apks
+          name: ghost-town-recomp-arm64-apks
           path: |
             android/app/build/outputs/apk/release/*.apk
             android/app/build/outputs/apk/debug/*.apk
@@ -71,7 +71,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           prerelease: true
-          title: "Overcooked Recomp Android ${{ github.ref_name }} (Pre-Release)"
+          title: "Ghost Town Recomp Android ${{ github.ref_name }} (Pre-Release)"
           files: |
             android/app/build/outputs/apk/release/*.apk
             android/app/build/outputs/apk/debug/*.apk

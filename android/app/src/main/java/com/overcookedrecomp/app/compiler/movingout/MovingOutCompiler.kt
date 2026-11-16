@@ -18,7 +18,7 @@ import java.security.MessageDigest
  */
 class MovingOutCompiler : GameCompiler {
 
-    override val developer: Developer = Developer.SMG_STUDIO
+    override val developer: Developer = Developer.GHOST_TOWN_GAMES
 
     override val gameId: String = "moving_out"
 

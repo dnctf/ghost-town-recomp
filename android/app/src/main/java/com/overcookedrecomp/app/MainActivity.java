@@ -40,6 +40,8 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import com.overcookedrecomp.app.compiler.movingout.MovingOutLauncherActivity;
+import com.overcookedrecomp.app.input.GamepadManager;
+import com.overcookedrecomp.app.input.VirtualGamepadOverlay;
 import java.io.File;
 import java.util.List;
 
@@ -67,6 +69,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private TextView oc1StatusText;
     private TextView oc2StatusText;
     private TextView moStatusText;
+    private TextView mo2StatusText;
+    private GamepadManager gamepadManager;
+    private VirtualGamepadOverlay virtualOverlay;
+    private boolean virtualControlsEnabled = true;
     private TextView importProgressText;
     private ProgressBar importProgressBar;
     private Button startGameBtn;
@@ -105,6 +111,65 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         gameSurfaceView.getHolder().addCallback(this);
         rootLayout.addView(gameSurfaceView);
 
+        // Inisialisasi Gamepad Manager untuk DS4 & Xbox
+        gamepadManager = new GamepadManager(this);
+        gamepadManager.setInputCallback(new GamepadManager.InputCallback() {
+            @Override
+            public void onAxisEvent(int deviceId, float lx, float ly, float rx, float ry, float hatX, float hatY) {
+                if (nativeLoaded) {
+                    try {
+                        nativeOnGamepadAxis(deviceId, lx, ly, rx, ry, hatX, hatY);
+                    } catch (Throwable ignored) {}
+                }
+            }
+
+            @Override
+            public void onButtonEvent(int deviceId, int keyCode, boolean pressed) {
+                if (nativeLoaded) {
+                    try {
+                        nativeOnGamepadButton(deviceId, keyCode, pressed);
+                    } catch (Throwable ignored) {}
+                }
+            }
+        });
+
+        // Kontrol Layar Sentuh Virtual (Virtual Touch Gamepad)
+        virtualOverlay = new VirtualGamepadOverlay(this);
+        virtualOverlay.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        virtualOverlay.setInputListener(new VirtualGamepadOverlay.VirtualInputListener() {
+            @Override
+            public void onVirtualAxis(float lx, float ly) {
+                if (nativeLoaded) {
+                    try {
+                        nativeOnGamepadAxis(999, lx, ly, 0f, 0f, 0f, 0f);
+                    } catch (Throwable ignored) {}
+                }
+            }
+
+            @Override
+            public void onVirtualButton(int keyCode, boolean pressed) {
+                if (nativeLoaded) {
+                    try {
+                        nativeOnGamepadButton(999, keyCode, pressed);
+                    } catch (Throwable ignored) {}
+                }
+            }
+
+            @Override
+            public void onToggleMenuRequested() {
+                if (setupOverlayView != null) {
+                    if (setupOverlayView.getVisibility() == View.VISIBLE) {
+                        setupOverlayView.setVisibility(View.GONE);
+                    } else {
+                        setupOverlayView.setVisibility(View.VISIBLE);
+                        refreshInstalledGamesStatus();
+                    }
+                }
+            }
+        });
+        rootLayout.addView(virtualOverlay);
+
         // Buat UI Importer & Setup
         setupOverlayView = createSetupOverlay();
         rootLayout.addView(setupOverlayView);
@@ -142,7 +207,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         // Header Title
         TextView titleView = new TextView(this);
-        titleView.setText("🍳 Overcooked Recomp");
+        titleView.setText("🎮 Ghost Town Recomp");
         titleView.setTextSize(24);
         titleView.setTextColor(Color.parseColor("#FF9F1C"));
         titleView.setTypeface(null, Typeface.BOLD);
@@ -150,7 +215,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(titleView);
 
         TextView subTitle = new TextView(this);
-        subTitle.setText("Jalankan game PC Overcooked 1 & 2 di Android / HarmonyOS Snapdragon");
+        subTitle.setText("Launcher & Compiler Game PC (Overcooked 1 & 2, Moving Out 1 & 2) — Ghost Town Games / Team17");
         subTitle.setTextSize(13);
         subTitle.setTextColor(Color.parseColor("#CCCCCC"));
         subTitle.setGravity(Gravity.CENTER);
@@ -163,51 +228,29 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         devBar.setGravity(Gravity.CENTER);
         devBar.setPadding(0, 0, 0, 20);
 
-        // Badge Ghost Town Games (Overcooked)
+        // Badge Ghost Town Games / Team17
         LinearLayout gtgBadge = new LinearLayout(this);
         gtgBadge.setOrientation(LinearLayout.HORIZONTAL);
         gtgBadge.setGravity(Gravity.CENTER_VERTICAL);
         gtgBadge.setBackground(createCardDrawable("#1E2229", "#FF9F1C"));
-        gtgBadge.setPadding(16, 10, 20, 10);
+        gtgBadge.setPadding(18, 10, 22, 10);
         ImageView gtgIcon = new ImageView(this);
         gtgIcon.setImageResource(R.drawable.ic_overcooked);
         gtgIcon.setLayoutParams(new LinearLayout.LayoutParams(40, 40));
         gtgBadge.addView(gtgIcon);
+        ImageView moDevIcon = new ImageView(this);
+        moDevIcon.setImageResource(R.drawable.ic_moving_out);
+        LinearLayout.LayoutParams moIconParams = new LinearLayout.LayoutParams(40, 40);
+        moIconParams.setMarginStart(10);
+        moDevIcon.setLayoutParams(moIconParams);
+        gtgBadge.addView(moDevIcon);
         TextView gtgText = new TextView(this);
-        gtgText.setText(" Ghost Town Games");
+        gtgText.setText(" Ghost Town Games / Team17");
         gtgText.setTextSize(12);
         gtgText.setTextColor(Color.parseColor("#FF9F1C"));
         gtgText.setTypeface(null, Typeface.BOLD);
         gtgBadge.addView(gtgText);
         devBar.addView(gtgBadge);
-
-        View devSpacer = new View(this);
-        devSpacer.setLayoutParams(new LinearLayout.LayoutParams(16, ViewGroup.LayoutParams.MATCH_PARENT));
-        devBar.addView(devSpacer);
-
-        // Badge SMG Studio (Moving Out)
-        LinearLayout smgBadge = new LinearLayout(this);
-        smgBadge.setOrientation(LinearLayout.HORIZONTAL);
-        smgBadge.setGravity(Gravity.CENTER_VERTICAL);
-        smgBadge.setBackground(createCardDrawable("#1E2229", "#00A8E8"));
-        smgBadge.setPadding(16, 10, 20, 10);
-        smgBadge.setClickable(true);
-        smgBadge.setFocusable(true);
-        smgBadge.setOnClickListener(v -> {
-            Intent moIntent = new Intent(MainActivity.this, MovingOutLauncherActivity.class);
-            startActivity(moIntent);
-        });
-        ImageView smgIcon = new ImageView(this);
-        smgIcon.setImageResource(R.drawable.ic_moving_out);
-        smgIcon.setLayoutParams(new LinearLayout.LayoutParams(40, 40));
-        smgBadge.addView(smgIcon);
-        TextView smgText = new TextView(this);
-        smgText.setText(" SMG Studio (Moving Out ↗)");
-        smgText.setTextSize(12);
-        smgText.setTextColor(Color.parseColor("#00A8E8"));
-        smgText.setTypeface(null, Typeface.BOLD);
-        smgBadge.addView(smgText);
-        devBar.addView(smgBadge);
 
         container.addView(devBar);
 
@@ -235,13 +278,44 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         spacer2.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 20));
         container.addView(spacer2);
 
-        // Kartu Moving Out (SMG Studio)
+        // Kartu Moving Out
         container.addView(createGameCard(
                 GameStorageVerifier.GameTitle.MOVING_OUT,
-                "Moving Out (PC) — SMG Studio",
+                "Moving Out (PC)",
                 "Salin/impor folder 'MovingOut_Data' dari PC (Fisika pindahan rumah & sofa)",
                 text -> moStatusText = text
         ));
+
+        View spacer3 = new View(this);
+        spacer3.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 20));
+        container.addView(spacer3);
+
+        // Kartu Moving Out 2
+        container.addView(createGameCard(
+                GameStorageVerifier.GameTitle.MOVING_OUT_2,
+                "Moving Out 2 (PC)",
+                "Salin/impor folder 'MovingOut2_Data' dari PC (Multiverse delivery, arcade physics & joint chaos)",
+                text -> mo2StatusText = text
+        ));
+
+        // Tombol Toggle Virtual On-Screen Controls
+        Button toggleVirtualBtn = new Button(this);
+        toggleVirtualBtn.setText(virtualControlsEnabled ? "🎮 Kontrol Virtual Layar Sentuh: AKTIF" : "🎮 Kontrol Virtual Layar Sentuh: NONAKTIF");
+        toggleVirtualBtn.setTextSize(13);
+        toggleVirtualBtn.setTextColor(Color.WHITE);
+        toggleVirtualBtn.setBackground(createButtonDrawable("#00A8E8"));
+        LinearLayout.LayoutParams vParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        vParams.setMargins(0, 20, 0, 0);
+        toggleVirtualBtn.setLayoutParams(vParams);
+        toggleVirtualBtn.setOnClickListener(v -> {
+            virtualControlsEnabled = !virtualControlsEnabled;
+            if (virtualOverlay != null) {
+                virtualOverlay.setVisibility(virtualControlsEnabled ? View.VISIBLE : View.GONE);
+            }
+            toggleVirtualBtn.setText(virtualControlsEnabled ? "🎮 Kontrol Virtual Layar Sentuh: AKTIF" : "🎮 Kontrol Virtual Layar Sentuh: NONAKTIF");
+        });
+        container.addView(toggleVirtualBtn);
 
         // Tombol Auto-Scan dari folder Download
         Button autoScanBtn = new Button(this);
@@ -412,16 +486,19 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             boolean hasOC1 = false;
             boolean hasOC2 = false;
             boolean hasMO = false;
+            boolean hasMO2 = false;
 
             for (GameStorageVerifier.VerificationResult g : games) {
                 if (g.gameTitle == GameStorageVerifier.GameTitle.OVERCOOKED_1) hasOC1 = true;
                 if (g.gameTitle == GameStorageVerifier.GameTitle.OVERCOOKED_2) hasOC2 = true;
                 if (g.gameTitle == GameStorageVerifier.GameTitle.MOVING_OUT) hasMO = true;
+                if (g.gameTitle == GameStorageVerifier.GameTitle.MOVING_OUT_2) hasMO2 = true;
             }
 
             final boolean fHasOC1 = hasOC1;
             final boolean fHasOC2 = hasOC2;
             final boolean fHasMO = hasMO;
+            final boolean fHasMO2 = hasMO2;
 
             runOnUiThread(() -> {
                 if (oc1StatusText != null) {
@@ -446,7 +523,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
                 if (moStatusText != null) {
                     if (fHasMO) {
-                        moStatusText.setText("Status: ✅ Terpasang & Siap Dimainkan (SMG Studio)");
+                        moStatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
                         moStatusText.setTextColor(Color.parseColor("#06D6A0"));
                     } else {
                         moStatusText.setText("Status: ❌ Belum Terpasang (Butuh MovingOut_Data)");
@@ -454,9 +531,20 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     }
                 }
 
+                if (mo2StatusText != null) {
+                    if (fHasMO2) {
+                        mo2StatusText.setText("Status: ✅ Terpasang & Siap Dimainkan");
+                        mo2StatusText.setTextColor(Color.parseColor("#06D6A0"));
+                    } else {
+                        mo2StatusText.setText("Status: ❌ Belum Terpasang (Butuh MovingOut2_Data)");
+                        mo2StatusText.setTextColor(Color.parseColor("#E71D36"));
+                    }
+                }
+
                 if (startGameBtn != null) {
-                    startGameBtn.setEnabled(fHasOC1 || fHasOC2 || fHasMO);
-                    startGameBtn.setAlpha((fHasOC1 || fHasOC2 || fHasMO) ? 1.0f : 0.5f);
+                    boolean anyInstalled = fHasOC1 || fHasOC2 || fHasMO || fHasMO2;
+                    startGameBtn.setEnabled(anyInstalled);
+                    startGameBtn.setAlpha(anyInstalled ? 1.0f : 0.5f);
                 }
             });
         }).start();
@@ -536,7 +624,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     File selected = zips.get(which);
                     String selName = selected.getName().toLowerCase();
                     GameStorageVerifier.GameTitle title;
-                    if (selName.contains("moving")) {
+                    if (selName.contains("movingout2") || selName.contains("moving_out_2") || (selName.contains("moving") && selName.contains("2"))) {
+                        title = GameStorageVerifier.GameTitle.MOVING_OUT_2;
+                    } else if (selName.contains("moving")) {
                         title = GameStorageVerifier.GameTitle.MOVING_OUT;
                     } else if (selName.contains("2")) {
                         title = GameStorageVerifier.GameTitle.OVERCOOKED_2;
@@ -587,7 +677,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             setupOverlayView.setVisibility(View.GONE);
         }
 
-        if (game.gameTitle == GameStorageVerifier.GameTitle.MOVING_OUT) {
+        if (game.gameTitle == GameStorageVerifier.GameTitle.MOVING_OUT || game.gameTitle == GameStorageVerifier.GameTitle.MOVING_OUT_2) {
             Intent intent = new Intent(this, MovingOutLauncherActivity.class);
             intent.putExtra(MovingOutLauncherActivity.EXTRA_DATA_DIR, game.dataDir.getAbsolutePath());
             intent.putExtra(MovingOutLauncherActivity.EXTRA_GAME_TITLE, game.gameTitle.displayName);
@@ -779,20 +869,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     public boolean dispatchGenericMotionEvent(MotionEvent event) {
-        if (nativeLoaded && (event.getSource() & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+        if (gamepadManager != null && (event.getSource() & (InputDevice.SOURCE_JOYSTICK | InputDevice.SOURCE_GAMEPAD)) != 0
                 && event.getAction() == MotionEvent.ACTION_MOVE) {
-            try {
-                nativeOnGamepadAxis(
-                        event.getDeviceId(),
-                        event.getAxisValue(MotionEvent.AXIS_X),
-                        event.getAxisValue(MotionEvent.AXIS_Y),
-                        event.getAxisValue(MotionEvent.AXIS_Z),
-                        event.getAxisValue(MotionEvent.AXIS_RZ),
-                        event.getAxisValue(MotionEvent.AXIS_HAT_X),
-                        event.getAxisValue(MotionEvent.AXIS_HAT_Y)
-                );
-                return true;
-            } catch (Throwable ignored) {}
+            gamepadManager.processMotionEvent(event);
+            return true;
         }
         return super.dispatchGenericMotionEvent(event);
     }
@@ -812,12 +892,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             return super.dispatchKeyEvent(event);
         }
 
-        if (nativeLoaded && (event.getSource() & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD) {
-            boolean pressed = event.getAction() == KeyEvent.ACTION_DOWN;
-            try {
-                nativeOnGamepadButton(event.getDeviceId(), keyCode, pressed);
+        if ((event.getSource() & (InputDevice.SOURCE_GAMEPAD | InputDevice.SOURCE_JOYSTICK | InputDevice.SOURCE_DPAD)) != 0) {
+            if (gamepadManager != null) {
+                gamepadManager.processKeyEvent(event);
                 return true;
-            } catch (Throwable ignored) {}
+            }
         }
         return super.dispatchKeyEvent(event);
     }
@@ -836,6 +915,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     protected void onDestroy() {
+        if (gamepadManager != null) {
+            gamepadManager.unregister();
+        }
         if (engineInitialized && nativeLoaded) {
             try { nativeShutdownEngine(); } catch (Throwable ignored) {}
         }

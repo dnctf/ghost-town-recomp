@@ -76,7 +76,7 @@ void InputMapper::UpdateButton(int32_t device_id, int32_t key_code, bool pressed
             players_[p].action_chop_throw = pressed;
             break;
         case AKEYCODE_BUTTON_Y:
-            // Fitur lempar bahan (Throw) khas Overcooked 2
+            // Fitur lempar bahan (Throw) khas Overcooked 2 / Jump Moving Out
             players_[p].action_throw = pressed;
             break;
         case AKEYCODE_BUTTON_B:
@@ -87,6 +87,30 @@ void InputMapper::UpdateButton(int32_t device_id, int32_t key_code, bool pressed
             break;
         case AKEYCODE_BUTTON_R1:
             players_[p].action_emote = pressed;
+            break;
+        case AKEYCODE_BUTTON_L2:
+            players_[p].action_trigger_left = pressed;
+            if (pressed) players_[p].action_pickup_drop = true;
+            break;
+        case AKEYCODE_BUTTON_R2:
+            players_[p].action_trigger_right = pressed;
+            if (pressed) players_[p].action_chop = true;
+            break;
+        case AKEYCODE_DPAD_UP:
+            if (pressed) players_[p].move_y = -1.0f;
+            else if (players_[p].move_y < 0.0f) players_[p].move_y = 0.0f;
+            break;
+        case AKEYCODE_DPAD_DOWN:
+            if (pressed) players_[p].move_y = 1.0f;
+            else if (players_[p].move_y > 0.0f) players_[p].move_y = 0.0f;
+            break;
+        case AKEYCODE_DPAD_LEFT:
+            if (pressed) players_[p].move_x = -1.0f;
+            else if (players_[p].move_x < 0.0f) players_[p].move_x = 0.0f;
+            break;
+        case AKEYCODE_DPAD_RIGHT:
+            if (pressed) players_[p].move_x = 1.0f;
+            else if (players_[p].move_x > 0.0f) players_[p].move_x = 0.0f;
             break;
         default:
             break;

@@ -16,17 +16,10 @@ enum class Developer(
 ) {
     GHOST_TOWN_GAMES(
         devId = "ghost_town",
-        displayName = "Ghost Town Games",
-        studioName = "Ghost Town Games / Team17",
+        displayName = "Ghost Town Games / Team17",
+        studioName = "Ghost Town Games / Team17 Digital",
         iconRes = R.drawable.ic_overcooked,
         accentColorHex = "#FF9F1C"
-    ),
-    SMG_STUDIO(
-        devId = "smg_studio",
-        displayName = "SMG Studio",
-        studioName = "SMG Studio / DevM Games",
-        iconRes = R.drawable.ic_moving_out,
-        accentColorHex = "#00A8E8"
     );
 
     companion object {

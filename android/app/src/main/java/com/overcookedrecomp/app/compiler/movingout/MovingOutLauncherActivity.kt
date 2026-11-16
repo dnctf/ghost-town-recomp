@@ -29,7 +29,7 @@ import com.overcookedrecomp.app.compiler.core.VerificationStatus
 import java.io.File
 
 /**
- * Activity UI Launcher khusus untuk developer "SMG Studio" dan game "Moving Out".
+ * Activity UI Launcher untuk developer "Ghost Town Games / Team17" dan game "Moving Out" & "Moving Out 2".
  * Menyediakan kontrol kompilasi asset pipeline, physics alignment, dan peluncur game.
  */
 class MovingOutLauncherActivity : AppCompatActivity() {
@@ -46,11 +46,21 @@ class MovingOutLauncherActivity : AppCompatActivity() {
     private lateinit var launchBtn: Button
 
     private var gameDataDir: File? = null
-    private val compiler = MovingOutCompiler()
+    private var compiler: com.overcookedrecomp.app.compiler.core.GameCompiler = MovingOutCompiler()
+    private var gameTitleDisplay: String = "Moving Out"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        val titleExtra = intent.getStringExtra(EXTRA_GAME_TITLE)
+        if (titleExtra != null && (titleExtra.contains("2") || titleExtra.contains("II"))) {
+            compiler = MovingOut2Compiler()
+            gameTitleDisplay = "Moving Out 2"
+        } else {
+            compiler = MovingOutCompiler()
+            gameTitleDisplay = "Moving Out"
+        }
 
         val dataDirPath = intent.getStringExtra(EXTRA_DATA_DIR)
         gameDataDir = if (dataDirPath != null) File(dataDirPath) else getExternalFilesDir(null)?.let { File(it, compiler.defaultFolderName) }
@@ -77,9 +87,9 @@ class MovingOutLauncherActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_HORIZONTAL
         }
 
-        // Header Developer SMG Studio
+        // Header Developer Ghost Town Games
         val devBadge = TextView(this).apply {
-            text = "🚚 SMG STUDIO • LAUNCHER"
+            text = "🚚 GHOST TOWN GAMES / TEAM17 • LAUNCHER"
             textSize = 12f
             setTextColor(Color.parseColor("#06D6A0"))
             typeface = Typeface.DEFAULT_BOLD
@@ -90,7 +100,7 @@ class MovingOutLauncherActivity : AppCompatActivity() {
 
         // Game Title
         val titleView = TextView(this).apply {
-            text = "📦 Moving Out Recomp"
+            text = "📦 $gameTitleDisplay Recomp"
             textSize = 24f
             setTextColor(Color.parseColor("#00A8E8"))
             typeface = Typeface.DEFAULT_BOLD
