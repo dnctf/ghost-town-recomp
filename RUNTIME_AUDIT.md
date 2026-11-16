@@ -1,61 +1,66 @@
 # Runtime Audit
 
 **Audit date:** 2026-11-16  
-**Audited ref:** `main`  
-**Scope:** README, Android Gradle/NDK build, native CMake sources, runtime and asset-pipeline source files, shader bridge, and GitHub Actions workflow.
+**Audited ref:** `main` baseline and `audit/runtime-wine-box64-source-engine` working branch  
+**Scope:** README, Android Gradle/NDK build, native CMake sources, runtime and asset-pipeline source files, shader bridge, manifest, and GitHub Actions workflow.
 
 ## Executive finding
 
-The repository is structured as an **early Unity-oriented native recompilation/runtime-shim prototype**, not as a general Windows executable compatibility layer. It contains Android Java/Kotlin launcher code, an ARM64 C++20 native library using Android Vulkan, placeholder Mono CIL and IL2CPP metadata components, basic Unity serialized-file/texture helpers, and a small shader-name-to-precompiled-SPIR-V lookup. The inspected build does not link Wine, Box64, Box86, a Linux userspace, DXVK, VKD3D-Proton, Mono runtime libraries, or an IL2CPP AOT compiler. Source Engine SDK code or a Source SDK submodule was not found in the audited paths; `.gitmodules` is absent (GitHub returned 404 for that path).
+Ghost Town Recomp is an Android ARM64 launcher and an early Unity-oriented native runtime/recompilation research scaffold. It contains Unity-named host abstractions, metadata/file inspection helpers, and a Vulkan-facing native layer. It does **not** currently contain a complete Unity Mono/CIL execution runtime, an IL2CPP-to-native recompilation pipeline, a Windows compatibility runtime, or a Source Engine port. Detecting game data or creating a Vulkan surface is not evidence of playable game execution.
 
 ## Findings by subsystem
 
-### 1. Android application and native build
+### Android and native build
+- `android/app/build.gradle` configures an Android application, ABI `arm64-v8a`, NDK `26.3.11579264`, C++20, minSdk 29, and AndroidX UI/document dependencies.
+- `android/native/CMakeLists.txt` builds `overcooked_native` and links Android, log, Vulkan, and AAudio.
+- The CMake target includes Unity-named metadata/host and asset/shader helper sources, but does not link Wine, Box64, Box86, DXVK, VKD3D-Proton, or a Mono runtime library.
 
-- `android/app/build.gradle` defines an Android application with ABI filter `arm64-v8a`, NDK `26.3.11579264`, C++20 flags, and Android API 29 minimum.
-- Gradle dependencies are AndroidX AppCompat, Core KTX, DocumentFile, and CardView only.
-- `android/native/CMakeLists.txt` builds `overcooked_native` from JNI, Vulkan surface, memory/audio/graphics code, Unity runtime-shim sources, asset parser/transcoder, shader bridge, input mapper, and thermal governor.
-- Native links are Android, log, Vulkan, and AAudio. No Wine/Box64/Box86/DXVK/VKD3D or Mono shared library is linked.
+### Unity CIL / Mono / IL2CPP
+- `runtime/mono/src/mono_runtime_host.cpp` checks that `Assembly-CSharp.dll` exists and validates its DOS MZ header. It does not call Mono initialization/assembly APIs, load a Mono shared library, or execute CIL. `TickUpdate` is a placeholder.
+- `runtime/il2cpp/src/il2cpp_metadata_parser.cpp` reads and validates the `global-metadata.dat` header. It does not translate IL2CPP methods or generate ARM64 machine code.
+- `runtime/interop/src/unity_method_invoker.cpp` selects nominal backends and stores transform values; it is not a complete Unity engine or managed-method invocation layer.
+- `assets-pipeline/assetstudio-wrapper/src/serialized_file_parser.cpp` reads a limited serialized-file header and checks a version range; it is not a complete AssetStudio extraction/rebuild pipeline.
+- `shader-bridge/src/shader_bridge.cpp` maps a small number of shader names to expected precompiled SPIR-V asset paths and checks the SPIR-V magic. It does not compile arbitrary Unity ShaderLab source into SPIR-V.
 
-### 2. Unity CIL / Mono / IL2CPP
+**Conclusion:** Unity Mono/CIL and IL2CPP are represented by scaffolding and metadata checks, not a complete CIL execution or IL2CPP recompilation pipeline. Vulkan integration is a native Android graphics foundation, not a complete Unity renderer.
 
-The source tree contains Unity-oriented names and scaffolding:
+### Wine / Box64
+No Wine, Box64, Box86, PRoot/rootfs, DXVK, or VKD3D-Proton dependency was found in the inspected Gradle files, native CMake target, or runtime source paths.
 
-- `runtime/mono/src/mono_runtime_host.cpp` checks for `Managed/Assembly-CSharp.dll` and validates its DOS MZ header. The actual `mono_jit_init`, assembly loading, method invocation, and Mono library linkage are not implemented in the inspected source. `TickUpdate` is a placeholder comment.
-- `runtime/il2cpp/src/il2cpp_metadata_parser.cpp` reads and validates the IL2CPP metadata magic/header. It does not compile IL2CPP metadata or game code into ARM64 native code.
-- `runtime/interop/src/unity_method_invoker.cpp` routes a selected backend to those components and contains a small transform map. This is not a complete Unity engine implementation.
-- `assets-pipeline/assetstudio-wrapper/src/serialized_file_parser.cpp` reads a limited serialized-file header and accepts versions 9–22. It is not a full Unity AssetStudio integration in the inspected CMake target.
-- `assets-pipeline/texture-compressor/src/texture_transcoder.cpp` selects format labels and estimates block sizes; the inspected implementation does not show an actual ASTC/ETC2 encoder.
-- `shader-bridge/src/shader_bridge.cpp` maps a small set of Unity shader names to precompiled `.spv` asset paths and checks the SPIR-V magic. It does **not** translate arbitrary Unity ShaderLab source into SPIR-V.
+**Conclusion:** Wine/Box64 is not integrated. Android ARM64 support alone does not execute Windows PE files.
 
-**Conclusion:** Unity CIL/Mono and IL2CPP are represented by scaffolding and metadata checks, not a complete CIL execution or IL2CPP recompilation pipeline. Vulkan is a native rendering integration point, but a Vulkan surface/render loop alone is not the Unity engine.
+### Source Engine
+No `source-sdk-2013`, Source Engine SDK, Source client/server target, or Source-specific Android port was found. The repository has no `.gitmodules` file at the audited baseline.
 
-### 3. Wine / Box64
+**Conclusion:** Source Engine is not supported by the current runtime.
 
-No Wine, Box64, Box86, PRoot/rootfs, DXVK, or VKD3D-Proton dependency was found in the inspected Gradle dependencies, native CMake source list/link libraries, or repository paths examined for this audit. The APK is built for ARM64 Android, but that does not itself execute Windows PE files.
+### GitHub Actions and local build constraints
+- `.github/workflows/build-android.yml` checks out recursive submodules, configures Android SDK/NDK and CMake, builds the native arm64-v8a target, runs `gradle assembleRelease assembleDebug`, and runs `gradle lint`.
+- The repository does not include `android/gradlew` or `android/gradle/wrapper/gradle-wrapper.properties` at the audited baseline. Therefore the requested exact command `./gradlew assembleDebug` cannot run from this checkout without adding a verified Gradle wrapper.
+- CI compilation/lint does not test Mono execution, IL2CPP recompilation, Windows EXE execution, or gameplay.
 
-**Conclusion:** Wine/Box64 is not integrated.
+## Runtime classification
 
-### 4. Source Engine
-
-No `source-sdk-2013`, Source Engine SDK, HL2 SDK, Source client/server code, SDL-based Source port, or Source-specific build target was found in the audited repository paths. There is no `.gitmodules` file on the audited `main` ref.
-
-**Conclusion:** Source Engine is not supported by this repository's current runtime.
-
-### 5. Build and test infrastructure
-
-- `.github/workflows/build-android.yml` configures recursive submodule checkout, Android SDK/NDK, a native CMake build, and Gradle debug/release APK packaging.
-- The inspected workflow does not run `./gradlew lint`, JVM unit tests, instrumentation tests, or native unit tests.
-- No test source set or CTest target was identified in the audited build files.
-
-The GitHub Actions build can prove that the current launcher/native library compiles and packages. It does not prove a Unity game runs, that Mono CIL executes, that IL2CPP is recompiled, or that Windows executables are supported.
+| Runtime / subsystem | Actual state |
+|---|---|
+| Unity Mono/CIL | Placeholder host; no CLR/Mono runtime linked |
+| Unity IL2CPP | Metadata header parser only; no AOT recompilation |
+| Unity asset pipeline | Limited serialized-file/texture helper scaffolding |
+| ShaderLab → SPIR-V | Name-to-precompiled-SPIR-V lookup; no ShaderLab compiler |
+| Vulkan | Android Vulkan integration scaffold |
+| Wine/Box64 | Not integrated |
+| Source Engine | Not integrated |
 
 ## Architecture recommendation
 
-1. **Keep the Unity native/recompilation work in this repository**, but describe the current state accurately as prototype scaffolding until managed execution, asset extraction, shader translation, gameplay systems, and per-title tests are complete.
-2. **Evaluate Wine/Box64 as an optional external runtime module or separate app/project.** Do not inject it into the Unity asset pipeline or claim that Box64 alone loads Windows PE. A 32-bit x86 game (as shown by the current Overcooked 2 preflight screenshot) additionally needs a compatible 32-bit execution strategy such as a supported WoW64 configuration or Box86 path; x86-64 support alone is not enough.
-3. **Treat Source Engine as a separate port/fork.** It needs a Source SDK-compatible codebase, platform layer, renderer/audio/input integration, and separate licensing/build/device validation.
+Adopt a **hybrid modular launcher** with isolated runtime adapters:
+
+1. Keep Unity-native research in this repository, but label it experimental until managed execution, IL2CPP handling, asset/shader pipeline, and per-title gameplay tests are implemented.
+2. Evaluate Wine + Box64 as an optional external runtime module or companion app. Do not link it into the Unity CMake target. The Windows path requires its own userspace, Wine, x86-64 translation, graphics compatibility, prefixes, and separate 32-bit strategy.
+3. Develop Source Engine in a separate upstream-based fork/port. Integrate it with Ghost Town only after a stable runtime interface and reproducible Android game boot exist.
+
+The launcher should own game discovery, user-selected paths, runtime selection, per-game configuration, lifecycle, logs, and capability reporting. Each runtime owns engine-specific execution and graphics compatibility.
 
 ## Explicit non-claims
 
-This audit does not certify any listed game as playable. The README's previous "Working" labels and launch wording exceed what the inspected runtime sources substantiate; the runtime support matrix is corrected in this branch to distinguish code scaffolding from tested gameplay.
+No listed game is certified playable by this audit. File detection, metadata parsing, native compilation, and Vulkan surface creation are not equivalent to successful gameplay.
