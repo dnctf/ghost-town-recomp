@@ -516,7 +516,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         message.append("\\n\\nRuntime path: ").append(status.getRuntimeRoot());
         if (!status.getMissing().isEmpty()) {
             message.append("\\n\\nKomponen yang belum tersedia:");
-            for (String item : status.missing) message.append("\\n• ").append(item);
+            for (String item : status.getMissing()) message.append("\\n• ").append(item);
         }
         message.append("\\n\\nCatatan: DXVK membutuhkan Vulkan bridge yang kompatibel. Status ini hanya memeriksa struktur file, bukan kompatibilitas GPU atau kemampuan menjalankan game.");
         AlertDialog.Builder builder = new AlertDialog.Builder(this)
@@ -530,8 +530,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     WineRuntimeBridge.ProbeResult result = WineRuntimeBridge.runWineVersionProbe(this);
                     runOnUiThread(() -> new AlertDialog.Builder(this)
                             .setTitle(result.getSuccess() ? "WINE PROBE BERHASIL" : "WINE PROBE GAGAL")
-                            .setMessage((result.getOutput().isEmpty() ? "Tidak ada output." : result.output)
-                                    + (result.getExitCode() == null ? "" : "\\nExit code: " + result.exitCode))
+                            .setMessage((result.getOutput().isEmpty() ? "Tidak ada output." : result.getOutput())
+                                    + (result.getExitCode() == null ? "" : "\\nExit code: " + result.getExitCode()))
                             .setPositiveButton("OK", null)
                             .show());
                 }).start();
