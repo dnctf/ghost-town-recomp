@@ -17,8 +17,10 @@ import android.view.SurfaceView;
 import android.view.WindowManager;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import java.io.File;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
     private static final String TAG = "OvercookedRecomp";
@@ -33,6 +35,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     private SurfaceView gameSurfaceView;
     private boolean engineInitialized = false;
+    private GameStorageVerifier.GameTitle activeGameTitle = GameStorageVerifier.GameTitle.UNKNOWN;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,22 +56,48 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             return;
         }
 
-        File externalDataDir = new File(extDir, "Overcooked_Data");
-        GameStorageVerifier.VerificationResult res =
-                GameStorageVerifier.verifyOvercookedDataDir(externalDataDir);
-        Log.i(TAG, "BYOG Verification: valid=" + res.valid + " backend=" + res.backendType + " msg=" + res.message);
+        // Deteksi otomatis apakah pengguna memiliki Overcooked 1, Overcooked 2, atau keduanya
+        List<GameStorageVerifier.VerificationResult> detectedGames =
+                GameStorageVerifier.detectInstalledGames(extDir);
 
-        if (res.valid) {
-            nativeInitEngine(externalDataDir.getAbsolutePath(), res.backendType.ordinal());
-            engineInitialized = true;
-            Log.i(TAG, "Native Engine berhasil diinisialisasi.\n" + nativeGetGraphicsSummary());
+        if (detectedGames.size() > 1) {
+            // Kedua game terpasang: tampilkan dialog pemilih game
+            showGameSelectionDialog(detectedGames);
+        } else if (detectedGames.size() == 1) {
+            // Satu game terpasang: langsung luncurkan game tersebut
+            launchGame(detectedGames.get(0));
         } else {
-            Log.w(TAG, "Game data tidak ditemukan atau belum lengkap: " + res.message);
-            // Tetap inisialisasi engine dengan path dummy jika user baru menginstal,
-            // sehingga layar tetap dapat menampilkan petunjuk / standby Vulkan.
-            nativeInitEngine(externalDataDir.getAbsolutePath(), 0);
+            // Belum ada data game terdeteksi
+            Log.w(TAG, "Tidak ditemukan Overcooked 1 maupun Overcooked 2 di " + extDir.getAbsolutePath());
+            Toast.makeText(this, "Salin folder 'Overcooked_Data' (OC1) atau 'Overcooked2_Data' (OC2) ke folder aplikasi", Toast.LENGTH_LONG).show();
+            File defaultDir = new File(extDir, "Overcooked_Data");
+            nativeInitEngine(defaultDir.getAbsolutePath(), 0, GameStorageVerifier.GameTitle.OVERCOOKED_1.id);
             engineInitialized = true;
         }
+    }
+
+    private void showGameSelectionDialog(List<GameStorageVerifier.VerificationResult> games) {
+        String[] titles = new String[games.size()];
+        for (int i = 0; i < games.size(); i++) {
+            titles[i] = games.get(i).gameTitle.displayName + " (" + games.get(i).dataDir.getName() + ")";
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Pilih Game untuk Dimainkan")
+                .setItems(titles, (dialog, which) -> {
+                    launchGame(games.get(which));
+                })
+                .setCancelable(false)
+                .show();
+    }
+
+    private void launchGame(GameStorageVerifier.VerificationResult game) {
+        activeGameTitle = game.gameTitle;
+        Log.i(TAG, "Meluncurkan " + game.gameTitle.displayName + " dari: " + game.dataDir.getAbsolutePath());
+        nativeInitEngine(game.dataDir.getAbsolutePath(), game.backendType.ordinal(), game.gameTitle.id);
+        engineInitialized = true;
+        Toast.makeText(this, "Memuat " + game.gameTitle.displayName + "...", Toast.LENGTH_SHORT).show();
+        Log.i(TAG, "Native Engine aktif.\n" + nativeGetGraphicsSummary());
     }
 
     private void detectAndApplyDeviceDisplaySettings() {
@@ -147,7 +176,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        // Jangan tahan tombol sistem Android seperti Back atau Home
         int keyCode = event.getKeyCode();
         if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_HOME) {
             return super.dispatchKeyEvent(event);
@@ -161,7 +189,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         return super.dispatchKeyEvent(event);
     }
 
-    // Dipanggil oleh C++ ThermalGovernor sebagai fallback jika AThermal NDK tidak tersedia
     public int getJavaThermalStatus() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -181,7 +208,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     // Native JNI functions
-    private native void nativeInitEngine(String dataDirPath, int backendOrdinal);
+    private native void nativeInitEngine(String dataDirPath, int backendOrdinal, int gameVersion);
     private native void nativeInitDisplayInfo(int width, int height, float dpi, float refreshRate, int ramMb);
     private native void nativeSetGraphicsPreset(int presetOrdinal);
     private native void nativeSetResolutionMode(int modeOrdinal, float customScale);

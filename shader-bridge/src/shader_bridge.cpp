@@ -9,6 +9,13 @@ std::string ShaderBridge::MapUnityShaderToSpirvAsset(const std::string& unity_sh
     if (unity_shader_name == "Unlit/Transparent") {
         return "shaders/unlit_transparent.frag.spv";
     }
+    // Overcooked 2 shader mappings
+    if (unity_shader_name == "Custom/Water" || unity_shader_name == "FX/Water") {
+        return "shaders/water.frag.spv";
+    }
+    if (unity_shader_name == "Custom/Conveyor" || unity_shader_name == "Custom/MovingPlatform") {
+        return "shaders/conveyor.frag.spv";
+    }
     return "shaders/overcooked_standard.frag.spv";
 }
 

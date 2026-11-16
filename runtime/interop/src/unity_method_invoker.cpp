@@ -9,14 +9,24 @@ std::unordered_map<int32_t, NativeTransform> g_transforms;
 std::mutex g_transform_mutex;
 } // namespace
 
-bool UnityRuntimeHost::Initialize(const std::string& data_dir, int backend_ordinal) {
+bool UnityRuntimeHost::Initialize(const std::string& data_dir, int backend_ordinal, int game_version) {
     active_backend_ = backend_ordinal;
+    game_title_ = static_cast<GameTitle>(game_version);
+
     if (backend_ordinal == 1) { // MONO_CIL
         return mono_host_.Initialize(data_dir + "/Managed", data_dir + "/Managed/Assembly-CSharp.dll");
     } else if (backend_ordinal == 2) { // IL2CPP_AOT
         return il2cpp_loader_.LoadFromFile(data_dir + "/il2cpp_data/Metadata/global-metadata.dat");
     }
     return false;
+}
+
+const char* UnityRuntimeHost::GetGameTitleName() const {
+    switch (game_title_) {
+        case GameTitle::OVERCOOKED_1: return "Overcooked (1)";
+        case GameTitle::OVERCOOKED_2: return "Overcooked 2";
+        default: return "Unknown";
+    }
 }
 
 void UnityRuntimeHost::TickFrame(float delta_time) {

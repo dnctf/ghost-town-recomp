@@ -1,12 +1,33 @@
 package com.overcookedrecomp.app;
 
+import android.util.Log;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class GameStorageVerifier {
+    private static final String TAG = "GameStorageVerifier";
+
+    public enum GameTitle {
+        UNKNOWN(0, "Unknown Game", ""),
+        OVERCOOKED_1(1, "Overcooked 1", "Overcooked_Data"),
+        OVERCOOKED_2(2, "Overcooked 2", "Overcooked2_Data");
+
+        public final int id;
+        public final String displayName;
+        public final String defaultFolderName;
+
+        GameTitle(int id, String displayName, String defaultFolderName) {
+            this.id = id;
+            this.displayName = displayName;
+            this.defaultFolderName = defaultFolderName;
+        }
+    }
+
     public enum RuntimeBackendType {
         UNKNOWN,
         MONO_CIL,
@@ -15,47 +36,122 @@ public final class GameStorageVerifier {
 
     public static final class VerificationResult {
         public final boolean valid;
+        public final GameTitle gameTitle;
         public final RuntimeBackendType backendType;
         public final String message;
         public final String primaryBinarySha256;
+        public final File dataDir;
 
-        public VerificationResult(boolean valid, RuntimeBackendType backendType, String message, String sha256) {
+        public VerificationResult(boolean valid, GameTitle gameTitle, RuntimeBackendType backendType,
+                                  String message, String sha256, File dataDir) {
             this.valid = valid;
+            this.gameTitle = gameTitle;
             this.backendType = backendType;
             this.message = message;
             this.primaryBinarySha256 = sha256;
+            this.dataDir = dataDir;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("[%s] Valid: %b | Backend: %s | Pesan: %s",
+                    gameTitle.displayName, valid, backendType, message);
         }
     }
 
-    public static VerificationResult verifyOvercookedDataDir(File dataDir) {
+    /**
+     * Memindai direktori penyimpanan untuk mendeteksi instalasi Overcooked 1 dan Overcooked 2.
+     */
+    public static List<VerificationResult> detectInstalledGames(File baseDir) {
+        List<VerificationResult> results = new ArrayList<>();
+        if (baseDir == null || !baseDir.exists()) {
+            return results;
+        }
+
+        // Cek Overcooked 1 (Overcooked_Data)
+        File oc1Dir = new File(baseDir, GameTitle.OVERCOOKED_1.defaultFolderName);
+        if (oc1Dir.exists() && oc1Dir.isDirectory()) {
+            VerificationResult res = verifyDataDir(oc1Dir, GameTitle.OVERCOOKED_1);
+            if (res.valid) results.add(res);
+        }
+
+        // Cek Overcooked 2 (Overcooked2_Data)
+        File oc2Dir = new File(baseDir, GameTitle.OVERCOOKED_2.defaultFolderName);
+        if (oc2Dir.exists() && oc2Dir.isDirectory()) {
+            VerificationResult res = verifyDataDir(oc2Dir, GameTitle.OVERCOOKED_2);
+            if (res.valid) results.add(res);
+        }
+
+        // Cek alternatif huruf kecil jika ada
+        if (results.isEmpty()) {
+            File oc1Lower = new File(baseDir, "overcooked_data");
+            if (oc1Lower.exists()) {
+                VerificationResult res = verifyDataDir(oc1Lower, GameTitle.OVERCOOKED_1);
+                if (res.valid) results.add(res);
+            }
+            File oc2Lower = new File(baseDir, "overcooked2_data");
+            if (oc2Lower.exists()) {
+                VerificationResult res = verifyDataDir(oc2Lower, GameTitle.OVERCOOKED_2);
+                if (res.valid) results.add(res);
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Memvalidasi direktori data game untuk Overcooked 1 atau Overcooked 2.
+     */
+    public static VerificationResult verifyDataDir(File dataDir, GameTitle hint) {
         if (dataDir == null || !dataDir.exists() || !dataDir.isDirectory()) {
-            return new VerificationResult(false, RuntimeBackendType.UNKNOWN,
-                    "Direktori Overcooked_Data tidak ditemukan.", "");
+            return new VerificationResult(false, hint, RuntimeBackendType.UNKNOWN,
+                    "Direktori data game tidak ditemukan.", "", dataDir);
+        }
+
+        GameTitle resolvedTitle = hint;
+        String dirNameLower = dataDir.getName().toLowerCase();
+        if (dirNameLower.contains("overcooked2") || dirNameLower.contains("overcooked_2")) {
+            resolvedTitle = GameTitle.OVERCOOKED_2;
+        } else if (dirNameLower.contains("overcooked")) {
+            resolvedTitle = (hint == GameTitle.OVERCOOKED_2) ? GameTitle.OVERCOOKED_2 : GameTitle.OVERCOOKED_1;
         }
 
         File globalGameManagers = new File(dataDir, "globalgamemanagers");
+        File dataUnity3d = new File(dataDir, "data.unity3d");
         File level0 = new File(dataDir, "level0");
-        if (!globalGameManagers.exists() || !level0.exists()) {
-            return new VerificationResult(false, RuntimeBackendType.UNKNOWN,
-                    "Berkas inti Unity (globalgamemanagers / level0) hilang.", "");
+
+        if (!globalGameManagers.exists() && !dataUnity3d.exists() && !level0.exists()) {
+            return new VerificationResult(false, resolvedTitle, RuntimeBackendType.UNKNOWN,
+                    "Berkas inti Unity (globalgamemanagers/data.unity3d) tidak ditemukan di " + dataDir.getName(), "", dataDir);
         }
 
+        // Cek C# bytecode (Assembly-CSharp.dll)
         File monoAssembly = new File(dataDir, "Managed/Assembly-CSharp.dll");
         if (monoAssembly.exists()) {
             String hash = computeSha256(monoAssembly);
-            return new VerificationResult(true, RuntimeBackendType.MONO_CIL,
-                    "Terdeteksi build Unity Mono (Jalur B). Siap menjalankan Assembly-CSharp.dll.", hash);
+            return new VerificationResult(true, resolvedTitle, RuntimeBackendType.MONO_CIL,
+                    String.format("Terdeteksi %s Unity Mono CIL. Siap menjalankan Assembly-CSharp.dll.", resolvedTitle.displayName),
+                    hash, dataDir);
         }
 
+        // Cek IL2CPP metadata
         File il2cppMetadata = new File(dataDir, "il2cpp_data/Metadata/global-metadata.dat");
         if (il2cppMetadata.exists()) {
             String hash = computeSha256(il2cppMetadata);
-            return new VerificationResult(true, RuntimeBackendType.IL2CPP_AOT,
-                    "Terdeteksi build Unity IL2CPP (Jalur A). Siap mem-parsing global-metadata.dat.", hash);
+            return new VerificationResult(true, resolvedTitle, RuntimeBackendType.IL2CPP_AOT,
+                    String.format("Terdeteksi %s Unity IL2CPP AOT. Siap mem-parsing global-metadata.dat.", resolvedTitle.displayName),
+                    hash, dataDir);
         }
 
-        return new VerificationResult(false, RuntimeBackendType.UNKNOWN,
-                "Tidak ditemukan Assembly-CSharp.dll maupun global-metadata.dat.", "");
+        return new VerificationResult(false, resolvedTitle, RuntimeBackendType.UNKNOWN,
+                "Tidak ditemukan Assembly-CSharp.dll maupun global-metadata.dat di " + dataDir.getName(), "", dataDir);
+    }
+
+    /**
+     * Kompatibilitas mundur dengan pemanggilan Overcooked 1 tunggal
+     */
+    public static VerificationResult verifyOvercookedDataDir(File dataDir) {
+        return verifyDataDir(dataDir, GameTitle.OVERCOOKED_1);
     }
 
     private static String computeSha256(File file) {
@@ -72,6 +168,7 @@ public final class GameStorageVerifier {
             }
             return sb.toString();
         } catch (IOException | NoSuchAlgorithmException e) {
+            Log.e(TAG, "Gagal menghitung SHA256 berkas: " + file.getAbsolutePath(), e);
             return "ERROR_HASH";
         }
     }

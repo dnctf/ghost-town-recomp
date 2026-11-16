@@ -19,11 +19,20 @@ struct NativeTransform {
     bool dirty = false;
 };
 
+enum class GameTitle : int {
+    UNKNOWN = 0,
+    OVERCOOKED_1 = 1,
+    OVERCOOKED_2 = 2
+};
+
 class UnityRuntimeHost {
 public:
-    bool Initialize(const std::string& data_dir, int backend_ordinal);
+    bool Initialize(const std::string& data_dir, int backend_ordinal, int game_version = 1);
     void TickFrame(float delta_time);
     void Shutdown();
+
+    GameTitle GetGameTitle() const { return game_title_; }
+    const char* GetGameTitleName() const;
 
     static void SetTransformPosition(int32_t handle, const Vector3& pos);
     static Vector3 GetTransformPosition(int32_t handle);
@@ -32,6 +41,7 @@ private:
     MonoRuntimeHost mono_host_;
     Il2CppMetadataLoader il2cpp_loader_;
     int active_backend_ = 0;
+    GameTitle game_title_ = GameTitle::UNKNOWN;
 };
 
 } // namespace overcooked

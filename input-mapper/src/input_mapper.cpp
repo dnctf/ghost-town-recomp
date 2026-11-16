@@ -45,9 +45,15 @@ void InputMapper::UpdateButton(int32_t device_id, int32_t key_code, bool pressed
         std::lock_guard<std::mutex> lock(mutex_);
         // Player 0: L1/L2; Player 1: R1/R2
         if (key_code == AKEYCODE_BUTTON_L1) players_[0].action_pickup_drop = pressed;
-        if (key_code == AKEYCODE_BUTTON_L2) players_[0].action_chop_throw = pressed;
+        if (key_code == AKEYCODE_BUTTON_L2) {
+            players_[0].action_chop = pressed;
+            players_[0].action_chop_throw = pressed;
+        }
         if (key_code == AKEYCODE_BUTTON_R1) players_[1].action_pickup_drop = pressed;
-        if (key_code == AKEYCODE_BUTTON_R2) players_[1].action_chop_throw = pressed;
+        if (key_code == AKEYCODE_BUTTON_R2) {
+            players_[1].action_chop = pressed;
+            players_[1].action_chop_throw = pressed;
+        }
         return;
     }
 
@@ -66,10 +72,21 @@ void InputMapper::UpdateButton(int32_t device_id, int32_t key_code, bool pressed
             players_[p].action_pickup_drop = pressed;
             break;
         case AKEYCODE_BUTTON_X:
+            players_[p].action_chop = pressed;
             players_[p].action_chop_throw = pressed;
+            break;
+        case AKEYCODE_BUTTON_Y:
+            // Fitur lempar bahan (Throw) khas Overcooked 2
+            players_[p].action_throw = pressed;
             break;
         case AKEYCODE_BUTTON_B:
             players_[p].action_dash = pressed;
+            break;
+        case AKEYCODE_BUTTON_L1:
+            players_[p].action_switch_chef = pressed;
+            break;
+        case AKEYCODE_BUTTON_R1:
+            players_[p].action_emote = pressed;
             break;
         default:
             break;

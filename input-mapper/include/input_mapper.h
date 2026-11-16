@@ -10,8 +10,12 @@ struct PlayerInputState {
     float move_x = 0.0f;
     float move_y = 0.0f;
     bool action_pickup_drop = false; // Button A / Cross
-    bool action_chop_throw = false;  // Button X / Square
+    bool action_chop = false;        // Button X / Square (Chop di OC1 & OC2)
+    bool action_throw = false;       // Button Y / Triangle (Throw di Overcooked 2)
+    bool action_chop_throw = false;  // Backward-compatibility alias
     bool action_dash = false;        // Button B / Circle
+    bool action_switch_chef = false; // L1 / LB
+    bool action_emote = false;       // R1 / RB
 };
 
 class InputMapper {

@@ -18,7 +18,7 @@ NativeEngine& NativeEngine::Instance() {
     return instance;
 }
 
-void NativeEngine::Initialize(const std::string& data_dir, int backend_ordinal) {
+void NativeEngine::Initialize(const std::string& data_dir, int backend_ordinal, int game_version) {
     data_dir_ = data_dir;
     backend_ordinal_ = backend_ordinal;
 
@@ -26,8 +26,9 @@ void NativeEngine::Initialize(const std::string& data_dir, int backend_ordinal) 
     arena_ = std::make_unique<LinearMemoryArena>(512ULL * 1024ULL * 1024ULL);
     thermal_.Initialize();
     audio_.Initialize(48000, 2);
-    runtime_host_.Initialize(data_dir_, backend_ordinal_);
-    LOGI("NativeEngine diinisialisasi untuk dataDir: %s", data_dir_.c_str());
+    runtime_host_.Initialize(data_dir_, backend_ordinal_, game_version);
+    LOGI("NativeEngine diinisialisasi untuk %s (versi %d) di: %s",
+         runtime_host_.GetGameTitleName(), game_version, data_dir_.c_str());
 }
 
 void NativeEngine::InitDisplayInfo(uint32_t width, uint32_t height, float dpi, float refresh_rate, uint32_t ram_mb) {
@@ -132,11 +133,11 @@ extern "C" {
 
 JNIEXPORT void JNICALL
 Java_com_overcookedrecomp_app_MainActivity_nativeInitEngine(
-        JNIEnv* env, jobject /*thiz*/, jstring data_dir, jint backend_ordinal) {
+        JNIEnv* env, jobject /*thiz*/, jstring data_dir, jint backend_ordinal, jint game_version) {
     const char* raw_path = env->GetStringUTFChars(data_dir, nullptr);
     std::string path(raw_path ? raw_path : "");
     if (raw_path) env->ReleaseStringUTFChars(data_dir, raw_path);
-    overcooked::NativeEngine::Instance().Initialize(path, backend_ordinal);
+    overcooked::NativeEngine::Instance().Initialize(path, backend_ordinal, game_version);
 }
 
 JNIEXPORT void JNICALL

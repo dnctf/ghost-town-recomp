@@ -17,7 +17,7 @@ class NativeEngine {
 public:
     static NativeEngine& Instance();
 
-    void Initialize(const std::string& data_dir, int backend_ordinal);
+    void Initialize(const std::string& data_dir, int backend_ordinal, int game_version = 1);
     void InitDisplayInfo(uint32_t width, uint32_t height, float dpi, float refresh_rate, uint32_t ram_mb);
     void OnSurfaceCreated(ANativeWindow* window);
     void OnSurfaceChanged(uint32_t width, uint32_t height);
