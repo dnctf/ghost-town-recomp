@@ -178,9 +178,9 @@ jobs:
           sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/doc/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/locale/"*
           sudo dpkg-query --admindir="$ROOTFS/var/lib/dpkg" -W -f='${Package}:${Architecture}=${Version}\n' > rootfs-package-manifest.txt
           mkdir -p rootfs-artifact/provenance
-          cp box64-upstream-commit.txt box64-ldd.txt wine-lddtree.txt rootfs-package-manifest.txt downloads/wine.tar.xz downloads/dxvk.tar.gz rootfs-artifact/provenance/
+          cp box64-upstream-commit.txt box64-ldd.txt wine-lddtree.txt rootfs-package-manifest.txt rootfs-artifact/provenance/
+          sha256sum downloads/wine.tar.xz downloads/dxvk.tar.gz > rootfs-artifact/provenance/UPSTREAM-ARCHIVE-SHA256SUMS
           printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=3.1.1\n' "$DEBIAN_SUITE" > rootfs-artifact/provenance/ROOTFS-BUILD-INFO.txt
-          cp -a "$ROOTFS" rootfs-artifact/
       - name: Upload glibc rootfs and Wine components
         uses: actions/upload-artifact@v4
         with:
