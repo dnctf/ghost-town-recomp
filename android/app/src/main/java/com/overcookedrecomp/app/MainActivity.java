@@ -76,7 +76,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private boolean virtualControlsEnabled = true;
     private TextView importProgressText;
     private ProgressBar importProgressBar;
-    private Button startGameBtn;
     private View firstGameCard;
 
     private boolean engineInitialized = false;
@@ -726,30 +725,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (importProgressText != null) {
             importProgressText.setVisibility(show ? View.VISIBLE : View.GONE);
             importProgressText.setText(text);
-        }
-    }
-
-    private void onStartGameClicked() {
-        File extDir = getExternalFilesDir(null);
-        if (extDir == null) return;
-
-        List<GameStorageVerifier.VerificationResult> games = GameStorageVerifier.detectInstalledGames(extDir);
-        if (games.isEmpty()) {
-            Toast.makeText(this, "Silakan impor data game PC terlebih dahulu.", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        if (games.size() > 1) {
-            String[] titles = new String[games.size()];
-            for (int i = 0; i < games.size(); i++) {
-                titles[i] = games.get(i).gameTitle.displayName;
-            }
-            new AlertDialog.Builder(this)
-                    .setTitle("Pilih Versi Game")
-                    .setItems(titles, (dialog, which) -> launchGame(games.get(which)))
-                    .show();
-        } else {
-            launchGame(games.get(0));
         }
     }
 
