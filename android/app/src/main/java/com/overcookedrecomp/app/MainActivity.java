@@ -401,7 +401,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(importProgressBar);
 
         TextView footer = new TextView(this);
-        footer.setText("GHOST TOWN RECOMP  •  BUILD 0.3.0  •  EXPERIMENTAL RUNTIME / BYOG");
+        footer.setText("GHOST TOWN RECOMP  •  BUILD 0.3.2  •  EXPERIMENTAL RUNTIME / BYOG");
         footer.setTextSize(9);
         footer.setTextColor(Color.parseColor("#63748B"));
         footer.setLetterSpacing(0.08f);
