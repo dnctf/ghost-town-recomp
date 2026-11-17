@@ -1,6 +1,5 @@
 plugins {
     id 'com.android.library'
-    id 'org.jetbrains.kotlin.android'
 }
 
 android {
@@ -30,10 +29,14 @@ android {
                 include "com/winlator/cmod/xenvironment/components/SysVSharedMemoryComponent.java"
                 include "XServerView.java"
                 include "ReadyGLRenderer.java"
+                include "GLRenderer.java"
                 include "WinHandler.java"
                 include "XrActivity.java"
+                exclude "com/winlator/cmod/widget/XServerView.java"
+                exclude "com/winlator/cmod/renderer/GLRenderer.java"
+                exclude "com/winlator/cmod/winhandler/WinHandler.java"
+                exclude "com/winlator/xr/XrActivity.java"
             }
-            res.srcDirs = ["../../external/winlatorxr/app/src/main/res"]
             manifest.srcFile "src/main/AndroidManifest.xml"
         }
     }
@@ -41,12 +44,6 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
-    }
-}
-
-kotlin {
-    sourceSets {
-        main.kotlin.setSrcDirs([])
     }
 }
 
