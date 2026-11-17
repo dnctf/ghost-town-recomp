@@ -289,9 +289,9 @@ jobs:
           prerelease: true
           body: |
             PRE-RELEASE ONLY. This bundle is a separately managed runtime payload for integration testing.
-            The app currently still requires manual archive import; managed first-run download is not yet integrated.
+            The Android alpha APK provides a managed HTTPS download action for this project-owned archive with SHA-256 verification and transactional app-private extraction. Physical-device download/install validation is still pending.
             Includes Debian Bookworm ARM64/glibc, Box64, Wine 11.19 amd64, DXVK 3.1.1 and static Android ARM64 PRoot.
-            No claim of Overcooked 2 execution or playability. Wine prefix, Vulkan/Turnip presentation, audio, input and physical-device gameplay remain unverified.
+            No claim of Overcooked 2 execution or playability. Automated in-app Wine prefix bootstrap, Turnip/libadrenotools, glibc-visible Vulkan WSI/presentation, Wine process launch, audio/input bridges, and physical-device gameplay remain unimplemented or unverified.
             See docs/V0.4.0_EXECUTION_GATES.md and docs/PROVENANCE.md.
           files: |
             ghost-town-wine-runtime-arm64.tar.gz
