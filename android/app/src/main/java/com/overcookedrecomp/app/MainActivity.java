@@ -712,7 +712,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         report.append("\nGRAPHICS / DXVK STATUS\n");
         try {
             report.append(WineRuntimeBridge.graphicsDiagnostics(this)).append("\n");
-            if (nativeLoaded) report.append(nativeGetVulkanDiagnostics()).append("\n");
+            if (nativeLoaded) report.append(nativeGetVulkanDiagnostics(getFilesDir().getAbsolutePath(), getApplicationInfo().nativeLibraryDir)).append("\n");
         } catch (Throwable error) {
             report.append("Graphics diagnostics error: ").append(error.getMessage()).append("\n");
         }
