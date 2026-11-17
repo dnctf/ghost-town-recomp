@@ -9,6 +9,11 @@
 #include <algorithm>
 #include <sstream>
 #include <vector>
+#include <dlfcn.h>
+#include <unistd.h>
+#include <adrenotools/driver.h>
+#include <sstream>
+#include <vector>
 
 #define LOG_TAG "OvercookedNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -146,41 +151,90 @@ extern "C" {
 
 JNIEXPORT jstring JNICALL
 Java_com_overcookedrecomp_app_MainActivity_nativeGetVulkanDiagnostics(
-        JNIEnv* env, jobject /*thiz*/) {
+        JNIEnv* env, jobject /*thiz*/, jstring files_dir, jstring native_lib_dir) {
     std::ostringstream report;
-    report << "Host Vulkan loader diagnostic (system loader; custom Turnip not selected).\n";
-    uint32_t loader_version = VK_API_VERSION_1_0;
-    auto enumerate_version = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion"));
-    if (enumerate_version && enumerate_version(&loader_version) == VK_SUCCESS) {
-        report << "Loader API: " << VK_VERSION_MAJOR(loader_version) << "." << VK_VERSION_MINOR(loader_version) << "." << VK_VERSION_PATCH(loader_version) << "\n";
-    } else report << "Loader API: Vulkan 1.0 or version query unavailable\n";
+    const char* raw_files = env->GetStringUTFChars(files_dir, nullptr);
+    const char* raw_libs = env->GetStringUTFChars(native_lib_dir, nullptr);
+    const std::string app_files = raw_files ? raw_files : "";
+    const std::string hook_dir = raw_libs ? raw_libs : "";
+    if (raw_files) env->ReleaseStringUTFChars(files_dir, raw_files);
+    if (raw_libs) env->ReleaseStringUTFChars(native_lib_dir, raw_libs);
+
+    const std::string driver_dir = app_files + "/gpu_drivers/turnip";
+    const std::string driver_path = driver_dir + "/vulkan.adreno.so";
+    void* vulkan_handle = nullptr;
+    bool custom_turnip = false;
+    if (access(driver_path.c_str(), R_OK) == 0) {
+        report << "Turnip package file found: " << driver_path << "\n";
+        vulkan_handle = adrenotools_open_libvulkan(
+            RTLD_NOW | RTLD_LOCAL, ADRENOTOOLS_DRIVER_CUSTOM, nullptr,
+            hook_dir.c_str(), driver_dir.c_str(), "vulkan.adreno.so", nullptr, nullptr);
+        custom_turnip = vulkan_handle != nullptr;
+        report << "libadrenotools custom driver load: " << (custom_turnip ? "SUCCESS" : "FAILED") << "\n";
+    } else {
+        report << "Turnip package not installed. Expected app-private file: " << driver_path << "\n";
+    }
+    if (!vulkan_handle) {
+        vulkan_handle = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
+        report << "Using Android system Vulkan loader fallback: " << (vulkan_handle ? "yes" : "no") << "\n";
+    }
+    if (!vulkan_handle) {
+        const char* error = dlerror();
+        report << "Unable to open Vulkan loader: " << (error ? error : "unknown error") << "\n";
+        return env->NewStringUTF(report.str().c_str());
+    }
+
+    auto gipa = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(vulkan_handle, "vkGetInstanceProcAddr"));
+    if (!gipa) {
+        report << "vkGetInstanceProcAddr missing from selected loader.\n";
+        dlclose(vulkan_handle);
+        return env->NewStringUTF(report.str().c_str());
+    }
+    auto create_instance = reinterpret_cast<PFN_vkCreateInstance>(gipa(VK_NULL_HANDLE, "vkCreateInstance"));
+    if (!create_instance) {
+        report << "vkCreateInstance entry point unavailable.\n";
+        dlclose(vulkan_handle);
+        return env->NewStringUTF(report.str().c_str());
+    }
     VkApplicationInfo app{}; app.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app.pApplicationName = "GhostTownGraphicsDiagnostics";
-    app.apiVersion = std::min(loader_version, VK_API_VERSION_1_1);
+    app.apiVersion = VK_API_VERSION_1_1;
     VkInstanceCreateInfo create{}; create.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO; create.pApplicationInfo = &app;
     VkInstance instance = VK_NULL_HANDLE;
-    VkResult result = vkCreateInstance(&create, nullptr, &instance);
-    if (result != VK_SUCCESS) { report << "vkCreateInstance failed: " << static_cast<int>(result) << "\n"; return env->NewStringUTF(report.str().c_str()); }
-    uint32_t count = 0; result = vkEnumeratePhysicalDevices(instance, &count, nullptr);
+    VkResult result = create_instance(&create, nullptr, &instance);
+    if (result != VK_SUCCESS) {
+        report << "vkCreateInstance failed: " << static_cast<int>(result) << "\n";
+        dlclose(vulkan_handle);
+        return env->NewStringUTF(report.str().c_str());
+    }
+
+    auto enumerate_devices = reinterpret_cast<PFN_vkEnumeratePhysicalDevices>(gipa(instance, "vkEnumeratePhysicalDevices"));
+    auto get_properties = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties>(gipa(instance, "vkGetPhysicalDeviceProperties"));
+    auto get_properties2 = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2>(gipa(instance, "vkGetPhysicalDeviceProperties2"));
+    auto destroy_instance = reinterpret_cast<PFN_vkDestroyInstance>(gipa(instance, "vkDestroyInstance"));
+    uint32_t count = 0;
+    result = enumerate_devices ? enumerate_devices(instance, &count, nullptr) : VK_ERROR_INITIALIZATION_FAILED;
+    report << "Selected loader: " << (custom_turnip ? "Turnip via libadrenotools" : "Android system Vulkan") << "\n";
     report << "Physical device enumeration: " << static_cast<int>(result) << ", count=" << count << "\n";
-    if (result == VK_SUCCESS && count > 0) {
+    if (result == VK_SUCCESS && count > 0 && get_properties) {
         std::vector<VkPhysicalDevice> devices(count);
-        result = vkEnumeratePhysicalDevices(instance, &count, devices.data());
+        result = enumerate_devices(instance, &count, devices.data());
         for (uint32_t i = 0; result == VK_SUCCESS && i < count; ++i) {
-            VkPhysicalDeviceProperties props{}; vkGetPhysicalDeviceProperties(devices[i], &props);
+            VkPhysicalDeviceProperties props{}; get_properties(devices[i], &props);
             report << "GPU[" << i << "]: " << props.deviceName << "\n"
-                   << "  API: " << VK_VERSION_MAJOR(props.apiVersion) << "." << VK_VERSION_MINOR(props.apiVersion) << "." << VK_VERSION_PATCH(props.apiVersion) << "\n"
+                   << "  API: " << VK_VERSION_MAJOR(props.apiVersion) << "." << VK_VERSION_MINOR(props.apiVersion) << "\n"
                    << "  Driver version raw: " << props.driverVersion << "\n"
                    << "  Vendor ID: 0x" << std::hex << props.vendorID << " Device ID: 0x" << props.deviceID << std::dec << "\n";
-            if (props.apiVersion >= VK_API_VERSION_1_1) {
+            if (props.apiVersion >= VK_API_VERSION_1_1 && get_properties2) {
                 VkPhysicalDeviceDriverProperties driver{}; driver.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
                 VkPhysicalDeviceProperties2 props2{}; props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2; props2.pNext = &driver;
-                vkGetPhysicalDeviceProperties2(devices[i], &props2);
+                get_properties2(devices[i], &props2);
                 report << "  Driver name: " << driver.driverName << "\n  Driver info: " << driver.driverInfo << "\n";
-            } else report << "  Driver name/info: VK_KHR_driver_properties query unavailable.\n";
+            }
         }
     }
-    vkDestroyInstance(instance, nullptr);
+    if (destroy_instance) destroy_instance(instance, nullptr);
+    dlclose(vulkan_handle);
     return env->NewStringUTF(report.str().c_str());
 }
 

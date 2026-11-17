@@ -589,7 +589,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private void showGraphicsDiagnostics() {
         String hostReport = "Native library unavailable; Vulkan host probe cannot run.";
         if (nativeLoaded) {
-            try { hostReport = nativeGetVulkanDiagnostics(); }
+            try { hostReport = nativeGetVulkanDiagnostics(getFilesDir().getAbsolutePath(), getApplicationInfo().nativeLibraryDir); }
             catch (Throwable error) { hostReport = "Vulkan probe error: " + error.getClass().getSimpleName() + ": " + error.getMessage(); }
         }
         String guestReport = WineRuntimeBridge.graphicsDiagnostics(this);
@@ -1276,7 +1276,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private native void nativeSetShadowQuality(int qualityOrdinal);
     private native void nativeSetTextureQuality(int qualityOrdinal);
     private native String nativeGetGraphicsSummary();
-    private native String nativeGetVulkanDiagnostics();
+    private native String nativeGetVulkanDiagnostics(String filesDir, String nativeLibraryDir);
     private native void nativePauseEngine();
     private native void nativeResumeEngine();
     private native void nativeOnSurfaceCreated(Surface surface);

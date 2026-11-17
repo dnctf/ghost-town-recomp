@@ -53,3 +53,15 @@ before any Vulkan instance is created; current direct Vulkan linkage does not ye
 calls through that custom loader. Wine guest still needs its own glibc-compatible ICD and
 a working display/presentation bridge. DXVK launch script now prepares per-prefix logs,
 but still blocks game launch until the display gate is explicitly validated.
+
+
+## Rootless Android Turnip loader wiring
+
+The Android native build includes pinned upstream libadrenotools as a recursive
+submodule. The GPU diagnostics probe checks the app-private package path
+`filesDir/gpu_drivers/turnip/vulkan.adreno.so`, opens it through
+`adrenotools_open_libvulkan`, and queries devices through that loader's own
+`vkGetInstanceProcAddr`. If the package is absent or fails to load, diagnostics
+explicitly use Android's system Vulkan loader. This is host-driver loader support,
+not yet proof that the full game renderer uses Turnip or that Wine/DXVK has a
+separate glibc-compatible ICD and presentation bridge.

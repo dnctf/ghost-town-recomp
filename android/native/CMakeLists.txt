@@ -6,6 +6,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
+set(ADRENOTOOLS_DIR "${REPO_ROOT}/external/libadrenotools")
+if (EXISTS "${ADRENOTOOLS_DIR}/CMakeLists.txt")
+    add_subdirectory("${ADRENOTOOLS_DIR}" "${CMAKE_BINARY_DIR}/adrenotools")
+else()
+    message(FATAL_ERROR "Pinned libadrenotools submodule is missing; checkout submodules recursively.")
+endif()
+
 add_library(overcooked_native SHARED
     src/main_jni.cpp
     src/vulkan_surface.cpp
@@ -48,6 +55,8 @@ target_link_libraries(overcooked_native
     ${LOG_LIB}
     ${VULKAN_LIB}
     ${AAUDIO_LIB}
+    adrenotools
+    ${CMAKE_DL_LIBS}
 )
 
 # Kesiapan 16 KB Page Alignment untuk Android 15+
