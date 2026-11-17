@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(overcooked_recomp_native LANGUAGES CXX)
+project(overcooked_recomp_native LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,6 +12,39 @@ if (EXISTS "${ADRENOTOOLS_DIR}/CMakeLists.txt")
 else()
     message(FATAL_ERROR "Pinned libadrenotools submodule is missing; checkout submodules recursively.")
 endif()
+
+# WinlatorXR's GPLv3/MIT-compatible VirGL host renderer is used as the
+# OpenGL transport backend. Only this native subdirectory is built; nested
+# OpenXR/SDL submodules are intentionally not initialized.
+set(WINLATOR_VIRGL_DIR "${REPO_ROOT}/external/winlatorxr/app/src/main/cpp/virglrenderer")
+if (EXISTS "${WINLATOR_VIRGL_DIR}/CMakeLists.txt")
+    add_subdirectory("${WINLATOR_VIRGL_DIR}" "${CMAKE_BINARY_DIR}/virglrenderer")
+else()
+    message(FATAL_ERROR "Pinned WinlatorXR VirGL source is missing.")
+endif()
+
+# JNI support used by the X11 socket server, drawable uploads, and SysV SHM.
+find_library(ANDROID_LIB android REQUIRED)
+find_library(LOG_LIB log REQUIRED)
+set(WINLATOR_NATIVE_DIR "${REPO_ROOT}/external/winlatorxr/app/src/main/cpp/winlator")
+add_library(winlator SHARED
+    "${WINLATOR_NATIVE_DIR}/drawable.c"
+    "${WINLATOR_NATIVE_DIR}/gpu_image.c"
+    "${WINLATOR_NATIVE_DIR}/sysvshared_memory.c"
+    "${WINLATOR_NATIVE_DIR}/xconnector_epoll.c"
+)
+target_include_directories(winlator PRIVATE "${WINLATOR_NATIVE_DIR}")
+find_library(JNIGRAPHICS_LIB jnigraphics REQUIRED)
+find_library(EGL_LIB EGL REQUIRED)
+find_library(GLESV2_LIB GLESv2 REQUIRED)
+target_link_libraries(winlator
+    ${ANDROID_LIB}
+    ${LOG_LIB}
+    ${JNIGRAPHICS_LIB}
+    ${EGL_LIB}
+    ${GLESV2_LIB}
+)
+target_link_options(winlator PRIVATE "-Wl,-z,max-page-size=16384")
 
 add_library(overcooked_native SHARED
     src/main_jni.cpp

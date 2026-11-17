@@ -8,6 +8,9 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
+import java.io.SequenceInputStream
+import java.util.Collections
 import java.io.FileInputStream
 import java.security.MessageDigest
 import java.nio.file.Files
@@ -40,6 +43,64 @@ object RuntimeBundleInstaller {
     @Throws(IOException::class)
     fun installBundled(context: Context, assetName: String, progress: Consumer<String>? = null) {
         context.assets.open(assetName).use { input -> install(context, input, progress) }
+    }
+
+    /**
+     * Installs a large APK-bundled archive from independently hashed chunks.
+     * Splitting the compressed archive avoids buffering a multi-gigabyte asset
+     * as one allocation during Android Gradle packaging.
+     */
+    @JvmStatic
+    @Throws(IOException::class)
+    fun installBundledParts(context: Context, manifestAssetName: String, progress: Consumer<String>? = null) {
+        val manifest = context.assets.open(manifestAssetName).bufferedReader().useLines { lines ->
+            lines.map { it.trim() }.filter { it.isNotEmpty() }.toList()
+        }
+        if (manifest.isEmpty() || manifest.size > 128) {
+            throw IOException("Manifest runtime parts kosong atau memiliki terlalu banyak bagian.")
+        }
+
+        val partPattern = Regex("runtime-[0-9]{4}\\.bin")
+        val entries = manifest.map { line ->
+            val fields = line.split(Regex("\\s+"), limit = 2)
+            if (fields.size != 2 || !fields[0].matches(Regex("[0-9a-fA-F]{64}")) ||
+                !partPattern.matches(fields[1])) {
+                throw IOException("Baris manifest runtime tidak valid: $line")
+            }
+            fields[0].lowercase() to fields[1]
+        }
+
+        entries.forEachIndexed { index, entry ->
+            verifyAssetChecksum(context, "runtime/parts/${entry.second}", entry.first)
+            progress?.accept("Memverifikasi bagian runtime ${index + 1}/${entries.size}...")
+        }
+
+        val streams = ArrayList<InputStream>(entries.size)
+        try {
+            entries.forEach { entry ->
+                streams.add(context.assets.open("runtime/parts/${entry.second}"))
+            }
+            install(context, SequenceInputStream(Collections.enumeration(streams)), progress)
+        } catch (error: Throwable) {
+            streams.forEach { runCatching { it.close() } }
+            throw if (error is IOException) error else IOException("Gagal membuka bagian runtime: ${error.message}", error)
+        }
+    }
+
+    private fun verifyAssetChecksum(context: Context, assetPath: String, expected: String) {
+        val digest = MessageDigest.getInstance("SHA-256")
+        context.assets.open(assetPath).use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        val actual = digest.digest().joinToString("") { "%02x".format(it) }
+        if (!actual.equals(expected, ignoreCase = true)) {
+            throw IOException("Checksum bagian runtime tidak cocok: $assetPath")
+        }
     }
 
     /** Shared transactional installer for APK assets, downloads, and user-selected files. */

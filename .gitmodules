@@ -1,3 +1,7 @@
 [submodule "external/libadrenotools"]
 	path = external/libadrenotools
 	url = https://github.com/bylaws/libadrenotools.git
+
+[submodule "external/winlatorxr"]
+	path = external/winlatorxr
+	url = https://github.com/WinlatorXR/WinlatorXR.git

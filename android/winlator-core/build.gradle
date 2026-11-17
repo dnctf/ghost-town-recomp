@@ -1,0 +1,39 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.winlator.cmod'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 29
+    }
+
+    sourceSets {
+        main {
+            java.setSrcDirs([
+                "../../external/winlatorxr/app/src/main/java/com/winlator/cmod/xserver",
+                "../../external/winlatorxr/app/src/main/java/com/winlator/cmod/xconnector",
+                fileTree(dir: "../../external/winlatorxr/app/src/main/java/com/winlator/cmod/renderer",
+                        include: ["**/*.java"], exclude: ["GLRenderer.java"]),
+                "../../external/winlatorxr/app/src/main/java/com/winlator/cmod/math",
+                "../../external/winlatorxr/app/src/main/java/com/winlator/cmod/sysvshm",
+                "src/main/java-custom"
+            ])
+            manifest.srcFile "src/main/AndroidManifest.xml"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.annotation:annotation:1.7.1'
+    implementation 'androidx.collection:collection:1.4.0'
+    implementation 'com.kohlschutter.junixsocket:junixsocket-common:2.6.0'
+    implementation 'com.kohlschutter.junixsocket:junixsocket-native-common:2.6.0'
+}
