@@ -187,12 +187,10 @@ object WineRuntimeSession {
     /** Stops the currently supervised bootstrap process, if any. */
     @JvmStatic
     fun stop() {
-        synchronized(processLock) {
-            activeProcess?.let { process ->
-                process.destroy()
-                if (process.isAlive) process.destroyForcibly()
-            }
-            activeProcess = null
+        activeProcess?.let { process ->
+            process.destroy()
+            if (process.isAlive) process.destroyForcibly()
         }
+        activeProcess = null
     }
 }
