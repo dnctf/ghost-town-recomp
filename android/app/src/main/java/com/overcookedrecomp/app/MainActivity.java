@@ -106,6 +106,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                         | View.SYSTEM_UI_FLAG_FULLSCREEN
                         | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
+        DiagnosticLog.info(this, "APP", "Ghost Town Recomp started; ABI=" + java.util.Arrays.toString(Build.SUPPORTED_ABIS));
+
         // Deteksi spesifikasi layar ponsel / tablet HarmonyOS secara aman
         detectAndApplyDeviceDisplaySettings();
 
@@ -545,12 +547,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (importProgressBar != null) importProgressBar.setVisibility(View.VISIBLE);
         new Thread(() -> {
             try {
-                Log.i(TAG, "Provisioning bundled Wine/Box64 runtime from APK assets.");
+                DiagnosticLog.info(this, "RUNTIME", "Provisioning bundled Wine/Box64 runtime from APK assets.");
                 RuntimeBundleInstaller.installBundled(this, "runtime/ghost-town-wine-runtime-arm64.tar.gz",
                         message -> runOnUiThread(() -> {
                             if (importProgressText != null) importProgressText.setText(message);
                         }));
-                Log.i(TAG, "Bundled runtime installed and checksum-validated.");
+                DiagnosticLog.info(this, "RUNTIME", "Bundled runtime installed and checksum-validated.");
                 runOnUiThread(() -> {
                     showImportProgress(false, "Runtime bawaan berhasil dipasang dan diverifikasi.");
                     refreshInstalledGamesStatus();
@@ -562,7 +564,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                             .show();
                 });
             } catch (Throwable error) {
-                Log.e(TAG, "Bundled runtime installation failed", error);
+                DiagnosticLog.error(this, "RUNTIME", "Bundled runtime installation failed", error);
                 runOnUiThread(() -> {
                     showImportProgress(false, "Runtime gagal dipasang. Periksa detail diagnostik.");
                     new AlertDialog.Builder(this)
@@ -575,6 +577,32 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 });
             }
         }, userRequested ? "runtime-repair" : "bundled-runtime-provisioner").start();
+    }
+
+    private void showGraphicsDiagnostics() {
+        String hostReport = "Native library unavailable; Vulkan host probe cannot run.";
+        if (nativeLoaded) {
+            try { hostReport = nativeGetVulkanDiagnostics(); }
+            catch (Throwable error) { hostReport = "Vulkan probe error: " + error.getClass().getSimpleName() + ": " + error.getMessage(); }
+        }
+        String guestReport = WineRuntimeBridge.graphicsDiagnostics(this);
+        DiagnosticLog.info(this, "GRAPHICS", "Host Vulkan probe completed. " + hostReport.replace('\\n', ' '));
+        DiagnosticLog.info(this, "DXVK", guestReport.replace('\\n', ' '));
+        String combined = "ANDROID HOST VULKAN\\n" + hostReport
+                + "\\n\\nWINE GUEST / DXVK\\n" + guestReport
+                + "\\n\\nCatatan: probe host tidak membuktikan Vulkan guest DXVK bekerja. Turnip baru dianggap aktif jika driver terpilih benar-benar dimuat oleh proses renderer. Jalur presentasi Wine ke SurfaceView juga belum diaktifkan.";
+        TextView content = new TextView(this);
+        content.setText(combined + "\\n\\nAPP LOG (tail)\\n" + DiagnosticLog.readTail(this, 18000));
+        content.setTextIsSelectable(true);
+        content.setTextSize(12);
+        content.setPadding(dp(18), dp(12), dp(18), dp(12));
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(content);
+        new AlertDialog.Builder(this).setTitle("GPU / TURNIP / DXVK DIAGNOSTICS")
+                .setView(scroll)
+                .setPositiveButton("BAGIKAN LOG", (dialog, which) -> shareDiagnosticReport())
+                .setNeutralButton("REFRESH", (dialog, which) -> showGraphicsDiagnostics())
+                .setNegativeButton("TUTUP", null).show();
     }
 
     private void showWineRuntimeStatus() {
@@ -1122,6 +1150,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     public void surfaceCreated(@NonNull SurfaceHolder holder) {
         if (nativeLoaded) {
+            DiagnosticLog.info(this, "SURFACE", "Surface created: " + holder.getSurfaceFrame());
             try { nativeOnSurfaceCreated(holder.getSurface()); } catch (Throwable t) {
                 Log.e(TAG, "nativeOnSurfaceCreated error: " + t.getMessage());
             }
@@ -1131,6 +1160,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
         if (nativeLoaded) {
+            DiagnosticLog.info(this, "SURFACE", "Surface changed: " + width + "x" + height);
             try { nativeOnSurfaceChanged(width, height); } catch (Throwable ignored) {}
         }
     }
@@ -1138,6 +1168,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
         if (nativeLoaded) {
+            DiagnosticLog.info(this, "SURFACE", "Surface destroyed.");
             try { nativeOnSurfaceDestroyed(); } catch (Throwable ignored) {}
         }
     }
@@ -1228,6 +1259,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private native void nativeSetShadowQuality(int qualityOrdinal);
     private native void nativeSetTextureQuality(int qualityOrdinal);
     private native String nativeGetGraphicsSummary();
+    private native String nativeGetVulkanDiagnostics();
     private native void nativePauseEngine();
     private native void nativeResumeEngine();
     private native void nativeOnSurfaceCreated(Surface surface);

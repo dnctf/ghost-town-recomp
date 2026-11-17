@@ -103,6 +103,39 @@ object WineRuntimeBridge {
         }
     }
 
+    /** Reports guest ICD manifests and DXVK files without claiming that they are active. */
+    @JvmStatic
+    fun graphicsDiagnostics(context: Context): String {
+        val root = File(context.filesDir, "runtime/wine/rootfs")
+        val lines = mutableListOf<String>()
+        lines += "Guest rootfs: ${root.absolutePath}"
+        val icdDirs = listOf("usr/share/vulkan/icd.d", "etc/vulkan/icd.d", "usr/local/share/vulkan/icd.d")
+        var foundIcd = false
+        for (relative in icdDirs) {
+            val dir = File(root, relative)
+            val files = dir.listFiles()?.filter { it.isFile && it.name.endsWith(".json") }.orEmpty()
+            for (file in files) {
+                foundIcd = true
+                lines += "ICD manifest: ${relative}/${file.name}"
+                runCatching { file.readText().take(1200) }.getOrNull()?.let { lines += it }
+            }
+        }
+        if (!foundIcd) lines += "No guest Vulkan ICD JSON found. DXVK cannot use a guest ICD yet."
+        val candidates = listOf("usr/lib/aarch64-linux-gnu/libvulkan_freedreno.so", "usr/lib/aarch64-linux-gnu/libvulkan.so.1", "usr/lib/libvulkan_freedreno.so", "usr/lib/libvulkan.so.1")
+        for (relative in candidates) {
+            val file = File(root, relative)
+            lines += "${relative}: ${if (file.isFile) "present (${file.length()} bytes)" else "missing"}"
+        }
+        val dxvk = File(root, "opt/dxvk/x64")
+        for (name in listOf("d3d11.dll", "dxgi.dll", "d3d10core.dll")) {
+            val file = File(dxvk, name)
+            lines += "DXVK ${name}: ${if (file.isFile) "present (${file.length()} bytes)" else "missing"}"
+        }
+        lines += "Guest Vulkan execution: NOT TESTED (no guest vulkaninfo/DXVK D3D test result recorded)."
+        lines += "Presentation bridge: NOT IMPLEMENTED / NOT ENABLED."
+        return lines.joinToString("\\n")
+    }
+
     /**
      * Runs only the fixed Wine version probe. It is intentionally headless and
      * does not launch a game or enable a graphics session.

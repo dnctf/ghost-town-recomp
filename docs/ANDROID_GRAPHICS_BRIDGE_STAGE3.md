@@ -38,3 +38,18 @@ A successful host Vulkan query is therefore only a host-GPU check. It is not pro
 The repository has an Android-native Vulkan surface/swapchain implementation, but the native engine currently deliberately does not initialize it for game rendering. No Turnip/libadrenotools integration, Wine-guest Vulkan ICD, or guest display server/presentation bridge is wired end-to-end. The existing Wine version probe is headless and does not exercise DXVK.
 
 Do not mark Stage 3 complete until the device-level gates above pass. A driver archive in an APK or a successful Android Vulkan enumeration alone is insufficient.
+
+
+## Diagnostics added in the Android app
+
+The dashboard now has **GPU / TURNIP / DXVK LOG**. It writes a persistent app-private
+log under `filesDir/logs/graphics-runtime.log`, displays Android host Vulkan loader/device
+and driver properties, checks guest ICD manifests and DXVK DLL presence, and includes
+these records in the shareable diagnostic report.
+
+This is diagnostic integration, not a claim that Turnip is active: the current native
+probe uses the Android system Vulkan loader. Turnip must be opened through libadrenotools
+before any Vulkan instance is created; current direct Vulkan linkage does not yet route
+calls through that custom loader. Wine guest still needs its own glibc-compatible ICD and
+a working display/presentation bridge. DXVK launch script now prepares per-prefix logs,
+but still blocks game launch until the display gate is explicitly validated.

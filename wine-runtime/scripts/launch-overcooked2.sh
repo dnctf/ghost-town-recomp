@@ -10,6 +10,22 @@ set -eu
   echo "Launch blocked: Wine display/Vulkan presentation backend has not passed device validation" >&2
   exit 4
 }
+LOG_DIR="${GHOST_TOWN_LOG_DIR:-$WINEPREFIX/logs}"
+mkdir -p "$LOG_DIR"
 export WINEPREFIX WINEDEBUG="${WINEDEBUG:--all}"
 export DXVK_CONFIG_FILE="${DXVK_CONFIG_FILE:-$WINEPREFIX/dxvk.conf}"
-exec "$WINE" "$GAME_EXE"
+export DXVK_LOG_LEVEL="${DXVK_LOG_LEVEL:-info}"
+export DXVK_LOG_PATH="${DXVK_LOG_PATH:-$LOG_DIR/dxvk}"
+export VK_LOADER_DEBUG="${VK_LOADER_DEBUG:-error,warn}"
+{
+  echo "=== Ghost Town Wine/DXVK launch ==="
+  date -Iseconds 2>/dev/null || date
+  echo "WINE=$WINE"
+  echo "GAME_EXE=$GAME_EXE"
+  echo "WINEPREFIX=$WINEPREFIX"
+  echo "DXVK_LOG_PATH=$DXVK_LOG_PATH"
+  echo "VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-<unset>}"
+  echo "VK_DRIVER_FILES=${VK_DRIVER_FILES:-<unset>}"
+  echo "GHOST_TOWN_DISPLAY_READY=$GHOST_TOWN_DISPLAY_READY"
+} >> "$LOG_DIR/graphics-session.log" 2>&1
+exec "$WINE" "$GAME_EXE" >> "$LOG_DIR/wine-game.log" 2>&1
