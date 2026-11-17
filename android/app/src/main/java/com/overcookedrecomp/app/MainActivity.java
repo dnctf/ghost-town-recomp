@@ -377,6 +377,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         wineRuntimeParams.topMargin = dp(8);
         container.addView(wineRuntimeBtn, wineRuntimeParams);
 
+        Button winePrefixBtn = createDashboardButton("PREPARE WINE PREFIX + DXVK", "#244B63");
+        winePrefixBtn.setOnClickListener(v -> showWineBootstrap());
+        LinearLayout.LayoutParams winePrefixParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
+        winePrefixParams.topMargin = dp(8);
+        container.addView(winePrefixBtn, winePrefixParams);
+
         Button runtimeRepairBtn = createDashboardButton("INSTALL / REPAIR BUILT-IN RUNTIME", "#24513D");
         runtimeRepairBtn.setOnClickListener(v -> installBundledRuntime(true));
         LinearLayout.LayoutParams runtimeRepairParams = new LinearLayout.LayoutParams(
@@ -584,6 +591,38 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 });
             }
         }, userRequested ? "runtime-repair" : "bundled-runtime-provisioner").start();
+    }
+
+    private void showWineBootstrap() {
+        WineRuntimeBridge.RuntimeStatus status = WineRuntimeBridge.probe(this);
+        if (status.getState() != WineRuntimeBridge.State.READY_FOR_HEADLESS_PROBE) {
+            new AlertDialog.Builder(this)
+                    .setTitle("WINE RUNTIME BELUM SIAP")
+                    .setMessage(status.getMessage() + "\n\n" + String.join("\n", status.getMissing()))
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+
+        AlertDialog progress = new AlertDialog.Builder(this)
+                .setTitle("MENYIAPKAN WINE PREFIX")
+                .setMessage("Membuat prefix Windows 64-bit dan memasang DXVK. Proses pertama dapat memerlukan beberapa menit.")
+                .setCancelable(false)
+                .create();
+        progress.show();
+        new Thread(() -> {
+            WineRuntimeSession.Result result = WineRuntimeSession.prepareOvercooked2(this);
+            runOnUiThread(() -> {
+                progress.dismiss();
+                new AlertDialog.Builder(this)
+                        .setTitle(result.getSuccess() ? "WINE PREFIX SIAP" : "WINE PREFIX GAGAL")
+                        .setMessage(result.getMessage() + "\n\nLog: " + result.getLogPath()
+                                + "\n\nCatatan: tahap ini hanya menyiapkan Wine dan DXVK. Peluncuran game tetap dikunci sampai Vulkan guest, display bridge, dan tes D3D11 berhasil.")
+                        .setPositiveButton("OK", null)
+                        .setNeutralButton("BAGIKAN LOG", (dialog, which) -> shareDiagnosticReport())
+                        .show();
+            });
+        }, "wine-prefix-bootstrap").start();
     }
 
     private void showGraphicsDiagnostics() {
