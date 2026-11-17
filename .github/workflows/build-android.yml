@@ -78,6 +78,7 @@ jobs:
           EXPECTED="$(awk '{print $1}' "$RUNNER_TEMP/runtime.sha256")"
           echo "$EXPECTED  android/app/src/main/assets/runtime/ghost-town-wine-runtime-arm64.tar.gz" | sha256sum -c -
           test "$(stat -c%s android/app/src/main/assets/runtime/ghost-town-wine-runtime-arm64.tar.gz)" -gt 100000000
+          python3 tools/validate_runtime_archive.py android/app/src/main/assets/runtime/ghost-town-wine-runtime-arm64.tar.gz
 
       - name: Build debug and release APK
         working-directory: android
