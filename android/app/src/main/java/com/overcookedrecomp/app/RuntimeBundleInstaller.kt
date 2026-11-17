@@ -29,6 +29,22 @@ object RuntimeBundleInstaller {
     @JvmStatic
     @Throws(IOException::class)
     fun install(context: Context, archiveUri: Uri, progress: Consumer<String>? = null) {
+        val input = context.contentResolver.openInputStream(archiveUri)
+            ?: throw IOException("Tidak dapat membuka file runtime.")
+        install(context, input, progress)
+    }
+
+    /** Installs the runtime archive embedded in the APK assets. */
+    @JvmStatic
+    @Throws(IOException::class)
+    fun installBundled(context: Context, assetName: String, progress: Consumer<String>? = null) {
+        context.assets.open(assetName).use { input -> install(context, input, progress) }
+    }
+
+    /** Shared transactional installer for APK assets, downloads, and user-selected files. */
+    @JvmStatic
+    @Throws(IOException::class)
+    fun install(context: Context, input: java.io.InputStream, progress: Consumer<String>? = null) {
         val runtimeParent = File(context.filesDir, "runtime")
         if (!runtimeParent.exists() && !runtimeParent.mkdirs()) {
             throw IOException("Tidak dapat membuat direktori runtime.")
@@ -44,10 +60,8 @@ object RuntimeBundleInstaller {
         var totalBytes = 0L
         var entries = 0
         try {
-            val raw = context.contentResolver.openInputStream(archiveUri)
-                ?: throw IOException("Tidak dapat membuka file runtime.")
-            raw.use { input ->
-                TarArchiveInputStream(GzipCompressorInputStream(BufferedInputStream(input))).use { tar ->
+            input.use { source ->
+                TarArchiveInputStream(GzipCompressorInputStream(BufferedInputStream(source))).use { tar ->
                     var entry = tar.nextTarEntry
                     while (entry != null) {
                         entries++
