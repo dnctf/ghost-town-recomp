@@ -1,3 +1,20 @@
+## [0.4.0-alpha.1] - 2026-11-17 (runtime foundation pre-release)
+
+### Added
+- Managed HTTPS downloader in the Android app for the project-owned runtime release, including SHA-256 sidecar verification and transactional app-private installation.
+- CI publication path for the v0.4.0-alpha.1 APKs and native ARM64 library, aligned with the runtime bundle release tag.
+- Runtime bundle contains Android ARM64 PRoot, Debian Bookworm ARM64/amd64 userspace, Box64 ARM64, Wine 11.19 amd64, and DXVK 3.1.1.
+
+### Not yet implemented / not verified
+- Turnip and libadrenotools integration.
+- A glibc-visible Vulkan loader/ICD and Android Surface presentation bridge for Wine/DXVK.
+- Automated first-run Wine prefix creation in the Android app.
+- In-app Wine/Box64 process launcher for Overcooked2.exe.
+- Wine audio and gamepad/touch input bridge.
+- Physical MatePad Air 2023 tests, main-menu screenshot, gameplay screenshot/FPS, and five-minute stability evidence.
+
+This is a foundation pre-release only. It is not a playable Overcooked 2 build. Stable v0.4.0 remains blocked on the device gates in docs/V0.4.0_EXECUTION_GATES.md.
+
 ## [0.3.3] - 2026-11-16 (tester candidate)
 
 ### Fixed
