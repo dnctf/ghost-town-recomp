@@ -405,7 +405,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         container.addView(importProgressBar);
 
         TextView footer = new TextView(this);
-        footer.setText("GHOST TOWN RECOMP  •  BUILD 0.4.0-ALPHA.1  •  EXPERIMENTAL RUNTIME / BYOG");
+        footer.setText("GHOST TOWN RECOMP  •  BUILD 0.5.0-ALPHA.1  •  EXPERIMENTAL RUNTIME / BYOG");
         footer.setTextSize(9);
         footer.setTextColor(Color.parseColor("#63748B"));
         footer.setLetterSpacing(0.08f);
@@ -568,7 +568,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     new AlertDialog.Builder(this)
                             .setTitle("INSTALASI RUNTIME GAGAL")
                             .setMessage((error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())
-                                    + "\\n\\nSilakan bagikan log diagnostik jika masalah berulang.")
+                                    + "\n\nSilakan bagikan log diagnostik jika masalah berulang.")
                             .setPositiveButton("BAGIKAN LOG", (dialog, which) -> shareDiagnosticReport())
                             .setNegativeButton("TUTUP", null)
                             .show();
