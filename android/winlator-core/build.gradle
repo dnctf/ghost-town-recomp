@@ -1,5 +1,6 @@
 plugins {
     id 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
 }
 
 android {
@@ -35,6 +36,12 @@ android {
         }
     }
 
+    kotlin {
+        sourceSets {
+            main.kotlin.setSrcDirs([])
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -43,7 +50,6 @@ android {
 
 dependencies {
     implementation 'androidx.annotation:annotation:1.7.1'
-    implementation 'androidx.collection:collection:1.4.0'
     implementation 'androidx.collection:collection:1.4.0'
     implementation 'com.kohlschutter.junixsocket:junixsocket-common:2.6.0'
     implementation 'com.kohlschutter.junixsocket:junixsocket-native-common:2.6.0'
