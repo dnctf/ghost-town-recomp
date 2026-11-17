@@ -12,31 +12,15 @@ android {
 
     sourceSets {
         main {
-            java {
-                srcDir "../../external/winlatorxr/app/src/main/java"
-                srcDir "src/main/java-custom"
-                include "com/winlator/cmod/xserver/**/*.java"
-                include "com/winlator/cmod/xconnector/**/*.java"
-                include "com/winlator/cmod/renderer/**/*.java"
-                include "com/winlator/cmod/math/**/*.java"
-                include "com/winlator/cmod/sysvshm/**/*.java"
-                include "com/winlator/cmod/core/CursorLocker.java"
-                include "com/winlator/cmod/core/Callback.java"
-                include "com/winlator/cmod/core/FileUtils.java"
-                include "com/winlator/cmod/xenvironment/EnvironmentComponent.java"
-                include "com/winlator/cmod/xenvironment/components/XServerComponent.java"
-                include "com/winlator/cmod/xenvironment/components/VirGLRendererComponent.java"
-                include "com/winlator/cmod/xenvironment/components/SysVSharedMemoryComponent.java"
-                include "XServerView.java"
-                include "ReadyGLRenderer.java"
-                include "GLRenderer.java"
-                include "WinHandler.java"
-                include "XrActivity.java"
-                exclude "com/winlator/cmod/widget/XServerView.java"
-                exclude "com/winlator/cmod/renderer/GLRenderer.java"
-                exclude "com/winlator/cmod/winhandler/WinHandler.java"
-                exclude "com/winlator/xr/XrActivity.java"
-            }
+            java.setSrcDirs([
+                "../../external/winlatorxr/app/src/main/java/com/winlator/cmod/xserver",
+                "../../external/winlatorxr/app/src/main/java/com/winlator/cmod/xconnector",
+                "../../external/winlatorxr/app/src/main/java/com/winlator/cmod/renderer",
+                "../../external/winlatorxr/app/src/main/java/com/winlator/cmod/math",
+                "../../external/winlatorxr/app/src/main/java/com/winlator/cmod/sysvshm",
+                "src/main/java-custom"
+            ])
+            res.srcDirs = ["../../external/winlatorxr/app/src/main/res"]
             manifest.srcFile "src/main/AndroidManifest.xml"
         }
     }
@@ -50,6 +34,9 @@ android {
 dependencies {
     implementation 'androidx.annotation:annotation:1.7.1'
     implementation 'androidx.collection:collection:1.4.0'
+    implementation 'androidx.appcompat:appcompat:1.4.0'
+    implementation 'androidx.preference:preference:1.2.1'
+    implementation 'com.google.android.material:material:1.6.1'
     implementation 'com.kohlschutter.junixsocket:junixsocket-common:2.6.0'
     implementation 'com.kohlschutter.junixsocket:junixsocket-native-common:2.6.0'
 }
