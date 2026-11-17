@@ -40,7 +40,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Initialize required native source submodules
-        run: git submodule update --init external/libadrenotools external/winlatorxr
+        run: |
+          git submodule update --init --recursive external/libadrenotools
+          git submodule update --init external/winlatorxr
       - name: Install Windows cross-compiler
         run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-x86-64-posix
       - name: Build standalone Windows D3D11 smoke test
@@ -78,6 +80,9 @@ jobs:
             -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384" \
             -DCMAKE_BUILD_TYPE=Release
           $ANDROID_HOME/cmake/3.22.1/bin/cmake --build build-native-arm64 -j$(nproc)
+          VIRGL_SO="$(find build-native-arm64 -type f -name 'libvirglrenderer.so' -print -quit)"
+          test -n "$VIRGL_SO"
+          echo "VirGL host renderer built: $VIRGL_SO"
       - name: Embed verified runtime bundle into APK assets
         run: |
           set -euo pipefail
