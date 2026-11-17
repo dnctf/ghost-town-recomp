@@ -80,13 +80,16 @@ object RuntimeBundleInstaller {
                                     Files.createDirectories(destination)
                                 }
                                 entry.isSymbolicLink -> {
-                                    val rawLink = Paths.get(entry.linkName)
-                                    // Some rootfs packagers store absolute links rooted at the
-                                    // extraction prefix. Rebase only links that remain inside
-                                    // this staging tree; never create links into Android storage.
-                                    val resolved = if (rawLink.isAbsolute) {
-                                        rawLink.normalize().takeIf { it.startsWith(root) }
-                                            ?: throw IOException("Symlink absolut keluar dari runtime: ${entry.name}")
+                                    val rawLink = entry.linkName
+                                    val resolved = if (rawLink.startsWith("/")) {
+                                        // Linux absolute symlinks inside Debian rootfs are guest-root
+                                        // paths (for example /usr/bin/perl), not Android host paths.
+                                        // Rebase them under this archive's rootfs directory.
+                                        val rootfs = root.resolve("rootfs")
+                                        if (!destination.startsWith(rootfs)) {
+                                            throw IOException("Symlink absolut di luar rootfs ditolak: ${entry.name}")
+                                        }
+                                        rootfs.resolve(rawLink.removePrefix("/")).normalize().toAbsolutePath()
                                     } else {
                                         destination.parent.resolve(rawLink).normalize().toAbsolutePath()
                                     }
