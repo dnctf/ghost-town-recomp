@@ -152,6 +152,8 @@ jobs:
             libxmu6:amd64 libxpm4:amd64 \
             libwayland-client0:amd64 libwayland-egl1:amd64 \
             libvulkan1:amd64 libgl1:amd64 libegl1:amd64 libgbm1:amd64 \
+            libgl1-mesa-dri:amd64 libglx-mesa0:amd64 libegl-mesa0:amd64 \
+            libglx0:amd64 libdrm2:amd64 mesa-utils:amd64 x11-utils:amd64 \
             libunwind8:amd64 libatomic1:amd64 libglib2.0-0:amd64 \
             libgstreamer1.0-0:amd64 libgstreamer-plugins-base1.0-0:amd64 \
             libkrb5-3:amd64 libldap-2.5-0:amd64
@@ -171,6 +173,14 @@ jobs:
           test -s "$ROOTFS/opt/dxvk/x64/d3d11.dll"
           test -s "$ROOTFS/opt/dxvk/x64/dxgi.dll"
           sudo readelf -h "$ROOTFS/opt/wine/bin/wine" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
+          test -s "$ROOTFS/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so"
+          test -x "$ROOTFS/usr/bin/glxinfo"
+          test -x "$ROOTFS/usr/bin/xmessage"
+          sudo lddtree -R "$ROOTFS" /usr/lib/x86_64-linux-gnu/dri/virgl_dri.so | tee virgl-lddtree.txt
+          if grep -Eq '=> None|could not locate library|not found' virgl-lddtree.txt; then
+            echo "Mesa VirGL driver has unresolved x86_64 shared-library dependencies." >&2
+            exit 1
+          fi
           sudo lddtree -R "$ROOTFS" /opt/wine/bin/wine | tee wine-lddtree.txt
           if grep -Eq '=> None|could not locate library|not found' wine-lddtree.txt; then
             echo "Wine has unresolved x86_64 shared-library dependencies." >&2
@@ -212,7 +222,8 @@ jobs:
           mkdir -p rootfs-artifact/provenance/licenses
           cp box64-src/LICENSE rootfs-artifact/provenance/licenses/BOX64-LICENSE
           cp runtime/licenses/WINE-LICENSE runtime/licenses/WINE-COPYING.LIB runtime/licenses/WINE-NOTICES.md runtime/licenses/DXVK-LICENSE rootfs-artifact/provenance/licenses/
-          cp box64-upstream-commit.txt box64-ldd.txt wine-lddtree.txt rootfs-package-manifest.txt rootfs-artifact/provenance/
+          cp box64-upstream-commit.txt box64-ldd.txt wine-lddtree.txt virgl-lddtree.txt rootfs-package-manifest.txt rootfs-artifact/provenance/
+          printf 'guest_driver=virgl_dri.so\narchitecture=x86_64\nsource=Debian Bookworm libgl1-mesa-dri\ntransport=VirGL over X11/DRI3\n' > rootfs-artifact/provenance/MESA-VIRGL-BUILD-INFO.txt
           sha256sum downloads/wine.tar.xz downloads/dxvk.tar.gz > rootfs-artifact/provenance/UPSTREAM-ARCHIVE-SHA256SUMS
           printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=3.1.1\n' "$DEBIAN_SUITE" > rootfs-artifact/provenance/ROOTFS-BUILD-INFO.txt
           # Upload one root-owned archive instead of traversing restricted Debian paths.
@@ -267,7 +278,7 @@ jobs:
           mkdir -p "$OUT/provenance/licenses"
           cp proot-artifact/provenance/PROOT-COPYING "$OUT/provenance/licenses/PROOT-COPYING"
           cp runtime/rootfs/README.md "$OUT/README.md"
-          (cd "$OUT" && sha256sum bin/proot libexec/proot/loader libexec/proot/loader32 rootfs/usr/local/bin/box64 rootfs/opt/wine/bin/wine rootfs/opt/dxvk/x64/d3d11.dll rootfs/opt/dxvk/x64/dxgi.dll > provenance/RUNTIME-SHA256SUMS)
+          (cd "$OUT" && sha256sum bin/proot libexec/proot/loader libexec/proot/loader32 rootfs/usr/local/bin/box64 rootfs/opt/wine/bin/wine rootfs/opt/dxvk/x64/d3d11.dll rootfs/opt/dxvk/x64/dxgi.dll rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so rootfs/usr/bin/glxinfo rootfs/usr/bin/xmessage > provenance/RUNTIME-SHA256SUMS)
           tar --numeric-owner --xattrs --acls -czf ghost-town-wine-runtime-arm64.tar.gz -C "$OUT" .
           sha256sum ghost-town-wine-runtime-arm64.tar.gz > ghost-town-wine-runtime-arm64.tar.gz.sha256
           du -h ghost-town-wine-runtime-arm64.tar.gz
@@ -280,18 +291,18 @@ jobs:
             ghost-town-wine-runtime-arm64.tar.gz.sha256
           if-no-files-found: error
           retention-days: 30
-      - name: Attach runtime bundle to v0.4.0-alpha.1 pre-release
+      - name: Attach runtime bundle to v0.5.0-alpha.2 pre-release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.4.0-alpha.1
+          tag_name: v0.5.0-alpha.2
           target_commitish: main
-          name: Ghost Town Recomp 0.4.0-alpha.1 - Runtime Foundation
+          name: Ghost Town Recomp 0.5.0-alpha.2 - VirGL Guest Runtime
           prerelease: true
           body: |
             PRE-RELEASE ONLY. This bundle is a separately managed runtime payload for integration testing.
             The Android alpha APK provides a managed HTTPS download action for this project-owned archive with SHA-256 verification and transactional app-private extraction. Physical-device download/install validation is still pending.
-            Includes Debian Bookworm ARM64/glibc, Box64, Wine 11.19 amd64, DXVK 3.1.1 and static Android ARM64 PRoot.
-            No claim of Overcooked 2 execution or playability. Automated in-app Wine prefix bootstrap, Turnip/libadrenotools, glibc-visible Vulkan WSI/presentation, Wine process launch, audio/input bridges, and physical-device gameplay remain unimplemented or unverified.
+            Includes Debian Bookworm ARM64/glibc, Box64, Wine 11.19 amd64, DXVK 3.1.1, Mesa VirGL guest DRI driver, X11/GLX smoke utilities, and static Android ARM64 PRoot.
+            No claim of Overcooked 2 execution or playability. The X11/VirGL display session is an integration foundation only; physical-device X11, GLX/VirGL, WineD3D, audio/input, and gameplay validation remain pending. DXVK/guest Vulkan remains a separate unvalidated path.
             See docs/V0.4.0_EXECUTION_GATES.md and docs/PROVENANCE.md.
           files: |
             ghost-town-wine-runtime-arm64.tar.gz
