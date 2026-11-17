@@ -83,6 +83,9 @@ jobs:
           VIRGL_SO="$(find build-native-arm64 -type f -name 'libvirglrenderer.so' -print -quit)"
           test -n "$VIRGL_SO"
           echo "VirGL host renderer built: $VIRGL_SO"
+          WINLATOR_SO="$(find build-native-arm64 -type f -name 'libwinlator.so' -print -quit)"
+          test -n "$WINLATOR_SO"
+          echo "Winlator X11 JNI bridge built: $WINLATOR_SO"
       - name: Embed verified runtime bundle into APK assets
         run: |
           set -euo pipefail
