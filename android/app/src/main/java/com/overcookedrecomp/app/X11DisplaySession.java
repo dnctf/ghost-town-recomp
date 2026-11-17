@@ -13,6 +13,7 @@ import com.winlator.cmod.widget.XServerView;
 import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.ScreenInfo;
 import com.winlator.cmod.xserver.XServer;
+import com.winlator.cmod.winhandler.WinHandler;
 
 import java.io.File;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -51,6 +52,7 @@ public final class X11DisplaySession implements AutoCloseable {
         this.host = host;
         this.listener = listener;
         xServer = new XServer(new ScreenInfo(width, height));
+        xServer.setWinHandler(new WinHandler());
         view = new XServerView(context, xServer, this::startComponentsAfterEgl);
         xServer.setRenderer(view.getRenderer());
 
