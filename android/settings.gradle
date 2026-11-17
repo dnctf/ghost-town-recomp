@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "ghost-town-recomp"
-include(":app")
+include(":app", ":winlator-core")
