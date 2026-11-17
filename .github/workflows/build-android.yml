@@ -1,4 +1,4 @@
-name: Ghost Town Recomp Android Build and v0.4.0 Alpha Release
+name: Ghost Town Recomp Android Build and v0.5.0 Alpha Release
 
 on:
   push:
@@ -100,7 +100,7 @@ jobs:
       - name: Upload APKs and native library
         uses: actions/upload-artifact@v4
         with:
-          name: ghost-town-recomp-0.4.0-alpha.1-arm64
+          name: ghost-town-recomp-0.5.0-alpha.1-arm64
           path: |
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
@@ -108,16 +108,16 @@ jobs:
             dist/*
           if-no-files-found: error
       - name: Publish v0.4.0-alpha.1 tester pre-release
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, 'release-v0.4.0-alpha.1')
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, 'release-v0.5.0-alpha.1')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.4.0-alpha.1
+          tag_name: v0.5.0-alpha.1
           target_commitish: main
-          name: Ghost Town Recomp 0.4.0-alpha.1 - Runtime Foundation
+          name: Ghost Town Recomp 0.5.0-alpha.1 - Bundled Runtime Repair
           prerelease: true
           body: |
             See CHANGELOG.md, docs/CONTRIBUTOR_TESTING.md, docs/V0.4.0_EXECUTION_GATES.md, and docs/PROVENANCE.md.
-            Alpha foundation release: APK bundles the verified Wine/Box64 runtime archive and provisions it automatically on first launch. Direct-install APK files are published alongside optional .apk.xz and .apk.zst compressed download copies with SHA-256 checksums. The managed HTTPS runtime downloader remains available as a recovery path.
+            Alpha foundation release: APK bundles the Wine/Box64 runtime archive and provisions it automatically on first launch. Runtime extraction now handles repeated hardlink entries and safely rebases absolute symlinks that remain inside the private staging root. The normal UI uses only the bundled runtime and offers an install/repair action; no manual runtime archive picker or runtime download is required.
             Includes ARM64 PRoot, Debian Bookworm ARM64/amd64 rootfs, Box64 ARM64, Wine 11.19 amd64, and DXVK 3.1.1 in the managed runtime archive.
             This is NOT a playable Overcooked 2 release. Turnip/libadrenotools, glibc-visible Vulkan WSI/presentation, Wine process launcher, audio/input bridge, and physical MatePad gameplay evidence remain incomplete.
             Does not include proprietary game binaries or user game assets.
