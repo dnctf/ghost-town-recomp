@@ -19,7 +19,7 @@ Turnip is Mesa's Vulkan driver for Adreno 6xx GPUs. The Adreno 660 is in the Adr
 
 ## Critical loader boundary
 
-`libadrenotools` loads a custom Android/Bionic Vulkan driver into the Android app process by hooking Android's Vulkan loader. Wine/Box64 under the Debian glibc rootfs is a separate guest userspace. Loading Turnip into the Android process does **not** automatically make that driver loadable by a glibc process. The project still needs a proven glibc-visible Vulkan loader/ICD and a WSI/presentation bridge that reaches the Android surface. Do not describe the adrenotools hook as a completed Wine Vulkan bridge.
+`libadrenotools` loads a custom Android/Bionic Vulkan driver into the Android app process by hooking Android's Vulkan loader. Wine/Box64 under the Debian glibc rootfs is a separate guest userspace. Loading Turnip into the Android process does **not** automatically make that driver loadable by a glibc process. The project still needs a proven glibc-visible Vulkan loader/ICD and a WSI/presentation bridge that reaches the Android surface. Do not describe the adrenotools hook as a completed Wine Vulkan bridge. The first rendering path is being evaluated separately through a glibc Mesa VirGL driver and an Android EGL/GLES VirGL renderer; that path is not DXVK and is not yet device-validated.
 
 ## Redistribution checklist
 

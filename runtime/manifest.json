@@ -1,9 +1,9 @@
 {
   "schema_version": 4,
   "target": "android-arm64-snapdragon-888-adreno-660",
-  "release": "0.4.0-alpha.1",
+  "release": "0.5.0-alpha.2",
   "release_channel": "pre-release",
-  "status": "runtime-provisioning-foundation-only; no-game-launch-claim",
+  "status": "Wine prefix bootstrap and X11/VirGL host integration foundation; no game-playability claim",
   "components": {
     "proot": {
       "upstream": "https://github.com/berilevi/proot-static",
@@ -51,13 +51,21 @@
       "license": "BSD-2-Clause"
     },
     "display_backend": {
-      "status": "NOT_IMPLEMENTED; need Wine window/display driver plus X11/Wayland or validated direct Vulkan WSI path; Android SurfaceView alone is not enough"
+      "status": "Android X11/VirGL host sources and session lifecycle integrated; guest Mesa VirGL, X11 smoke window and D3D11 presentation remain device-validation gates"
     },
     "audio_input": {
       "status": "NOT_IMPLEMENTED for Wine process; existing native app input is not automatically bridged into Wine"
     },
     "game": {
       "status": "BYOG only; Overcooked2.exe and proprietary assets are not distributed"
+    },
+    "virgl": {
+      "upstream": "Debian Bookworm Mesa package libgl1-mesa-dri:amd64",
+      "driver": "/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so",
+      "architecture": "x86_64 Wine guest",
+      "transport": "VirGL over X11/DRI3 to Android GLES host renderer",
+      "status": "included in v0.5.0-alpha.2 runtime; guest driver enumeration and physical-device presentation still require validation",
+      "license": "Mesa component licenses; preserve Debian copyright files"
     }
   },
   "runtime_layout": {
@@ -70,10 +78,10 @@
     "render_width": 1280,
     "render_height": 720,
     "vsync": false,
-    "driver": "turnip",
-    "driver_fallback": "system-vulkan-with-warning",
+    "driver": "virgl-wined3d (initial rendering path)",
+    "driver_fallback": "WineD3D software fallback; DXVK remains disabled until guest Vulkan is independently validated",
     "dxvk_async": false,
     "dxvk_async_note": "Do not enable DXVK_ASYNC unless using a specifically pinned compatible fork; upstream DXVK 3.1.1 does not imply async patch support."
   },
-  "release_gate": "Do not publish stable v0.4.0 until all physical-device evidence in docs/V0.4.0_EXECUTION_GATES.md is attached. Otherwise publish pre-release only."
+  "release_gate": "Do not claim Overcooked! 2 playable until a visible X11 window, a visible D3D11 smoke frame, audio/input, and a physical-device gameplay session are verified."
 }
