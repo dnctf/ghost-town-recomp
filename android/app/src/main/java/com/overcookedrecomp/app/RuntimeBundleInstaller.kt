@@ -60,7 +60,7 @@ object RuntimeBundleInstaller {
             throw IOException("Manifest runtime parts kosong atau memiliki terlalu banyak bagian.")
         }
 
-        val partPattern = Regex("runtime-[0-9]{4}\\.gz")
+        val partPattern = Regex("runtime-[0-9]{4}\\.bin")
         val entries = manifest.map { line ->
             val fields = line.split(Regex("\\s+"), limit = 2)
             if (fields.size != 2 || !fields[0].matches(Regex("[0-9a-fA-F]{64}")) ||
