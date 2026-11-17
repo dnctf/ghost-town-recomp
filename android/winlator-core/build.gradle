@@ -15,6 +15,7 @@ android {
         main {
             java {
                 srcDir "../../external/winlatorxr/app/src/main/java"
+                srcDir "src/main/java-custom"
                 include "com/winlator/cmod/xserver/**/*.java"
                 include "com/winlator/cmod/xconnector/**/*.java"
                 include "com/winlator/cmod/renderer/**/*.java"
@@ -27,24 +28,24 @@ android {
                 include "com/winlator/cmod/xenvironment/components/XServerComponent.java"
                 include "com/winlator/cmod/xenvironment/components/VirGLRendererComponent.java"
                 include "com/winlator/cmod/xenvironment/components/SysVSharedMemoryComponent.java"
-                include "com/winlator/cmod/widget/XServerView.java"
-                include "com/winlator/cmod/winhandler/WinHandler.java"
-                include "com/winlator/xr/XrActivity.java"
+                include "XServerView.java"
+                include "WinHandler.java"
+                include "XrActivity.java"
             }
             res.srcDirs = ["../../external/winlatorxr/app/src/main/res"]
             manifest.srcFile "src/main/AndroidManifest.xml"
         }
     }
 
-    kotlin {
-        sourceSets {
-            main.kotlin.setSrcDirs([])
-        }
-    }
-
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+kotlin {
+    sourceSets {
+        main.kotlin.setSrcDirs([])
     }
 }
 
