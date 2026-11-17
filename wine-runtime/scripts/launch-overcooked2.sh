@@ -5,11 +5,8 @@ set -eu
 : "${GAME_EXE:?GAME_EXE must point to the user-owned Overcooked2.exe}"
 [ -f "$GAME_EXE" ] || { echo "User game executable not found: $GAME_EXE" >&2; exit 2; }
 [ -s "$WINEPREFIX/system.reg" ] || { echo "Wine prefix is not initialized" >&2; exit 3; }
-# A real display/WSI bridge must be supplied by the host before enabling this script.
-[ "${GHOST_TOWN_DISPLAY_READY:-0}" = 1 ] || {
-  echo "Launch blocked: Wine display/Vulkan presentation backend has not passed device validation" >&2
-  exit 4
-}
+# Always record why a launch is refused; the graphics gate remains closed until
+# guest Vulkan + DXVK + presentation have passed device-level tests.
 LOG_DIR="${GHOST_TOWN_LOG_DIR:-$WINEPREFIX/logs}"
 mkdir -p "$LOG_DIR"
 export WINEPREFIX WINEDEBUG="${WINEDEBUG:--all}"
@@ -18,7 +15,7 @@ export DXVK_LOG_LEVEL="${DXVK_LOG_LEVEL:-info}"
 export DXVK_LOG_PATH="${DXVK_LOG_PATH:-$LOG_DIR/dxvk}"
 export VK_LOADER_DEBUG="${VK_LOADER_DEBUG:-error,warn}"
 {
-  echo "=== Ghost Town Wine/DXVK launch ==="
+  echo "=== Ghost Town Wine/DXVK launch request ==="
   date -Iseconds 2>/dev/null || date
   echo "WINE=$WINE"
   echo "GAME_EXE=$GAME_EXE"
@@ -26,6 +23,10 @@ export VK_LOADER_DEBUG="${VK_LOADER_DEBUG:-error,warn}"
   echo "DXVK_LOG_PATH=$DXVK_LOG_PATH"
   echo "VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-<unset>}"
   echo "VK_DRIVER_FILES=${VK_DRIVER_FILES:-<unset>}"
-  echo "GHOST_TOWN_DISPLAY_READY=$GHOST_TOWN_DISPLAY_READY"
+  echo "GHOST_TOWN_DISPLAY_READY=${GHOST_TOWN_DISPLAY_READY:-0}"
 } >> "$LOG_DIR/graphics-session.log" 2>&1
+[ "${GHOST_TOWN_DISPLAY_READY:-0}" = 1 ] || {
+  echo "Launch blocked: Wine guest Vulkan + DXVK + Android presentation bridge not validated." >> "$LOG_DIR/graphics-session.log"
+  exit 4
+}
 exec "$WINE" "$GAME_EXE" >> "$LOG_DIR/wine-game.log" 2>&1

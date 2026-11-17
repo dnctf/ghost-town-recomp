@@ -10,6 +10,7 @@ set -eu
 SYSTEM32="$WINEPREFIX/drive_c/windows/system32"
 LOG_DIR="$WINEPREFIX/logs"
 mkdir -p "$SYSTEM32" "$LOG_DIR"
+exec >> "$LOG_DIR/dxvk-install.log" 2>&1
 {
   echo "=== DXVK install ==="
   date -Iseconds 2>/dev/null || date
@@ -19,5 +20,5 @@ mkdir -p "$SYSTEM32" "$LOG_DIR"
 } >> "$LOG_DIR/dxvk-install.log" 2>&1
 install -m 0644 "$DXVK_DIR/x64/d3d11.dll" "$SYSTEM32/d3d11.dll"
 install -m 0644 "$DXVK_DIR/x64/dxgi.dll" "$SYSTEM32/dxgi.dll"
-"$WINE" reg add 'HKCU\\Software\\Wine\\DllOverrides' /v d3d11 /d native /f
-"$WINE" reg add 'HKCU\\Software\\Wine\\DllOverrides' /v dxgi /d native /f
+"$WINE" reg add 'HKCU\Software\Wine\DllOverrides' /v d3d11 /d native /f
+"$WINE" reg add 'HKCU\Software\Wine\DllOverrides' /v dxgi /d native /f

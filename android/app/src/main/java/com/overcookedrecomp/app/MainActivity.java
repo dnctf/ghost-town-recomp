@@ -391,6 +391,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         diagnosticsParams.topMargin = dp(8);
         container.addView(diagnosticsBtn, diagnosticsParams);
 
+        Button graphicsDiagnosticsBtn = createDashboardButton("GPU / TURNIP / DXVK LOG", "#263B55");
+        graphicsDiagnosticsBtn.setOnClickListener(v -> showGraphicsDiagnostics());
+        LinearLayout.LayoutParams graphicsDiagnosticsParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        graphicsDiagnosticsParams.topMargin = dp(8);
+        container.addView(graphicsDiagnosticsBtn, graphicsDiagnosticsParams);
+
         importProgressText = new TextView(this);
         importProgressText.setText("");
         importProgressText.setTextSize(11);
@@ -698,6 +705,16 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             for (String missing : runtime.getMissing()) report.append("Missing: ").append(missing).append("\n");
         } catch (Throwable error) {
             report.append("Runtime probe error: ").append(error.getClass().getSimpleName()).append(": ").append(error.getMessage()).append("\n");
+        }
+
+        report.append("\nPERSISTENT APP DIAGNOSTIC LOG\n");
+        report.append(DiagnosticLog.readTail(this, 50000)).append("\n");
+        report.append("\nGRAPHICS / DXVK STATUS\n");
+        try {
+            report.append(WineRuntimeBridge.graphicsDiagnostics(this)).append("\n");
+            if (nativeLoaded) report.append(nativeGetVulkanDiagnostics()).append("\n");
+        } catch (Throwable error) {
+            report.append("Graphics diagnostics error: ").append(error.getMessage()).append("\n");
         }
 
         report.append("\nWINE VERSION PROBE OUTPUT\n");
