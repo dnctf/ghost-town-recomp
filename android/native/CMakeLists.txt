@@ -24,6 +24,8 @@ else()
 endif()
 
 # JNI support used by the X11 socket server, drawable uploads, and SysV SHM.
+find_library(ANDROID_LIB android REQUIRED)
+find_library(LOG_LIB log REQUIRED)
 set(WINLATOR_NATIVE_DIR "${REPO_ROOT}/external/winlatorxr/app/src/main/cpp/winlator")
 add_library(winlator SHARED
     "${WINLATOR_NATIVE_DIR}/drawable.c"
