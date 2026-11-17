@@ -80,13 +80,22 @@ object RuntimeBundleInstaller {
                                     Files.createDirectories(destination)
                                 }
                                 entry.isSymbolicLink -> {
-                                    val link = Paths.get(entry.linkName)
-                                    if (link.isAbsolute) throw IOException("Symlink absolut ditolak: ${entry.name}")
-                                    val resolved = destination.parent.resolve(link).normalize()
-                                    if (!resolved.toAbsolutePath().normalize().startsWith(root)) {
+                                    val rawLink = Paths.get(entry.linkName)
+                                    // Some rootfs packagers store absolute links rooted at the
+                                    // extraction prefix. Rebase only links that remain inside
+                                    // this staging tree; never create links into Android storage.
+                                    val resolved = if (rawLink.isAbsolute) {
+                                        rawLink.normalize().takeIf { it.startsWith(root) }
+                                            ?: throw IOException("Symlink absolut keluar dari runtime: ${entry.name}")
+                                    } else {
+                                        destination.parent.resolve(rawLink).normalize().toAbsolutePath()
+                                    }
+                                    if (!resolved.startsWith(root)) {
                                         throw IOException("Symlink keluar dari runtime ditolak: ${entry.name}")
                                     }
-                                    Files.createSymbolicLink(destination, link)
+                                    val relativeLink = destination.parent.toAbsolutePath().normalize().relativize(resolved)
+                                    replaceConflictingEntry(destination, resolved, symbolic = true)
+                                    Files.createSymbolicLink(destination, relativeLink)
                                 }
                                 entry.isLink -> {
                                     val linkTarget = safeRelativePath(entry.linkName)
@@ -95,7 +104,14 @@ object RuntimeBundleInstaller {
                                     if (!targetPath.startsWith(root) || !Files.exists(targetPath, LinkOption.NOFOLLOW_LINKS)) {
                                         throw IOException("Target hardlink tidak ditemukan: ${entry.linkName}")
                                     }
-                                    Files.createLink(destination, targetPath)
+                                    // Tar files can contain repeated directory metadata / link
+                                    // records. Treat an identical existing hardlink as already
+                                    // extracted, and safely replace a conflicting non-directory
+                                    // entry according to tar's last-entry-wins semantics.
+                                    replaceConflictingEntry(destination, targetPath, symbolic = false)
+                                    if (!Files.exists(destination, LinkOption.NOFOLLOW_LINKS)) {
+                                        Files.createLink(destination, targetPath)
+                                    }
                                 }
                                 entry.isFile -> {
                                     if (entry.size < 0 || totalBytes + entry.size > MAX_EXPANDED_BYTES) {
@@ -161,6 +177,16 @@ object RuntimeBundleInstaller {
             throw IOException("Path traversal ditolak: $raw")
         }
         return path
+    }
+
+    private fun replaceConflictingEntry(destination: Path, target: Path, symbolic: Boolean) {
+        if (!Files.exists(destination, LinkOption.NOFOLLOW_LINKS)) return
+        if (!symbolic && Files.exists(target, LinkOption.NOFOLLOW_LINKS) &&
+            Files.isSameFile(destination, target)) return
+        if (Files.isDirectory(destination, LinkOption.NOFOLLOW_LINKS)) {
+            throw IOException("Arsip mencoba mengganti direktori dengan link: $destination")
+        }
+        Files.delete(destination)
     }
 
     private fun ensureSafeParents(root: Path, parent: Path?) {
