@@ -73,6 +73,8 @@ object WineRuntimeSession {
             }
 
             installDxvk(root, hostPrefix, logDir, context)
+            val serverStop = stopWineServer(context, root, hostPrefix, logDir)
+            if (!serverStop.success) sessionLog.appendText("WARNING: wineserver cleanup returned ${serverStop.exitCode ?: "timeout"}: ${serverStop.output.takeLast(500)}\n")
             sessionLog.appendText("Prefix siap dan DXVK DLL/registry berhasil dipasang.\n")
             Result(true, "Wine prefix 64-bit berhasil disiapkan dan DXVK sudah dipasang. Ini belum membuktikan Vulkan/D3D11 dapat tampil.", sessionLog.absolutePath)
         } catch (error: Throwable) {
@@ -114,6 +116,13 @@ object WineRuntimeSession {
 
     private data class CommandResult(val success: Boolean, val exitCode: Int?, val output: String)
 
+    private fun stopWineServer(context: Context, root: File, hostPrefix: File, logDir: File): CommandResult {
+        return runGuest(
+            context, root, hostPrefix, logDir, "wineserver-stop.log",
+            listOf("/opt/wine/bin/wineserver", "-k")
+        )
+    }
+
     private fun runGuest(
         context: Context,
         root: File,
@@ -137,9 +146,11 @@ object WineRuntimeSession {
 
         val guestMount = File(rootfs, "home/ghosttown/.wineprefixes/overcooked2")
         if (!guestMount.exists() && !guestMount.mkdirs()) throw IOException("Mount point prefix guest gagal dibuat.")
+        val guestExecutable = File(rootfs, guestCommand.first().removePrefix("/"))
+        if (!guestExecutable.isFile) throw IOException("Program guest tidak ditemukan: ${guestCommand.first()}")
         val args = mutableListOf(
             proot.absolutePath, "-0", "-r", rootfs.absolutePath,
-            "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", "/tmp",
+            "-b", "/dev", "-b", "/proc", "-b", "/sys",
             "-b", "${hostPrefix.absolutePath}:$GUEST_PREFIX",
             "-w", GUEST_HOME,
             box64
