@@ -204,6 +204,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     .show();
         }
 
+        // Provision the runtime from APK assets on first launch; never overwrite an existing install.
+        ensureBundledRuntimeInstalled();
+
         // Refresh status game yang terpasang
         refreshInstalledGamesStatus();
     }
@@ -537,6 +540,31 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setEnabled(selectedGame != null));
         dialog.show();
+    }
+
+    private void ensureBundledRuntimeInstalled() {
+        File runtimeRoot = new File(getFilesDir(), "runtime/wine");
+        if (runtimeRoot.isDirectory()) {
+            Log.i(TAG, "Bundled runtime provisioning skipped: runtime already exists.");
+            return;
+        }
+        new Thread(() -> {
+            try {
+                Log.i(TAG, "Installing bundled Wine/Box64 runtime from APK assets.");
+                RuntimeBundleInstaller.installBundled(this, "runtime/ghost-town-wine-runtime-arm64.tar.gz",
+                        message -> Log.i(TAG, message));
+                Log.i(TAG, "Bundled runtime installed and checksum-validated.");
+                runOnUiThread(() -> {
+                    refreshInstalledGamesStatus();
+                    Toast.makeText(this, "Runtime bawaan APK berhasil dipasang.", Toast.LENGTH_LONG).show();
+                });
+            } catch (Throwable error) {
+                Log.e(TAG, "Bundled runtime installation failed; managed download remains available.", error);
+                runOnUiThread(() -> Toast.makeText(this,
+                        "Instalasi runtime bawaan gagal. Gunakan opsi download runtime dan kirim log diagnostik.",
+                        Toast.LENGTH_LONG).show());
+            }
+        }, "bundled-runtime-provisioner").start();
     }
 
     private void downloadAndInstallManagedRuntime() {
