@@ -62,6 +62,14 @@ class RuntimeArchiveValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "hardlink target"):
             MODULE.validate(self.make_archive(members))
 
+    def test_rejects_hardlink_to_symlink(self):
+        members = self.base_members() + [
+            ("rootfs/usr/bin/perl-target", "sym", "/usr/bin/perl-real"),
+            ("rootfs/usr/bin/perl", "hard", "rootfs/usr/bin/perl-target"),
+        ]
+        with self.assertRaisesRegex(ValueError, "preceding regular file"):
+            MODULE.validate(self.make_archive(members))
+
 
 if __name__ == "__main__":
     unittest.main()

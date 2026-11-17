@@ -7,10 +7,10 @@ import java.util.concurrent.TimeUnit
 /**
  * Optional Wine/Box64 adapter.
  *
- * The Android APK does not embed the Linux runtime. A runtime must be provisioned
- * under filesDir/runtime/wine using the layout documented in
- * runtime/ANDROID_RUNTIME_LAYOUT.md. This adapter never invokes a shell and
- * never accepts arbitrary command strings.
+ * The APK provisions its bundled Linux runtime under filesDir/runtime/wine.
+ * This adapter currently performs only a fixed, headless Wine version probe;
+ * it does not create a graphics session or launch a game. It never invokes a
+ * shell and never accepts arbitrary command strings.
  */
 object WineRuntimeBridge {
     enum class State {

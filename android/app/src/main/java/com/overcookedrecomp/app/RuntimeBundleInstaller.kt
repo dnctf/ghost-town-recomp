@@ -13,6 +13,7 @@ import java.security.MessageDigest
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import java.nio.file.Paths
 import java.util.function.Consumer
 
@@ -77,6 +78,10 @@ object RuntimeBundleInstaller {
 
                             when {
                                 entry.isDirectory -> {
+                                    if (Files.exists(destination, LinkOption.NOFOLLOW_LINKS) &&
+                                        !Files.isDirectory(destination, LinkOption.NOFOLLOW_LINKS)) {
+                                        Files.delete(destination)
+                                    }
                                     Files.createDirectories(destination)
                                 }
                                 entry.isSymbolicLink -> {
@@ -104,8 +109,9 @@ object RuntimeBundleInstaller {
                                     val linkTarget = safeRelativePath(entry.linkName)
                                         ?: throw IOException("Hardlink tidak valid: ${entry.name}")
                                     val targetPath = root.resolve(linkTarget).normalize()
-                                    if (!targetPath.startsWith(root) || !Files.exists(targetPath, LinkOption.NOFOLLOW_LINKS)) {
-                                        throw IOException("Target hardlink tidak ditemukan: ${entry.linkName}")
+                                    if (!targetPath.startsWith(root) ||
+                                        !Files.isRegularFile(targetPath, LinkOption.NOFOLLOW_LINKS)) {
+                                        throw IOException("Target hardlink bukan file reguler yang sudah diekstrak: ${entry.linkName}")
                                     }
                                     // Tar files can contain repeated directory metadata / link
                                     // records. Treat an identical existing hardlink as already
@@ -123,7 +129,20 @@ object RuntimeBundleInstaller {
                                     if (totalBytes + entry.size > availableBytes * 9 / 10) {
                                         throw IOException("Ruang penyimpanan tidak cukup untuk memasang runtime.")
                                     }
-                                    Files.newOutputStream(destination).use { output ->
+                                    // Never follow a symlink left by an earlier duplicate tar entry.
+                                    // Replacing the leaf is safe only after rejecting directories;
+                                    // parent components were checked by ensureSafeParents().
+                                    if (Files.exists(destination, LinkOption.NOFOLLOW_LINKS)) {
+                                        if (Files.isDirectory(destination, LinkOption.NOFOLLOW_LINKS)) {
+                                            throw IOException("Arsip mencoba mengganti direktori dengan file: $destination")
+                                        }
+                                        Files.delete(destination)
+                                    }
+                                    Files.newOutputStream(
+                                        destination,
+                                        StandardOpenOption.CREATE_NEW,
+                                        StandardOpenOption.WRITE
+                                    ).use { output ->
                                         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                                         while (true) {
                                             val read = tar.read(buffer)

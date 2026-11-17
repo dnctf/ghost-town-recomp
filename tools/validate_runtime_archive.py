@@ -9,7 +9,6 @@ from __future__ import annotations
 import posixpath
 import sys
 import tarfile
-from pathlib import PurePosixPath
 
 REQUIRED = {
     "bin/proot",
@@ -33,6 +32,7 @@ def validate(path: str) -> None:
     with tarfile.open(path, "r:gz") as archive:
         members = archive.getmembers()
         names: set[str] = set()
+        regular_targets: set[str] = set()
         symlinks = hardlinks = 0
         for member in members:
             name = safe_name(member.name)
@@ -51,9 +51,12 @@ def validate(path: str) -> None:
             elif member.islnk():
                 hardlinks += 1
                 target = safe_name(member.linkname)
-                if target not in names:
-                    raise ValueError(f"hardlink target must precede link: {name} -> {target}")
-            elif not (member.isdir() or member.isfile() or member.isfifo() or member.ischr() or member.isblk()):
+                if target not in regular_targets:
+                    raise ValueError(f"hardlink target must be a preceding regular file: {name} -> {target}")
+                regular_targets.add(name)
+            elif member.isfile():
+                regular_targets.add(name)
+            elif not (member.isdir() or member.isfifo() or member.ischr() or member.isblk()):
                 raise ValueError(f"unsupported tar entry type: {name}")
 
         missing = sorted(REQUIRED - names)
