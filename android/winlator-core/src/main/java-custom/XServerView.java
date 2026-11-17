@@ -7,6 +7,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import com.winlator.cmod.renderer.GLRenderer;
+import com.winlator.cmod.renderer.ReadyGLRenderer;
 import com.winlator.cmod.xserver.XServer;
 
 /** Standard Android GLES3 surface used by the embedded X11 server. */
