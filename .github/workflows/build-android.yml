@@ -83,6 +83,18 @@ jobs:
       - name: Run Android lint
         working-directory: android
         run: gradle lint --no-daemon --stacktrace
+      - name: Compress APK distribution copies
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find android/app/build/outputs/apk -type f -name '*.apk' -print0 | while IFS= read -r -d '' apk; do
+            base="$(basename "$apk")"
+            # Keep the original installable APK; publish an additional high-compression download copy.
+            xz -T0 -9e -c "$apk" > "dist/$base.xz"
+            zstd -T0 -19 --ultra -f "$apk" -o "dist/$base.zst"
+            sha256sum "$apk" "dist/$base.xz" "dist/$base.zst" >> dist/SHA256SUMS
+          done
+          ls -lh android/app/build/outputs/apk/*/*.apk dist/*
       - name: Upload APKs and native library
         uses: actions/upload-artifact@v4
         with:
@@ -91,6 +103,7 @@ jobs:
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
             build-native-arm64/**/*.so
+            dist/*
           if-no-files-found: error
       - name: Publish v0.4.0-alpha.1 tester pre-release
         if: github.event_name == 'push' && contains(github.event.head_commit.message, 'release-v0.4.0-alpha.1')
@@ -102,7 +115,7 @@ jobs:
           prerelease: true
           body: |
             See CHANGELOG.md, docs/CONTRIBUTOR_TESTING.md, docs/V0.4.0_EXECUTION_GATES.md, and docs/PROVENANCE.md.
-            Alpha foundation release: APK includes managed HTTPS runtime downloader with SHA-256 verification; the separately published runtime archive is attached to this release by the runtime workflow.
+            Alpha foundation release: APK bundles the verified Wine/Box64 runtime archive and provisions it automatically on first launch. Direct-install APK files are published alongside optional .apk.xz and .apk.zst compressed download copies with SHA-256 checksums. The managed HTTPS runtime downloader remains available as a recovery path.
             Includes ARM64 PRoot, Debian Bookworm ARM64/amd64 rootfs, Box64 ARM64, Wine 11.19 amd64, and DXVK 3.1.1 in the managed runtime archive.
             This is NOT a playable Overcooked 2 release. Turnip/libadrenotools, glibc-visible Vulkan WSI/presentation, Wine process launcher, audio/input bridge, and physical MatePad gameplay evidence remain incomplete.
             Does not include proprietary game binaries or user game assets.
@@ -110,6 +123,9 @@ jobs:
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
             build-native-arm64/**/*.so
+            dist/*.apk.xz
+            dist/*.apk.zst
+            dist/SHA256SUMS
           generate_release_notes: true
 
   runtime-components:
@@ -119,7 +135,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install archive tools
-        run: sudo apt-get update && sudo apt-get install -y curl xz-utils tar file
+        run: sudo apt-get update && sudo apt-get install -y curl xz-utils tar file zstd
       - name: Download pinned upstream releases
         run: |
           set -euo pipefail
