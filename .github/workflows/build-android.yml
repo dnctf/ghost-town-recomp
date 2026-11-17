@@ -1,4 +1,4 @@
-name: Ghost Town Recomp Android Build and Tester Release
+name: Ghost Town Recomp Android Build and v0.4.0 Alpha Release
 
 on:
   push:
@@ -75,25 +75,26 @@ jobs:
       - name: Upload APKs and native library
         uses: actions/upload-artifact@v4
         with:
-          name: ghost-town-recomp-0.3.3-arm64
+          name: ghost-town-recomp-0.4.0-alpha.1-arm64
           path: |
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
             build-native-arm64/**/*.so
           if-no-files-found: error
-      - name: Publish v0.3.3 tester pre-release
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, 'release-v0.3.3')
+      - name: Publish v0.4.0-alpha.1 tester pre-release
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, 'release-v0.4.0-alpha.1')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.3.3
+          tag_name: v0.4.0-alpha.1
           target_commitish: main
-          name: Ghost Town Recomp 0.3.3 - Contributor Tester Candidate
+          name: Ghost Town Recomp 0.4.0-alpha.1 - Runtime Foundation
           prerelease: true
           body: |
-            See CHANGELOG.md, docs/CONTRIBUTOR_TESTING.md, and runtime/ANDROID_RUNTIME_LAYOUT.md.
-            Includes app-private Wine runtime bundle import with path-safety checks and runtime payload checksum validation.
-            Runtime bundle is a separate Actions artifact and is not embedded in the APK.
-            Does not bundle proprietary Unity Player/game files. Wine/Box64/DXVK and Vulkan gameplay compatibility remain unverified on physical Android hardware.
+            See CHANGELOG.md, docs/CONTRIBUTOR_TESTING.md, docs/V0.4.0_EXECUTION_GATES.md, and docs/PROVENANCE.md.
+            Alpha foundation release: APK includes managed HTTPS runtime downloader with SHA-256 verification; the separately published runtime archive is attached to this release by the runtime workflow.
+            Includes ARM64 PRoot, Debian Bookworm ARM64/amd64 rootfs, Box64 ARM64, Wine 11.19 amd64, and DXVK 3.1.1 in the managed runtime archive.
+            This is NOT a playable Overcooked 2 release. Turnip/libadrenotools, glibc-visible Vulkan WSI/presentation, Wine process launcher, audio/input bridge, and physical MatePad gameplay evidence remain incomplete.
+            Does not include proprietary game binaries or user game assets.
           files: |
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
