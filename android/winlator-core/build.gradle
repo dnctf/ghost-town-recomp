@@ -29,6 +29,7 @@ android {
                 include "com/winlator/cmod/xenvironment/components/VirGLRendererComponent.java"
                 include "com/winlator/cmod/xenvironment/components/SysVSharedMemoryComponent.java"
                 include "XServerView.java"
+                include "ReadyGLRenderer.java"
                 include "WinHandler.java"
                 include "XrActivity.java"
             }
