@@ -89,11 +89,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 if (uri != null) handleImportZipUri(uri);
             });
 
-    private final ActivityResultLauncher<String[]> runtimeBundleLauncher =
-            registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
-                if (uri != null) installRuntimeBundle(uri);
-            });
-
     private final ActivityResultLauncher<Uri> openFolderLauncher =
             registerForActivityResult(new ActivityResultContracts.OpenDocumentTree(), uri -> {
                 if (uri != null) handleImportFolderUri(uri);
@@ -380,21 +375,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         wineRuntimeParams.topMargin = dp(8);
         container.addView(wineRuntimeBtn, wineRuntimeParams);
 
-        Button installRuntimeBtn = createDashboardButton("INSTALL WINE RUNTIME BUNDLE (.TAR.GZ)", "#203A2C");
-        installRuntimeBtn.setOnClickListener(v -> runtimeBundleLauncher.launch(new String[]{
-                "application/gzip", "application/x-gzip", "application/octet-stream", "*/*"
-        }));
-        LinearLayout.LayoutParams installRuntimeParams = new LinearLayout.LayoutParams(
+        Button runtimeRepairBtn = createDashboardButton("INSTALL / REPAIR BUILT-IN RUNTIME", "#24513D");
+        runtimeRepairBtn.setOnClickListener(v -> installBundledRuntime(true));
+        LinearLayout.LayoutParams runtimeRepairParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
-        installRuntimeParams.topMargin = dp(8);
-        container.addView(installRuntimeBtn, installRuntimeParams);
-
-        Button managedRuntimeBtn = createDashboardButton("DOWNLOAD & INSTALL RUNTIME (MANAGED)", "#24513D");
-        managedRuntimeBtn.setOnClickListener(v -> downloadAndInstallManagedRuntime());
-        LinearLayout.LayoutParams managedRuntimeParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
-        managedRuntimeParams.topMargin = dp(8);
-        container.addView(managedRuntimeBtn, managedRuntimeParams);
+        runtimeRepairParams.topMargin = dp(8);
+        container.addView(runtimeRepairBtn, runtimeRepairParams);
 
         Button diagnosticsBtn = createDashboardButton("BAGIKAN LOG DIAGNOSTIK", "#493018");
         diagnosticsBtn.setOnClickListener(v -> shareDiagnosticReport());
@@ -547,103 +533,48 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             Log.i(TAG, "Bundled runtime provisioning skipped: validated runtime already exists.");
             return;
         }
-        new Thread(() -> {
-            try {
-                Log.i(TAG, "Installing bundled Wine/Box64 runtime from APK assets.");
-                RuntimeBundleInstaller.installBundled(this, "runtime/ghost-town-wine-runtime-arm64.tar.gz",
-                        message -> Log.i(TAG, message));
-                Log.i(TAG, "Bundled runtime installed and checksum-validated.");
-                runOnUiThread(() -> {
-                    refreshInstalledGamesStatus();
-                    Toast.makeText(this, "Runtime bawaan APK berhasil dipasang.", Toast.LENGTH_LONG).show();
-                });
-            } catch (Throwable error) {
-                Log.e(TAG, "Bundled runtime installation failed; managed download remains available.", error);
-                runOnUiThread(() -> Toast.makeText(this,
-                        "Instalasi runtime bawaan gagal. Gunakan opsi download runtime dan kirim log diagnostik.",
-                        Toast.LENGTH_LONG).show());
-            }
-        }, "bundled-runtime-provisioner").start();
+        installBundledRuntime(false);
     }
 
-    private void downloadAndInstallManagedRuntime() {
-        new AlertDialog.Builder(this)
-                .setTitle("DOWNLOAD RUNTIME 0.4.0-ALPHA.1")
-                .setMessage("Aplikasi akan mengunduh paket runtime resmi dari GitHub Release Ghost Town Recomp, memverifikasi SHA-256, lalu memasangnya ke penyimpanan privat. Koneksi internet dan ruang kosong yang cukup diperlukan. Ini belum mengaktifkan game launch atau membuktikan kompatibilitas Vulkan.")
-                .setNegativeButton("BATAL", null)
-                .setPositiveButton("LANJUTKAN", (dialog, which) -> {
-                    showImportProgress(true, "Mengunduh runtime terkelola...");
-                    new Thread(() -> {
-                        try {
-                            RuntimeBundleDownloader.downloadAndInstall(this, message ->
-                                    runOnUiThread(() -> {
-                                        if (importProgressText != null) importProgressText.setText(message);
-                                    }));
-                            runOnUiThread(() -> {
-                                showImportProgress(false, "Runtime 0.4.0-alpha.1 berhasil diunduh, diverifikasi, dan dipasang.");
-                                new AlertDialog.Builder(this)
-                                        .setTitle("RUNTIME TERPASANG")
-                                        .setMessage("Checksum SHA-256 cocok dan struktur runtime lolos validasi. Berikutnya jalankan Wine version probe. Game launch tetap menunggu prefix, display/Vulkan, audio, dan input backend.")
-                                        .setPositiveButton("PERIKSA STATUS", (d, w) -> showWineRuntimeStatus())
-                                        .setNegativeButton("TUTUP", null)
-                                        .show();
-                            });
-                        } catch (Throwable error) {
-                            Log.e(TAG, "Managed runtime download/install failed", error);
-                            runOnUiThread(() -> {
-                                showImportProgress(false, "Download runtime gagal.");
-                                new AlertDialog.Builder(this)
-                                        .setTitle("DOWNLOAD RUNTIME GAGAL")
-                                        .setMessage(error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())
-                                        .setPositiveButton("OK", null)
-                                        .show();
-                            });
-                        }
-                    }, "managed-runtime-download").start();
-                })
-                .show();
-    }
-
-    private void installRuntimeBundle(Uri uri) {
+    /** Installs or repairs the one runtime shipped inside this APK; no network or file picker. */
+    private void installBundledRuntime(boolean userRequested) {
         if (importProgressText != null) {
-            importProgressText.setText("Menyiapkan instalasi Wine runtime...");
+            importProgressText.setText("Memasang runtime bawaan APK...");
             importProgressText.setVisibility(View.VISIBLE);
         }
         if (importProgressBar != null) importProgressBar.setVisibility(View.VISIBLE);
-
         new Thread(() -> {
             try {
-                RuntimeBundleInstaller.install(this, uri,
+                Log.i(TAG, "Provisioning bundled Wine/Box64 runtime from APK assets.");
+                RuntimeBundleInstaller.installBundled(this, "runtime/ghost-town-wine-runtime-arm64.tar.gz",
                         message -> runOnUiThread(() -> {
                             if (importProgressText != null) importProgressText.setText(message);
                         }));
+                Log.i(TAG, "Bundled runtime installed and checksum-validated.");
                 runOnUiThread(() -> {
-                    if (importProgressBar != null) importProgressBar.setVisibility(View.GONE);
-                    if (importProgressText != null) {
-                        importProgressText.setText("Wine runtime berhasil dipasang ke penyimpanan privat aplikasi.");
-                    }
+                    showImportProgress(false, "Runtime bawaan berhasil dipasang dan diverifikasi.");
+                    refreshInstalledGamesStatus();
                     new AlertDialog.Builder(this)
-                            .setTitle("RUNTIME TERPASANG")
-                            .setMessage("Komponen runtime berhasil diekstrak dan struktur dasarnya tervalidasi. Ini belum membuktikan PRoot/Wine berjalan pada perangkat atau DXVK dapat membuat Vulkan device.")
+                            .setTitle("RUNTIME SIAP")
+                            .setMessage("Runtime bawaan APK berhasil diekstrak dan checksum diverifikasi. Ini baru validasi instalasi; pengujian Wine, Vulkan, dan peluncuran game masih diperlukan.")
                             .setPositiveButton("PERIKSA STATUS", (dialog, which) -> showWineRuntimeStatus())
                             .setNegativeButton("TUTUP", null)
                             .show();
                 });
             } catch (Throwable error) {
-                Log.e(TAG, "Runtime bundle installation failed", error);
+                Log.e(TAG, "Bundled runtime installation failed", error);
                 runOnUiThread(() -> {
-                    if (importProgressBar != null) importProgressBar.setVisibility(View.GONE);
-                    if (importProgressText != null) {
-                        importProgressText.setText("Instalasi runtime gagal.");
-                    }
+                    showImportProgress(false, "Runtime gagal dipasang. Periksa detail diagnostik.");
                     new AlertDialog.Builder(this)
                             .setTitle("INSTALASI RUNTIME GAGAL")
-                            .setMessage(error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())
-                            .setPositiveButton("OK", null)
+                            .setMessage((error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())
+                                    + "\\n\\nSilakan bagikan log diagnostik jika masalah berulang.")
+                            .setPositiveButton("BAGIKAN LOG", (dialog, which) -> shareDiagnosticReport())
+                            .setNegativeButton("TUTUP", null)
                             .show();
                 });
             }
-        }, "runtime-bundle-installer").start();
+        }, userRequested ? "runtime-repair" : "bundled-runtime-provisioner").start();
     }
 
     private void showWineRuntimeStatus() {
