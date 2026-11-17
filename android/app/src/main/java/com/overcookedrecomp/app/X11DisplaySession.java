@@ -79,6 +79,9 @@ public final class X11DisplaySession implements AutoCloseable {
             virglRendererComponent.start();
             if (listener != null) listener.onStatus("X11 server and VirGL renderer started.");
         } catch (Throwable error) {
+            try { virglRendererComponent.stop(); } catch (Throwable ignored) {}
+            try { sharedMemoryComponent.stop(); } catch (Throwable ignored) {}
+            try { xServerComponent.stop(); } catch (Throwable ignored) {}
             componentsStarted.set(false);
             if (listener != null) listener.onError("Unable to start X11/VirGL services.", error);
         }
