@@ -23,6 +23,27 @@ else()
     message(FATAL_ERROR "Pinned WinlatorXR VirGL source is missing.")
 endif()
 
+# JNI support used by the X11 socket server, drawable uploads, and SysV SHM.
+set(WINLATOR_NATIVE_DIR "${REPO_ROOT}/external/winlatorxr/app/src/main/cpp/winlator")
+add_library(winlator SHARED
+    "${WINLATOR_NATIVE_DIR}/drawable.c"
+    "${WINLATOR_NATIVE_DIR}/gpu_image.c"
+    "${WINLATOR_NATIVE_DIR}/sysvshared_memory.c"
+    "${WINLATOR_NATIVE_DIR}/xconnector_epoll.c"
+)
+target_include_directories(winlator PRIVATE "${WINLATOR_NATIVE_DIR}")
+find_library(JNIGRAPHICS_LIB jnigraphics REQUIRED)
+find_library(EGL_LIB EGL REQUIRED)
+find_library(GLESV2_LIB GLESv2 REQUIRED)
+target_link_libraries(winlator
+    ${ANDROID_LIB}
+    ${LOG_LIB}
+    ${JNIGRAPHICS_LIB}
+    ${EGL_LIB}
+    ${GLESV2_LIB}
+)
+target_link_options(winlator PRIVATE "-Wl,-z,max-page-size=16384")
+
 add_library(overcooked_native SHARED
     src/main_jni.cpp
     src/vulkan_surface.cpp
