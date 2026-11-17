@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(overcooked_recomp_native LANGUAGES CXX)
+project(overcooked_recomp_native LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,6 +11,16 @@ if (EXISTS "${ADRENOTOOLS_DIR}/CMakeLists.txt")
     add_subdirectory("${ADRENOTOOLS_DIR}" "${CMAKE_BINARY_DIR}/adrenotools")
 else()
     message(FATAL_ERROR "Pinned libadrenotools submodule is missing; checkout submodules recursively.")
+endif()
+
+# WinlatorXR's GPLv3/MIT-compatible VirGL host renderer is used as the
+# OpenGL transport backend. Only this native subdirectory is built; nested
+# OpenXR/SDL submodules are intentionally not initialized.
+set(WINLATOR_VIRGL_DIR "${REPO_ROOT}/external/winlatorxr/app/src/main/cpp/virglrenderer")
+if (EXISTS "${WINLATOR_VIRGL_DIR}/CMakeLists.txt")
+    add_subdirectory("${WINLATOR_VIRGL_DIR}" "${CMAKE_BINARY_DIR}/virglrenderer")
+else()
+    message(FATAL_ERROR "Pinned WinlatorXR VirGL source is missing.")
 endif()
 
 add_library(overcooked_native SHARED
