@@ -133,6 +133,7 @@ object RuntimeBundleInstaller {
             }
 
             validate(stage)
+            File(stage, ".runtime-install-complete").writeText("ghost-town-runtime-v1\\n")
             deleteTree(backup)
             if (target.exists() && !target.renameTo(backup)) {
                 throw IOException("Tidak dapat mencadangkan runtime lama.")
@@ -175,6 +176,19 @@ object RuntimeBundleInstaller {
                 throw IOException("Path induk bukan direktori.")
             }
         }
+    }
+
+    /** Returns true only for a fully provisioned runtime from this installer. */
+    @JvmStatic
+    fun isInstalled(context: Context): Boolean {
+        val root = File(context.filesDir, "runtime/wine")
+        if (!File(root, ".runtime-install-complete").isFile) return false
+        val required = listOf(
+            "bin/proot", "libexec/proot/loader", "rootfs/etc/os-release",
+            "rootfs/usr/local/bin/box64", "rootfs/opt/wine/bin/wine",
+            "rootfs/opt/dxvk/x64/d3d11.dll", "rootfs/opt/dxvk/x64/dxgi.dll"
+        )
+        return required.all { File(root, it).isFile }
     }
 
     private fun validate(root: File) {
