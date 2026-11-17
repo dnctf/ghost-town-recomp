@@ -33,6 +33,12 @@ android {
         }
     }
 
+    // The runtime archive is already gzip-compressed; avoid AGP recompressing
+    // hundreds of megabytes into a byte array during asset packaging.
+    androidResources {
+        noCompress += ['gz']
+    }
+
     packaging {
         jniLibs {
             useLegacyPackaging = true
