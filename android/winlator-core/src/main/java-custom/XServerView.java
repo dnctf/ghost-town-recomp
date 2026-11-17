@@ -14,7 +14,7 @@ import com.winlator.cmod.xserver.XServer;
 public final class XServerView extends GLSurfaceView {
     private final GLRenderer renderer;
 
-    public XServerView(Context context, XServer xServer) {
+    public XServerView(Context context, XServer xServer, Runnable onEglReady) {
         super(context);
         setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -22,7 +22,7 @@ public final class XServerView extends GLSurfaceView {
         setEGLContextClientVersion(3);
         setEGLConfigChooser(8, 8, 8, 8, 0, 0);
         setPreserveEGLContextOnPause(true);
-        renderer = new GLRenderer(this, xServer);
+        renderer = new ReadyGLRenderer(this, xServer, onEglReady);
         setRenderer(renderer);
         setRenderMode(RENDERMODE_CONTINUOUSLY);
     }
