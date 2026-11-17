@@ -562,7 +562,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         new Thread(() -> {
             try {
                 DiagnosticLog.info(this, "RUNTIME", "Provisioning bundled Wine/Box64 runtime from APK assets.");
-                RuntimeBundleInstaller.installBundled(this, "runtime/ghost-town-wine-runtime-arm64.tar.gz",
+                RuntimeBundleInstaller.installBundledParts(this, "runtime/parts/SHA256SUMS",
                         message -> runOnUiThread(() -> {
                             if (importProgressText != null) importProgressText.setText(message);
                         }));

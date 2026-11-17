@@ -86,14 +86,21 @@ jobs:
       - name: Embed verified runtime bundle into APK assets
         run: |
           set -euo pipefail
-          mkdir -p android/app/src/main/assets/runtime
+          mkdir -p android/app/src/main/assets/runtime/parts
           BASE="https://github.com/dnctf/ghost-town-recomp/releases/download/v0.4.0-alpha.1"
-          curl -fL --retry 5 --retry-all-errors "$BASE/ghost-town-wine-runtime-arm64.tar.gz" -o android/app/src/main/assets/runtime/ghost-town-wine-runtime-arm64.tar.gz
+          curl -fL --retry 5 --retry-all-errors "$BASE/ghost-town-wine-runtime-arm64.tar.gz" -o "$RUNNER_TEMP/runtime.tar.gz"
           curl -fL --retry 5 --retry-all-errors "$BASE/ghost-town-wine-runtime-arm64.tar.gz.sha256" -o "$RUNNER_TEMP/runtime.sha256"
           EXPECTED="$(awk '{print $1}' "$RUNNER_TEMP/runtime.sha256")"
-          echo "$EXPECTED  android/app/src/main/assets/runtime/ghost-town-wine-runtime-arm64.tar.gz" | sha256sum -c -
-          test "$(stat -c%s android/app/src/main/assets/runtime/ghost-town-wine-runtime-arm64.tar.gz)" -gt 100000000
-          python3 tools/validate_runtime_archive.py android/app/src/main/assets/runtime/ghost-town-wine-runtime-arm64.tar.gz
+          echo "$EXPECTED  $RUNNER_TEMP/runtime.tar.gz" | sha256sum -c -
+          test "$(stat -c%s "$RUNNER_TEMP/runtime.tar.gz")" -gt 100000000
+          python3 tools/validate_runtime_archive.py "$RUNNER_TEMP/runtime.tar.gz"
+          split -b 64m -d -a 4 "$RUNNER_TEMP/runtime.tar.gz" android/app/src/main/assets/runtime/parts/runtime-
+          for part in android/app/src/main/assets/runtime/parts/runtime-[0-9][0-9][0-9][0-9]; do
+            mv "$part" "$part.gz"
+          done
+          (cd android/app/src/main/assets/runtime/parts && sha256sum runtime-*.gz > SHA256SUMS)
+          test -s android/app/src/main/assets/runtime/parts/SHA256SUMS
+          test "$(find android/app/src/main/assets/runtime/parts -maxdepth 1 -type f -name 'runtime-*.gz' | wc -l)" -gt 0
 
       - name: Build debug and release APK
         working-directory: android
