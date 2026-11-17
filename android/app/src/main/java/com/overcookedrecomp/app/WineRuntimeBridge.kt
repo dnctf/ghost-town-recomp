@@ -133,7 +133,7 @@ object WineRuntimeBridge {
         }
         lines += "Guest Vulkan execution: NOT TESTED (no guest vulkaninfo/DXVK D3D test result recorded)."
         lines += "Presentation bridge: NOT IMPLEMENTED / NOT ENABLED."
-        return lines.joinToString("\\n")
+        return lines.joinToString("\n")
     }
 
     /**

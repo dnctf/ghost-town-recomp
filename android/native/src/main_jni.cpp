@@ -148,36 +148,36 @@ JNIEXPORT jstring JNICALL
 Java_com_overcookedrecomp_app_MainActivity_nativeGetVulkanDiagnostics(
         JNIEnv* env, jobject /*thiz*/) {
     std::ostringstream report;
-    report << "Host Vulkan loader diagnostic (system loader; custom Turnip not selected).\\n";
+    report << "Host Vulkan loader diagnostic (system loader; custom Turnip not selected).\n";
     uint32_t loader_version = VK_API_VERSION_1_0;
     auto enumerate_version = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion"));
     if (enumerate_version && enumerate_version(&loader_version) == VK_SUCCESS) {
-        report << "Loader API: " << VK_VERSION_MAJOR(loader_version) << "." << VK_VERSION_MINOR(loader_version) << "." << VK_VERSION_PATCH(loader_version) << "\\n";
-    } else report << "Loader API: Vulkan 1.0 or version query unavailable\\n";
+        report << "Loader API: " << VK_VERSION_MAJOR(loader_version) << "." << VK_VERSION_MINOR(loader_version) << "." << VK_VERSION_PATCH(loader_version) << "\n";
+    } else report << "Loader API: Vulkan 1.0 or version query unavailable\n";
     VkApplicationInfo app{}; app.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app.pApplicationName = "GhostTownGraphicsDiagnostics";
     app.apiVersion = std::min(loader_version, VK_API_VERSION_1_1);
     VkInstanceCreateInfo create{}; create.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO; create.pApplicationInfo = &app;
     VkInstance instance = VK_NULL_HANDLE;
     VkResult result = vkCreateInstance(&create, nullptr, &instance);
-    if (result != VK_SUCCESS) { report << "vkCreateInstance failed: " << static_cast<int>(result) << "\\n"; return env->NewStringUTF(report.str().c_str()); }
+    if (result != VK_SUCCESS) { report << "vkCreateInstance failed: " << static_cast<int>(result) << "\n"; return env->NewStringUTF(report.str().c_str()); }
     uint32_t count = 0; result = vkEnumeratePhysicalDevices(instance, &count, nullptr);
-    report << "Physical device enumeration: " << static_cast<int>(result) << ", count=" << count << "\\n";
+    report << "Physical device enumeration: " << static_cast<int>(result) << ", count=" << count << "\n";
     if (result == VK_SUCCESS && count > 0) {
         std::vector<VkPhysicalDevice> devices(count);
         result = vkEnumeratePhysicalDevices(instance, &count, devices.data());
         for (uint32_t i = 0; result == VK_SUCCESS && i < count; ++i) {
             VkPhysicalDeviceProperties props{}; vkGetPhysicalDeviceProperties(devices[i], &props);
-            report << "GPU[" << i << "]: " << props.deviceName << "\\n"
-                   << "  API: " << VK_VERSION_MAJOR(props.apiVersion) << "." << VK_VERSION_MINOR(props.apiVersion) << "." << VK_VERSION_PATCH(props.apiVersion) << "\\n"
-                   << "  Driver version raw: " << props.driverVersion << "\\n"
-                   << "  Vendor ID: 0x" << std::hex << props.vendorID << " Device ID: 0x" << props.deviceID << std::dec << "\\n";
+            report << "GPU[" << i << "]: " << props.deviceName << "\n"
+                   << "  API: " << VK_VERSION_MAJOR(props.apiVersion) << "." << VK_VERSION_MINOR(props.apiVersion) << "." << VK_VERSION_PATCH(props.apiVersion) << "\n"
+                   << "  Driver version raw: " << props.driverVersion << "\n"
+                   << "  Vendor ID: 0x" << std::hex << props.vendorID << " Device ID: 0x" << props.deviceID << std::dec << "\n";
             if (props.apiVersion >= VK_API_VERSION_1_1) {
                 VkPhysicalDeviceDriverProperties driver{}; driver.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
                 VkPhysicalDeviceProperties2 props2{}; props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2; props2.pNext = &driver;
                 vkGetPhysicalDeviceProperties2(devices[i], &props2);
-                report << "  Driver name: " << driver.driverName << "\\n  Driver info: " << driver.driverInfo << "\\n";
-            } else report << "  Driver name/info: VK_KHR_driver_properties query unavailable.\\n";
+                report << "  Driver name: " << driver.driverName << "\n  Driver info: " << driver.driverInfo << "\n";
+            } else report << "  Driver name/info: VK_KHR_driver_properties query unavailable.\n";
         }
     }
     vkDestroyInstance(instance, nullptr);

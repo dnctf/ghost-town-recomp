@@ -19,8 +19,8 @@ object DiagnosticLog {
         val line = buildString {
             append(SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US).format(Date()))
             append(" ").append(level).append("/").append(category).append(": ").append(message)
-            if (error != null) append("\\n").append(Log.getStackTraceString(error))
-            append("\\n")
+            if (error != null) append("\n").append(Log.getStackTraceString(error))
+            append("\n")
         }
         if (level == "ERROR") Log.e(TAG, "$category: $message", error) else Log.i(TAG, "$category: $message")
         runCatching {

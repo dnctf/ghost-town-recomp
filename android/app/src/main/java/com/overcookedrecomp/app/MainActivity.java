@@ -586,13 +586,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             catch (Throwable error) { hostReport = "Vulkan probe error: " + error.getClass().getSimpleName() + ": " + error.getMessage(); }
         }
         String guestReport = WineRuntimeBridge.graphicsDiagnostics(this);
-        DiagnosticLog.info(this, "GRAPHICS", "Host Vulkan probe completed. " + hostReport.replace('\\n', ' '));
-        DiagnosticLog.info(this, "DXVK", guestReport.replace('\\n', ' '));
-        String combined = "ANDROID HOST VULKAN\\n" + hostReport
-                + "\\n\\nWINE GUEST / DXVK\\n" + guestReport
-                + "\\n\\nCatatan: probe host tidak membuktikan Vulkan guest DXVK bekerja. Turnip baru dianggap aktif jika driver terpilih benar-benar dimuat oleh proses renderer. Jalur presentasi Wine ke SurfaceView juga belum diaktifkan.";
+        DiagnosticLog.info(this, "GRAPHICS", "Host Vulkan probe completed. " + hostReport.replace('\n', ' '));
+        DiagnosticLog.info(this, "DXVK", guestReport.replace('\n', ' '));
+        String combined = "ANDROID HOST VULKAN\n" + hostReport
+                + "\n\nWINE GUEST / DXVK\n" + guestReport
+                + "\n\nCatatan: probe host tidak membuktikan Vulkan guest DXVK bekerja. Turnip baru dianggap aktif jika driver terpilih benar-benar dimuat oleh proses renderer. Jalur presentasi Wine ke SurfaceView juga belum diaktifkan.";
         TextView content = new TextView(this);
-        content.setText(combined + "\\n\\nAPP LOG (tail)\\n" + DiagnosticLog.readTail(this, 18000));
+        content.setText(combined + "\n\nAPP LOG (tail)\n" + DiagnosticLog.readTail(this, 18000));
         content.setTextIsSelectable(true);
         content.setTextSize(12);
         content.setPadding(dp(18), dp(12), dp(18), dp(12));
