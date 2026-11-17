@@ -543,9 +543,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void ensureBundledRuntimeInstalled() {
-        File runtimeRoot = new File(getFilesDir(), "runtime/wine");
-        if (runtimeRoot.isDirectory()) {
-            Log.i(TAG, "Bundled runtime provisioning skipped: runtime already exists.");
+        if (RuntimeBundleInstaller.isInstalled(this)) {
+            Log.i(TAG, "Bundled runtime provisioning skipped: validated runtime already exists.");
             return;
         }
         new Thread(() -> {
