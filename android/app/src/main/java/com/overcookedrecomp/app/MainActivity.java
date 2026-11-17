@@ -598,7 +598,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (status.getState() != WineRuntimeBridge.State.READY_FOR_HEADLESS_PROBE) {
             new AlertDialog.Builder(this)
                     .setTitle("WINE RUNTIME BELUM SIAP")
-                    .setMessage(status.getMessage() + "\\n\\n" + String.join("\\n", status.getMissing()))
+                    .setMessage(status.getMessage() + "\n\n" + String.join("\n", status.getMissing()))
                     .setPositiveButton("OK", null)
                     .show();
             return;
@@ -616,8 +616,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 progress.dismiss();
                 new AlertDialog.Builder(this)
                         .setTitle(result.getSuccess() ? "WINE PREFIX SIAP" : "WINE PREFIX GAGAL")
-                        .setMessage(result.getMessage() + "\\n\\nLog: " + result.getLogPath()
-                                + "\\n\\nCatatan: tahap ini hanya menyiapkan Wine dan DXVK. Peluncuran game tetap dikunci sampai Vulkan guest, display bridge, dan tes D3D11 berhasil.")
+                        .setMessage(result.getMessage() + "\n\nLog: " + result.getLogPath()
+                                + "\n\nCatatan: tahap ini hanya menyiapkan Wine dan DXVK. Peluncuran game tetap dikunci sampai Vulkan guest, display bridge, dan tes D3D11 berhasil.")
                         .setPositiveButton("OK", null)
                         .setNeutralButton("BAGIKAN LOG", (dialog, which) -> shareDiagnosticReport())
                         .show();
