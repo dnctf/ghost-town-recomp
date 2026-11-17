@@ -66,6 +66,17 @@ jobs:
             -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384" \
             -DCMAKE_BUILD_TYPE=Release
           $ANDROID_HOME/cmake/3.22.1/bin/cmake --build build-native-arm64 -j$(nproc)
+      - name: Embed verified runtime bundle into APK assets
+        run: |
+          set -euo pipefail
+          mkdir -p android/app/src/main/assets/runtime
+          BASE="https://github.com/dnctf/ghost-town-recomp/releases/download/v0.4.0-alpha.1"
+          curl -fL --retry 5 --retry-all-errors "$BASE/ghost-town-wine-runtime-arm64.tar.gz" -o android/app/src/main/assets/runtime/ghost-town-wine-runtime-arm64.tar.gz
+          curl -fL --retry 5 --retry-all-errors "$BASE/ghost-town-wine-runtime-arm64.tar.gz.sha256" -o "$RUNNER_TEMP/runtime.sha256"
+          EXPECTED="$(awk '{print $1}' "$RUNNER_TEMP/runtime.sha256")"
+          echo "$EXPECTED  android/app/src/main/assets/runtime/ghost-town-wine-runtime-arm64.tar.gz" | sha256sum -c -
+          test "$(stat -c%s android/app/src/main/assets/runtime/ghost-town-wine-runtime-arm64.tar.gz)" -gt 100000000
+
       - name: Build debug and release APK
         working-directory: android
         run: gradle assembleDebug assembleRelease --no-daemon --stacktrace
