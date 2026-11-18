@@ -301,3 +301,20 @@ The next diagnostics collection writes complete inventories to files before trun
 - Rung a PASS 0s: `Box64 arm64 v0.4.5 with Dynarec`. Rung b PASS 0s: `Wine 11.19`. Rung c PASS 0s: `wine-11.19`. Rung d FAIL/timeout 180s dengan SIGSEGV/EGL. Rung e NOT RUN karena harness berhenti pada d.
 - Harness baru menambahkan assertion output rung c `^wine-[0-9]`; rung d berjalan terpisah dengan log bertimestamp, HOME/USER/TMPDIR/WINEARCH/WINEPREFIX eksplisit, prefix writable dalam rootfs, snapshot t=15/45/90/180/600, status/wchan, dan cleanup wineserver sebelum kill process group.
 - Belum ada variasi `BOX64_DYNAREC=0`, `BOX64_LOG=0`, `WINEDEBUG=-all`, atau Xvfb. Satu run diagnostik 600 detik harus mengumpulkan bukti snapshot terlebih dahulu sebelum memilih satu variasi.
+
+
+## Run #49: extended wineboot diagnostic 600 seconds — pending dispatch
+
+- Status: **belum dijalankan**. Konfigurasi workflow manual `workflow_dispatch` sekarang memilih timeout `600` sebagai default; push-triggered runtime run tetap memakai fallback `180`.
+- Tidak ada hasil atau klasifikasi penyebab baru. Run #48 tetap menjadi bukti terakhir: rung d timeout 180 detik, SIGSEGV dan EGL init error terlihat, tetapi hubungan sebab-akibat belum terbukti.
+- Harness saat ini mencatat stdout/stderr dengan timestamp per baris, `WINEDEBUG=err+all,+timestamp,+process`, `HOME`, `USER`, `WINEARCH=win64`, `WINEPREFIX`, dan `TMPDIR` eksplisit. Rung c memeriksa stdout dengan regex `^wine-[0-9]`.
+- Snapshot dijadwalkan pada t=15/45/90/180/300/600 detik. Setiap snapshot berisi `ps --forest`, isi `/tmp` dan entri `.wine-*`, serta `/proc/<pid>/status` dan `wchan` untuk proses diagnostik.
+- Jika timeout, harness menjalankan `wineserver -k` melalui Box64, mencatat exit code cleanup, lalu menghentikan process group yang tersisa. Artifact `runtime-wine-smoke-diagnostics` diunggah dengan `if: always()`.
+- Setelah satu run dispatch 600 detik, klasifikasi harus dipilih hanya jika log mendukungnya:
+  - **wineserver tidak hidup**: tidak ada proses wineserver pada snapshot, tidak ada startup sukses/socket evidence; bila hanya tidak terlihat, tulis belum diketahui.
+  - **anak proses macet**: wineserver hidup, proses anak tetap ada, status/wchan menunjukkan menunggu tanpa progres.
+  - **hanya lambat**: proses menunjukkan progres berkelanjutan dan akhirnya keluar normal; durasi panjang saja tidak cukup.
+  - **hang dynarec**: stack/trace menunjukkan loop atau fault di jalur dynarec Box64; SIGSEGV tunggal tidak cukup.
+  - **driver display**: error EGL/GL/Vulkan berkorelasi dengan kegagalan inisialisasi/presentasi; error EGL yang muncul bersamaan belum membuktikan kausalitas.
+  - **lain/belum diketahui**: bukti tidak memenuhi kriteria di atas.
+- Setelah hasil run ini dianalisis, hentikan eksperimen. Jangan jalankan variasi dynarec/Xvfb/driver paralel atau spekulatif sebelum laporan hasil satu run selesai.
