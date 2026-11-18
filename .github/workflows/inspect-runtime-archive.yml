@@ -10,7 +10,7 @@ on:
       source_run_id:
         description: GitHub Actions run ID containing the validated runtime bundle
         required: true
-        default: '44279571506'
+        default: '44283143664'
         type: string
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ghost-town-wine-runtime-0.5.0-alpha.2-arm64-debian-bookworm
-          run-id: ${{ inputs.source_run_id || '44279571506' }}
+          run-id: ${{ inputs.source_run_id || '44283143664' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: runtime-artifact
       - name: Verify and print exact archive metadata
@@ -50,7 +50,7 @@ jobs:
           test -n "$audit_bytes"
           test "$actual_bytes" = "$audit_bytes"
           {
-            printf 'source_run_id=%s\n' "${{ inputs.source_run_id || '44279571506' }}"
+            printf 'source_run_id=%s\n' "${{ inputs.source_run_id || '44283143664' }}"
             printf 'archive_file=%s\n' "$archive"
             printf 'archive_size_bytes=%s\n' "$actual_bytes"
             printf 'archive_sha256=%s\n' "$actual_sha256"
