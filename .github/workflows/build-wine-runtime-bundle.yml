@@ -101,7 +101,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y debootstrap git cmake ninja-build build-essential \
-            file binutils libcapstone-dev curl xz-utils tar python3 pax-utils
+            file binutils libcapstone-dev curl xz-utils tar python3 pax-utils \
+            qemu-user-static binfmt-support
+          # Register the x86_64 ELF handler on this ARM64 runner before any
+          # amd64 package maintainer script is executed inside the chroot.
+          sudo modprobe binfmt_misc || true
+          if ! mountpoint -q /proc/sys/fs/binfmt_misc; then
+            sudo mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc
+          fi
+          sudo update-binfmts --enable qemu-x86_64
+          sudo update-binfmts --display qemu-x86_64
+          test -r /proc/sys/fs/binfmt_misc/qemu-x86_64
+          grep -q '^enabled' /proc/sys/fs/binfmt_misc/qemu-x86_64
       - name: Build Box64 for ARM64 glibc
         run: |
           set -euo pipefail
@@ -139,6 +150,11 @@ jobs:
             --include=ca-certificates,locales,libstdc++6,libgcc-s1,libcapstone4 \
             "$DEBIAN_SUITE" "$ROOTFS" https://deb.debian.org/debian
           sudo cp /etc/resolv.conf "$ROOTFS/etc/resolv.conf"
+          # Keep a private emulator copy in the guest root while dpkg runs.
+          # The host binfmt registration handles normal execve from maintainer scripts.
+          sudo install -D -m 0755 "$(command -v qemu-x86_64-static)" \
+            "$ROOTFS/usr/bin/qemu-x86_64-static"
+          file "$ROOTFS/usr/bin/qemu-x86_64-static"
           sudo chroot "$ROOTFS" /usr/bin/dpkg --add-architecture amd64
           sudo chroot "$ROOTFS" /usr/bin/apt-get update
           sudo chroot "$ROOTFS" /usr/bin/apt-get install -y --no-install-recommends \
@@ -186,6 +202,16 @@ jobs:
             echo "Wine has unresolved x86_64 shared-library dependencies." >&2
             exit 1
           fi
+          # Prove that Box64 can execute the pinned x86_64 Wine binary on this
+          # ARM64 runner, and record the ELF architecture of the critical payloads.
+          file "$ROOTFS/opt/wine/bin/wine" \
+            "$ROOTFS/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so" \
+            "$ROOTFS/usr/bin/glxinfo" "$ROOTFS/usr/bin/xmessage"
+          sudo chroot "$ROOTFS" /usr/local/bin/box64 /opt/wine/bin/wine --version \
+            | tee wine-box64-smoke.txt
+          grep -Eiq 'wine-11\.19|wine version 11\.19' wine-box64-smoke.txt
+          # The host binfmt path is no longer needed after package configuration.
+          sudo rm -f "$ROOTFS/usr/bin/qemu-x86_64-static"
           sudo chroot "$ROOTFS" /usr/bin/apt-get clean
           sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/locale/"*
           sudo find "$ROOTFS/usr/share/doc" -type f ! -name copyright -delete
@@ -222,7 +248,7 @@ jobs:
           mkdir -p rootfs-artifact/provenance/licenses
           cp box64-src/LICENSE rootfs-artifact/provenance/licenses/BOX64-LICENSE
           cp runtime/licenses/WINE-LICENSE runtime/licenses/WINE-COPYING.LIB runtime/licenses/WINE-NOTICES.md runtime/licenses/DXVK-LICENSE rootfs-artifact/provenance/licenses/
-          cp box64-upstream-commit.txt box64-ldd.txt wine-lddtree.txt virgl-lddtree.txt rootfs-package-manifest.txt rootfs-artifact/provenance/
+          cp box64-upstream-commit.txt box64-ldd.txt wine-lddtree.txt virgl-lddtree.txt rootfs-package-manifest.txt wine-box64-smoke.txt rootfs-artifact/provenance/
           printf 'guest_driver=virgl_dri.so\narchitecture=x86_64\nsource=Debian Bookworm libgl1-mesa-dri\ntransport=VirGL over X11/DRI3\n' > rootfs-artifact/provenance/MESA-VIRGL-BUILD-INFO.txt
           sha256sum downloads/wine.tar.xz downloads/dxvk.tar.gz > rootfs-artifact/provenance/UPSTREAM-ARCHIVE-SHA256SUMS
           printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=3.1.1\n' "$DEBIAN_SUITE" > rootfs-artifact/provenance/ROOTFS-BUILD-INFO.txt
