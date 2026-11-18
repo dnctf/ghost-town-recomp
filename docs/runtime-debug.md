@@ -272,3 +272,32 @@ The next diagnostics collection writes complete inventories to files before trun
 | c — `wine --version` | **NOT RUN** | — | Tidak ada log rung c |
 | d — `wineboot` | **NOT RUN** | — | Tidak ada log rung d |
 | e — `wine cmd /c ver` | **NOT RUN** | — | Tidak ada log rung e |
+
+
+## Run #48: rung d wineboot timeout dengan bukti SIGSEGV dan EGL
+
+- Run: [44243158612](https://github.com/dnctf/ghost-town-recomp/actions/runs/44243158612), commit `b3e012daae07e8ffd1a811a5d78b935c7cf4b1f6`, completed **failure**. Runtime rootfs job gagal pada rung d; assemble/trim dilewati.
+- Artifact smoke [runtime-wine-smoke-diagnostics](https://github.com/dnctf/ghost-town-recomp/actions/runs/44243158612/artifacts/14401010508), 6,596 bytes, SHA-256 `f049af373f7fbc90428a03848b6a28543438a734a827e016d05945a04a9421e6`.
+- Artifact build [runtime-build-diagnostics](https://github.com/dnctf/ghost-town-recomp/actions/runs/44243158612/artifacts/14400543231), 471,387 bytes, SHA-256 `b62e4f1636f9ea65c670d212d5e64fa28903ad857b18d85e98bf793e9b3ea5c2`.
+- Versi artifact: Box64 `arm64 v0.4.5` (dibangun 18 Nov 2026); Wine `11.19`. Rung c output persis `wine-11.19`; rung b output `Wine 11.19`.
+- File smoke artifact: `00-entrypoint.log`, `a-box64-version.log`, `b-x86_64-utility.log`, `c-wine-version.log`, `d-wineboot.log`, `mounts.log`, `PASSED.txt`, `STOPPED_AT.txt`.
+- `d-wineboot.log` ada: 31.257 bytes / 434 lines. `BOX64_LOG=1` output `[BOX64]` tercampur dalam file ini; tidak ada file BOX64 terpisah. Ada jejak wineserver (`posix_spawn(...wineserver...)`, `Rename process to "wineserver"`), tetapi tidak ada stdout/stderr wineserver terpisah.
+- Tidak tersimpan: snapshot proses berkala, `/proc/<pid>/status`, `wchan`, daftar isi `/tmp` saat proses hidup, log BOX64 terpisah, log wineserver terpisah, dan log rung e. Tidak ada direktori `d-snapshots/`.
+- Environment rung d lama hanya mencatat `BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all` dan `WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix`. `HOME`, `USER`, `WINEARCH`, dan `TMPDIR` tidak diset eksplisit; tidak ada assertion prefix/home writable sebelum proses.
+- Kutipan log penting (nomor baris di `d-wineboot.log`):
+  ```
+  [line 1] [RUN] rung=d-wineboot timeout_seconds=180
+  [line 56] [BOX64] posix_spawn(... "/opt/wine/lib/wine/../../bin/wineserver" ...)
+  [line 71] [BOX64] Rename process to "wineserver"
+  [line 420] err:wgl:egldrv_init_pixel_formats Failed to get any configs from eglChooseConfig
+  [line 421] err:wgl:internal_context_create Failed to create internal root context ...
+  [line 422] [BOX64] 19242|SIGSEGV ... win32u.so/parse_extensions ... for accessing (nil)
+  [line 430] [BOX64] Signal 11: si_addr=(nil) ...
+  [line 432] exit_code=124
+  [line 433] duration_seconds=180
+  ```
+- Klasifikasi bukti: **(d) SIGSEGV terlihat eksplisit** dan **(e) kegagalan inisialisasi EGL/display terlihat**. Kausalitas EGL → SIGSEGV belum terbukti. **(a) socket/izin wineserver** dan **(b) anak Wine macet** belum dapat diputuskan karena tidak ada snapshot/status/wchan. **(c) hanya lambat** tidak didukung karena SIGSEGV tercatat sebelum timeout; belum ada bukti progres hingga 180 detik.
+- Error tambahan: simbol `strunvis`, `vis`, `strvis` tidak ditemukan saat memuat `libedit.so.2`; swrast gagal dibuka dari `/usr/lib/dri/swrast_dri.so`. Ini petunjuk dependency/driver, bukan akar masalah final.
+- Rung a PASS 0s: `Box64 arm64 v0.4.5 with Dynarec`. Rung b PASS 0s: `Wine 11.19`. Rung c PASS 0s: `wine-11.19`. Rung d FAIL/timeout 180s dengan SIGSEGV/EGL. Rung e NOT RUN karena harness berhenti pada d.
+- Harness baru menambahkan assertion output rung c `^wine-[0-9]`; rung d berjalan terpisah dengan log bertimestamp, HOME/USER/TMPDIR/WINEARCH/WINEPREFIX eksplisit, prefix writable dalam rootfs, snapshot t=15/45/90/180/600, status/wchan, dan cleanup wineserver sebelum kill process group.
+- Belum ada variasi `BOX64_DYNAREC=0`, `BOX64_LOG=0`, `WINEDEBUG=-all`, atau Xvfb. Satu run diagnostik 600 detik harus mengumpulkan bukti snapshot terlebih dahulu sebelum memilih satu variasi.

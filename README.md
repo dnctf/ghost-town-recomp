@@ -8,7 +8,7 @@ Ghost Town Recomp adalah proyek launcher Android dan riset runtime untuk menjala
 
 | Gerbang | Status | Bukti CI | Emulator | MatePad Air 2023 |
 |---|---|---|---|---|
-| **R — Runtime CI** | **Gagal / belum hijau** | Run [#44242702116](https://github.com/dnctf/ghost-town-recomp/actions/runs/44242702116) gagal pada validasi `/lib` setelah ekstraksi paket; perbaikan staging diuji pada [run #44243158612](https://github.com/dnctf/ghost-town-recomp/actions/runs/44243158612) (masih berjalan saat README diperbarui) | Belum diuji | Belum diuji |
+| **R — Runtime CI** | **Gagal / belum hijau** | Run [#44243158612](https://github.com/dnctf/ghost-town-recomp/actions/runs/44243158612): a–c PASS; d `wineboot` timeout 180s dengan SIGSEGV/EGL; e NOT RUN. Harness diagnostik diperkuat; menunggu dispatch 600s | Belum diuji | Belum diuji |
 | **P — Runtime pack & installer** | **Belum diuji; manifest pending** | Belum ada archive runtime terverifikasi atau asset release | Belum diuji terhadap archive nyata | Belum diuji |
 | **D — Display X11/VirGL** | **Belum diuji** | Belum ada self-test window/GLX/frame yang lolos | Belum diuji | Belum diuji |
 | **G — Game** | **Belum diuji** | Belum ada D3D11/game/audio/input/stability evidence | Belum diuji | Belum diuji |
@@ -21,13 +21,13 @@ Run [UI Preview #44238289772](https://github.com/dnctf/ghost-town-recomp/actions
 - Dashboard demo, halaman Runtime, Library (pemilih folder SAF), dan Settings telah dikompilasi serta melewati lint di CI. Empat unit test Play launch policy lulus.
 - **Play gate nyata** membaca status instalasi dari `RuntimeBundleInstaller.isInstalled()` dan marker display `filesDir/runtime/display/GHOST_TOWN_DISPLAY_READY` dengan isi persis `GHOST_TOWN_DISPLAY_READY=1`. Preview tidak membuat marker; Play tetap diblokir sampai self-test display sungguhan menulis marker tersebut.
 - Pipeline runtime CI telah berhasil membangun Box64 ARM64 di container Debian Bookworm. Pemeriksaan simbol mencatat kebutuhan maksimum Box64 `GLIBC_2.35`, sementara rootfs Bookworm menggunakan glibc `2.36`; pemeriksaan kompatibilitas ini lulus pada run #46.
-- Bootstrap rootfs, download/extract paket amd64, validasi Wine ELF/dependency, dan verifikasi glibc lulus pada run #46. Smoke runner gagal sebelum menjalankan rung pertama; karena itu belum ada rung a-e yang dapat dinyatakan lulus.
+- Bootstrap rootfs, download/extract paket amd64, validasi Wine ELF/dependency, dan verifikasi glibc lulus pada run #48. Run #48 membuktikan Box64 `v0.4.5`, Wine `11.19`, dan rung a–c PASS pada rootfs untrimmed. Rung d `wineboot` timeout setelah 180 detik; log memuat kegagalan EGL dan SIGSEGV di `win32u.so/parse_extensions`. Rung e belum dijalankan.
 
 ## Yang belum berfungsi / belum terbukti
 
 - Runtime pack belum dibangun, belum memiliki URL/ukuran/SHA-256 final, dan belum dipublikasikan. `runtime/manifest.json` tetap `runtime_pack.status = pending`.
 - Pengunduh/installer belum diuji terhadap archive runtime nyata end-to-end (resume, retry, checksum, ekstraksi atomik, pemulihan instalasi rusak, dan low-storage).
-- Wine belum lulus smoke ladder a-e. Belum ada X11 window, GLX renderer, VirGL visible frame, D3D11 frame, atau marker display-ready.
+- Wine belum lulus smoke ladder a-e: a–c PASS di CI, d timeout dengan SIGSEGV/EGL, e NOT RUN. Belum ada X11 window, GLX renderer, VirGL visible frame, D3D11 frame, atau marker display-ready.
 - Peluncuran Overcooked! 2, input sentuh/keyboard/gamepad ke Wine, audio game, pause/resume, crash recovery, FPS, RAM, suhu, dan sesi stabil 15 menit belum diuji.
 - Fitur **Ekspor diagnostik ZIP** belum tersedia.
 - Tidak ada pengujian emulator atau pengujian fisik Huawei MatePad Air 2023 yang diklaim.

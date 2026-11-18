@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/build-wine-runtime-bundle.yml'
       - 'runtime/**'
+      - '!runtime/scripts/ci-wine-smoke.sh'
       - 'runtime/rootfs/packages-amd64.txt'
       - 'tools/audit_runtime_tree.py'
       - 'tools/validate_runtime_archive.py'
@@ -22,6 +22,12 @@ on:
         required: true
         default: 7fab05334445948c918281b54f2a604ff63337f7
         type: string
+      wineboot_timeout_seconds:
+        description: Diagnostic wineboot timeout; choose 600 for the extended diagnostic run
+        required: true
+        default: '180'
+        type: choice
+        options: ['180', '600']
 
 permissions:
   contents: read
@@ -105,6 +111,7 @@ jobs:
     env:
       DEBIAN_SUITE: ${{ inputs.debian_suite || 'bookworm' }}
       WINE_SHA256: 40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e
+      WINEBOOT_TIMEOUT_SECONDS: ${{ inputs.wineboot_timeout_seconds || '180' }}
       ROOTFS: ${{ github.workspace }}/rootfs-artifact/rootfs
     steps:
       - name: Checkout repository
@@ -290,7 +297,7 @@ jobs:
         run: |
           source runtime/scripts/ci-diagnostics.sh 06-smoke-wine-untrimmed-rootfs
           mkdir -p runtime-smoke
-          bash runtime/scripts/ci-wine-smoke.sh "$ROOTFS" runtime-smoke
+          bash runtime/scripts/ci-wine-smoke.sh "$ROOTFS" runtime-smoke "$WINEBOOT_TIMEOUT_SECONDS"
       - name: Upload untrimmed Wine smoke diagnostics
         if: always()
         uses: actions/upload-artifact@v4
