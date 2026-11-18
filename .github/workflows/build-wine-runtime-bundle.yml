@@ -316,6 +316,9 @@ jobs:
           tar --numeric-owner --xattrs --acls -czf ghost-town-wine-runtime-arm64.tar.gz -C "$OUT" .
           sha256sum ghost-town-wine-runtime-arm64.tar.gz > ghost-town-wine-runtime-arm64.tar.gz.sha256
           du -h ghost-town-wine-runtime-arm64.tar.gz
+          python3 tools/audit_runtime_tree.py "$OUT" | tee runtime-tree-size-audit.txt
+          printf '\\nARCHIVE_BYTES=' >> runtime-tree-size-audit.txt
+          stat -c '%s' ghost-town-wine-runtime-arm64.tar.gz >> runtime-tree-size-audit.txt
       - name: Upload complete runtime bundle
         uses: actions/upload-artifact@v4
         with:
@@ -323,6 +326,7 @@ jobs:
           path: |
             ghost-town-wine-runtime-arm64.tar.gz
             ghost-town-wine-runtime-arm64.tar.gz.sha256
+            runtime-tree-size-audit.txt
           if-no-files-found: error
           retention-days: 30
       - name: Attach runtime bundle to v0.5.0-alpha.2 pre-release
