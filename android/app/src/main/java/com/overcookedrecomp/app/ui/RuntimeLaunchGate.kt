@@ -22,7 +22,7 @@ object RuntimeLaunchGate {
 
     fun read(context: Context): Snapshot {
         val marker = File(context.filesDir, DISPLAY_MARKER)
-        val displayReady = marker.isFile && marker.readText().trim() == "1"
+        val displayReady = marker.isFile && marker.readText().trim() == "$DISPLAY_READY_ENV=1"
         return Snapshot(
             runtimeInstalled = runCatching { RuntimeBundleInstaller.isInstalled(context) }.getOrDefault(false),
             displaySelfTestPassed = displayReady,
