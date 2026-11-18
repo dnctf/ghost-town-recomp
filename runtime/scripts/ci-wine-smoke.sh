@@ -33,6 +33,17 @@ for mount_path in "$ROOTFS/dev" "$ROOTFS/dev/pts" "$ROOTFS/proc" "$ROOTFS/sys" "
   mountpoint -q "$mount_path" || { echo "[FAIL] required chroot mount is missing: $mount_path" | tee "$LOG_DIR/mounts.log"; exit 1; }
 done
 { echo "### active chroot mounts"; findmnt -R "$ROOTFS" || true; echo "### required mountpoint assertions"; for mount_path in "$ROOTFS/dev" "$ROOTFS/dev/pts" "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/tmp/.X11-unix"; do mountpoint "$mount_path"; done; echo "DISPLAY=:99"; ps -p "$XVFB_PID" -o pid,pgid,stat,args; } | tee "$LOG_DIR/mounts.log"
+# Keep the guest dynamic-loader search configuration explicit for multiarch x86_64 payloads.
+sudo install -d "$ROOTFS/etc/ld.so.conf.d"
+sudo tee "$ROOTFS/etc/ld.so.conf.d/ghost-town-x86_64.conf" >/dev/null <<'EOF'
+/lib/x86_64-linux-gnu
+/usr/lib/x86_64-linux-gnu
+/opt/wine/lib
+/opt/wine/lib64
+/opt/wine/lib/wine/x86_64-unix
+EOF
+if [ -x "$ROOTFS/sbin/ldconfig" ]; then sudo chroot "$ROOTFS" /sbin/ldconfig; fi
+
 find_entry() {
   local name="$1" candidate
   candidate="$(find "$ROOTFS/opt/wine/bin" -maxdepth 1 \( -type f -o -type l \) -name "$name" -print -quit)"
@@ -52,8 +63,10 @@ run_rung() {
   { echo "[RUN] rung=$rung timeout_seconds=$limit"; echo "environment: BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all"; printf 'command='; printf '%q ' "$@"; echo; } | tee "$log"
   set +e
   timeout --signal=TERM --kill-after=10s "$limit"s sudo chroot "$ROOTFS" env \
-    BOX64_LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib \
-    BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all DISPLAY=:99 FONTCONFIG_FILE=/etc/fonts/fonts.conf HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix "$@" >> "$log" 2>&1
+    BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
+      BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
+      LIBGL_ALWAYS_SOFTWARE=1 \
+    BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all DISPLAY=:99 WAYLAND_DISPLAY= FONTCONFIG_FILE=/etc/fonts/fonts.conf LIBGL_ALWAYS_SOFTWARE=1 BOX64_PRELOAD=libmd.so.0:libbsd.so.0 HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix "$@" >> "$log" 2>&1
   rc=$?
   set -e
   end="$(date +%s)"; elapsed=$((end-start))
@@ -94,13 +107,15 @@ run_wineboot_d() {
   {
     echo "[RUN] rung=d-wineboot timeout_seconds=$limit"
     echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "environment: BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all,+timestamp,+process HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix TMPDIR=/tmp DISPLAY=<unset> WAYLAND_DISPLAY=<unset>"
+    echo "environment: BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib BOX64_PRELOAD=libmd.so.0:libbsd.so.0 LIBGL_ALWAYS_SOFTWARE=1 DISPLAY=:99 WAYLAND_DISPLAY=<empty> FONTCONFIG_FILE=/etc/fonts/fonts.conf WINEDEBUG=err+all,+timestamp,+process"
     echo "command=sudo chroot ROOTFS env ... box64 $WINEBOOT_ENTRY"
   } | tee "$log"
   setsid --wait bash -o pipefail -c '
     rootfs="$1"; entry="$2"; logfile="$3"; wineserver_entry="$4"
     sudo chroot "$rootfs" env \
-      BOX64_LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib \
+      BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
+      BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
+      LIBGL_ALWAYS_SOFTWARE=1 \
       BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all,+timestamp,+process \
       HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke TMPDIR=/tmp \
       WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix WINEDLLOVERRIDES=mscoree,mshtml= \
@@ -110,7 +125,9 @@ run_wineboot_d() {
     rc=$?
     if [ "$rc" -eq 0 ]; then
       sudo chroot "$rootfs" env \
-        BOX64_LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib \
+        BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
+      BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
+      LIBGL_ALWAYS_SOFTWARE=1 \
         HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke \
         WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix \
         DISPLAY=:99 FONTCONFIG_FILE=/etc/fonts/fonts.conf \
@@ -136,7 +153,9 @@ run_wineboot_d() {
     {
       echo "[CLEANUP] wineserver -k via Box64 timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
       timeout --signal=TERM --kill-after=3s 15s sudo chroot "$ROOTFS" env \
-        BOX64_LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib \
+        BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
+      BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
+      LIBGL_ALWAYS_SOFTWARE=1 \
         BOX64_LOG=1 BOX64_SHOWSEGV=1 HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke \
         WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix /usr/local/bin/box64 "$WINESERVER_ENTRY" -k
       echo "wineserver_kill_exit_code=$?"
