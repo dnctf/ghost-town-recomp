@@ -28,7 +28,7 @@ class ReportTests(unittest.TestCase):
   x=self.run_report({},'{"android-build":{"result":"success"}}',workflow="Ghost Town Android APK",api_status="ok",run=run,api_jobs=jobs)
   self.assertIn("N/A (tidak berlaku untuk workflow ini)",x)
   self.assertIn("Runtime archive: N/A (tidak berlaku)",x)
-  self.assertIn("Rootfs sebelum/sesudah trim: N/A (tidak berlaku)",x
+  self.assertIn("Rootfs sebelum/sesudah trim: N/A (tidak berlaku)",x)
   self.assertNotIn("| a | box64 --version | TIDAK TERSEDIA | TIDAK TERSEDIA | NOT RUN |",x)
   self.assertIn("durasi total 1m 0s (60s)",x)
   self.assertIn("50s (50s)",x)
