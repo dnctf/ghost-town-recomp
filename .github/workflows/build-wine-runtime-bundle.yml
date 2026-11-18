@@ -99,7 +99,7 @@ jobs:
           header.write_text(source)
           print("Enabled libbsd wrappers: strunvis, strvis, vis")
           PY
-            (cd box64-src && python3 rebuild_wrappers.py . --)
+            (cd box64-src && python3 rebuild_wrappers.py . -- src/wrapped/*_private.h)
             grep -q 'GO(strunvis, iFpp)' box64-src/src/wrapped/wrappedlibbsd_private.h
             grep -q 'GO(strvis, iFppi)' box64-src/src/wrapped/wrappedlibbsd_private.h
             grep -q 'GO(vis, pFpiii)' box64-src/src/wrapped/wrappedlibbsd_private.h
