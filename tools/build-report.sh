@@ -126,7 +126,7 @@ prev_run = env("REPORT_PREVIOUS_APK_RUN")
 if apk_release is not None and prev_release is not None:
     delta = apk_release - prev_release
     delta_text = f"{delta:+,} byte vs run {prev_run} (current {apk_release:,}; previous {prev_release:,})"
-else: delta_text = "TIDAK TERSEDIA (APK audit/baseline sebelumnya tidak ditemukan)"
+else: delta_text = "TIDAK TERSEDIA (APK audit current atau baseline sukses sebelumnya tidak ditemukan)"
 apk_hash = pick(r"SHA256=([^\s]+)", release_audit)
 if apk_hash == "TIDAK TERSEDIA":
     apk_hash = pick(r"([0-9a-f]{64})\s+android/app/build/outputs/apk/release/[^\s]+", release_audit)
