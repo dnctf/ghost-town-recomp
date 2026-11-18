@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.BatteryManager
 import android.os.Bundle
 import android.os.PowerManager
-import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
@@ -33,10 +32,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -45,18 +46,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextAlign
 import androidx.documentfile.provider.DocumentFile
 import com.overcookedrecomp.app.ui.theme.GhostTownColors as C
 import com.overcookedrecomp.app.ui.theme.GhostTownSpace
@@ -80,11 +75,11 @@ private val demoGames = listOf(
 class DashboardActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.decorView.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-        )
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).let { controller ->
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
         setContent { GhostTownTheme { ConsoleDashboard() } }
     }
 }
@@ -98,6 +93,8 @@ private fun ConsoleDashboard() {
     var tabsFocused by remember { mutableStateOf(false) }
     var detailsOpen by remember { mutableStateOf(false) }
     var contextMenuOpen by remember { mutableStateOf(false) }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     var reduceMotion by remember { mutableStateOf(false) }
     var uiScale by remember { mutableFloatStateOf(1f) }
     var uiSounds by remember { mutableStateOf(false) }
@@ -112,7 +109,6 @@ private fun ConsoleDashboard() {
         Notice(2, "RUNTIME PENDING", "Pemasangan belum tersedia")
     )) }
     var nextNoticeId by remember { mutableIntStateOf(3) }
-    var swipeOffset by remember { mutableFloatStateOf(0f) }
     val selected = demoGames[selectedIndex.coerceIn(0, demoGames.lastIndex)]
     val playState = PlayLaunchPolicy.resolve(gate.runtimeInstalled, gate.displaySelfTestPassed)
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -155,8 +151,9 @@ private fun ConsoleDashboard() {
     }
     val rootFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { rootFocusRequester.requestFocus() } }
-    BackHandler(enabled = detailsOpen || contextMenuOpen || activeTab != DashboardTab.GAMES) {
+    BackHandler(enabled = detailsOpen || contextMenuOpen || searchOpen || activeTab != DashboardTab.GAMES) {
         when {
+            searchOpen -> searchOpen = false
             contextMenuOpen -> contextMenuOpen = false
             detailsOpen -> detailsOpen = false
             else -> activeTab = DashboardTab.GAMES
@@ -174,7 +171,7 @@ private fun ConsoleDashboard() {
     Box(
         Modifier.fillMaxSize().background(C.Storm)
             .focusRequester(rootFocusRequester).focusable().onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                if (event.type != KeyEventType.KeyDown || searchOpen) return@onPreviewKeyEvent false
                 when (event.key) {
                     Key.DirectionLeft -> {
                         if (tabsFocused || activeTab != DashboardTab.GAMES) {
@@ -200,7 +197,7 @@ private fun ConsoleDashboard() {
                         tabsFocused = false
                         true
                     }
-                    Key.ButtonY -> { activeTab = DashboardTab.LIBRARY; tabsFocused = true; true }
+                    Key.ButtonY, Key.Y -> { searchOpen = true; tabsFocused = false; true }
                     Key.Menu -> { contextMenuOpen = true; true }
                     else -> false
                 }
@@ -225,8 +222,8 @@ private fun ConsoleDashboard() {
                         onLongSelect = { selectedIndex = it; contextMenuOpen = true },
                         onAddGame = { picker.launch(null); activeTab = DashboardTab.LIBRARY },
                         onRuntime = { activeTab = DashboardTab.RUNTIME },
+                        onSearch = { searchOpen = true },
                         selected = selected,
-                        playState = playState,
                         onDetails = { detailsOpen = true }
                     )
                     DashboardTab.LIBRARY -> LibraryScreen(
@@ -270,6 +267,37 @@ private fun ConsoleDashboard() {
                     onClose = { detailsOpen = false }
                 )
             }
+        }
+        if (searchOpen) {
+            val matches = demoGames.withIndex().filter { it.value.title.contains(searchQuery, ignoreCase = true) }
+            AlertDialog(
+                onDismissRequest = { searchOpen = false },
+                containerColor = C.Surface,
+                title = { Text("Cari game DEMO", color = C.TextPrimary) },
+                text = {
+                    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            singleLine = true,
+                            label = { Text("Nama game") }
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        matches.forEach { match ->
+                            TextButton(onClick = {
+                                selectedIndex = match.index
+                                activeTab = DashboardTab.GAMES
+                                searchOpen = false
+                                detailsOpen = true
+                            }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                Text(match.value.title, color = C.TextPrimary)
+                            }
+                        }
+                        if (matches.isEmpty()) Text("Tidak ada game DEMO yang cocok.", color = C.TextMuted, fontSize = 11.sp)
+                    }
+                },
+                confirmButton = { TextButton(onClick = { searchOpen = false }) { Text("TUTUP") } }
+            )
         }
         if (contextMenuOpen) {
             AlertDialog(
@@ -360,7 +388,6 @@ private fun GamesHome(
     onAddGame: () -> Unit,
     onRuntime: () -> Unit,
     selected: DemoGame,
-    playState: PlayLaunchState,
     onDetails: () -> Unit
 ) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
@@ -406,7 +433,7 @@ private fun GamesHome(
                 }
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("CARI  Y", color = C.TextSecondary, fontSize = 10.sp)
+                TextButton(onClick = onSearch, modifier = Modifier.heightIn(min = 48.dp)) { Text("CARI  Y", color = C.TextSecondary, fontSize = 10.sp) }
                 Button(onClick = onDetails, colors = ButtonDefaults.buttonColors(containerColor = C.Accent, contentColor = C.Storm), modifier = Modifier.heightIn(min = 48.dp)) {
                     Text("DETAIL GAME  →", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }

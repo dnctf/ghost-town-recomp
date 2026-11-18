@@ -103,6 +103,30 @@ jobs:
         working-directory: android
         run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon --stacktrace
 
+      - name: Summarize Play-state unit-test results
+        run: |
+          python3 - <<'PY'
+          import glob
+          import sys
+          import xml.etree.ElementTree as ET
+          files = glob.glob("android/app/build/test-results/testDebugUnitTest/TEST-*.xml")
+          if not files:
+              raise SystemExit("No JUnit XML test results found")
+          total = failures = errors = skipped = 0
+          for path in files:
+              root = ET.parse(path).getroot()
+              total += int(root.attrib.get("tests", 0))
+              failures += int(root.attrib.get("failures", 0))
+              errors += int(root.attrib.get("errors", 0))
+              skipped += int(root.attrib.get("skipped", 0))
+          print(f"PLAY_STATE_TESTS_TOTAL={total}")
+          print(f"PLAY_STATE_TESTS_FAILURES={failures}")
+          print(f"PLAY_STATE_TESTS_ERRORS={errors}")
+          print(f"PLAY_STATE_TESTS_SKIPPED={skipped}")
+          if total < 4 or failures or errors:
+              sys.exit(1)
+          PY
+
       - name: Audit APK contents and compare package size
         id: apk-audit
         run: |
@@ -139,6 +163,8 @@ jobs:
             native-libraries.txt
             proot-native-sha256.txt
             proot-upstream-commit.txt
+            android/app/build/test-results/testDebugUnitTest/
+            android/app/build/reports/lint-results-debug.html
             docs/design-tokens.md
             docs/ui-preview.md
           if-no-files-found: error

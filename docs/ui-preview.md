@@ -31,7 +31,7 @@ The APK is signed with the standard Android debug signing configuration and is i
 
 The isolated `.github/workflows/ui-preview.yml` workflow is triggered only by UI/app source paths, UI docs, and itself, or manually with `workflow_dispatch`. It does not depend on, download from, or wait for the runtime workflow. It runs:
 
-- `:app:testDebugUnitTest` — Play launch policy (Ready / Blocked / Processing).
+- `:app:testDebugUnitTest` — Play launch policy (Ready / Blocked / Processing); JUnit XML summary is included in the artifact.
 - `:app:lintDebug`.
 - `:app:assembleDebug`.
 - APK ZIP inventory, size comparison, and `EMBEDDED_RUNTIME_PARTS=0` assertion.
@@ -60,7 +60,7 @@ whose exact content must be `GHOST_TOWN_DISPLAY_READY=1`. This preview does not 
 The CI job builds the ARM64 APK and runs JVM unit tests/lint, but it does not launch an ARM64 emulator or capture an emulator screenshot. No screenshot is represented as a device capture. Capture one on the target tablet with:
 
 ```bash
-adb shell am start -n com.overcookedrecomp.app.uipreview/.ui.DashboardActivity
+adb shell monkey -p com.overcookedrecomp.app.uipreview 1
 adb shell screencap -p /sdcard/ghost-town-ui-preview.png
 adb pull /sdcard/ghost-town-ui-preview.png .
 ```
@@ -78,3 +78,8 @@ Task :app:compileDebugKotlin FAILED
 ```
 
 The input handler now maps Compose `Key` values directly (D-pad, A/B/Y, Enter/Escape, Menu), avoiding the unavailable Android-specific `nativeKeyEvent` extension and supporting explicit up/down focus-zone movement.
+
+
+### Size note from preview build
+
+The first complete UI Preview build measured 28,964,663 bytes (about 27.62 MiB), compared with the pre-UI debug APK baseline of 13,135,290 bytes. The measured increase is 15,829,373 bytes (+120.51%). The APK remains free of embedded runtime parts (`EMBEDDED_RUNTIME_PARTS=0`); the size increase is primarily the added Compose UI stack. Compose tooling-only dependencies were removed from the preview build to avoid shipping preview tooling.
