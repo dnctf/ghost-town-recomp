@@ -165,7 +165,8 @@ object WineRuntimeBridge {
                 .apply {
                     environment()["HOME"] = "/root"
                     environment()["BOX64_LD_LIBRARY_PATH"] =
-                        "/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib"
+                        "/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib"
+                    environment()["BOX64_PRELOAD"] = "libmd.so.0:libbsd.so.0"
                     environment()["PROOT_LOADER"] = l.prootLoader.absolutePath
                     environment()["PROOT_NO_SECCOMP"] = "1"
                 }
