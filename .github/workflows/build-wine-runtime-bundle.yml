@@ -193,6 +193,14 @@ jobs:
         run: |
           source runtime/scripts/ci-diagnostics.sh 05-trim-package-rootfs
           sudo du -sb "$ROOTFS" > rootfs-size-before-trim.txt
+          sudo readelf -l "$ROOTFS/usr/bin/apt-get" | grep -F 'Requesting program interpreter' | tee apt-get-interpreter.txt
+          {
+            for loader in /lib/ld-linux-aarch64.so.1 /usr/lib/ld-linux-aarch64.so.1 /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1; do
+              echo "### $loader"
+              sudo ls -l "$ROOTFS$loader" 2>&1 || true
+              sudo test -e "$ROOTFS$loader" && echo "exists" || echo "missing"
+            done
+          } | tee apt-get-loader-paths.txt
           sudo chroot "$ROOTFS" /usr/bin/apt-get -o Dpkg::Use-Pty=0 clean
           sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/info/"*
           sudo rm -rf "$ROOTFS/var/cache/"*

@@ -135,3 +135,18 @@ The next diagnostics collection writes complete inventories to files before trun
 - Chroot smoke owns its mount lifecycle: bind-mount `/dev` and `/dev/pts`, mount `/proc` and `/sys`, log `findmnt -R` before tests and after cleanup, and unmount in an EXIT trap.
 - Per-rung timeouts are a/b 30s, c 60s, d/e 180s. Each rung logs command, diagnostic environment, exit code, and elapsed seconds. The ladder stops at the first failed rung. Rung d runs `wineboot` with a fresh temporary prefix and `WINEDLLOVERRIDES=mscoree,mshtml=`.
 - The assemble-stage rootfs size measurements also use sudo because extracted root-owned directories are not readable by the runner user.
+
+
+## Run after Run #38 fix: chroot apt-get cleanup failure
+
+- Run: [44228629627](https://github.com/dnctf/ghost-town-recomp/actions/runs/44228629627), commit `74472ecf8983b14005a77bdb5c9830be33ba2f58`, completed **failure**.
+- Native runner assertion passed (the step `Verify native ARM64 runner and record CPU` completed successfully). Box64 build succeeded and uploaded its artifact. Rootfs bootstrap, package download/extraction, and Wine/ELF/dependency plus advisory graphics validation passed.
+- The previous `du` permission failure is fixed: log now shows `sudo du -sb "$ROOTFS"` succeeded.
+- New failure is at trim stage line 3:
+  ```
+  + ...:3:main: sudo chroot "$ROOTFS" /usr/bin/apt-get -o Dpkg::Use-Pty=0 clean
+  chroot: failed to run command ‘/usr/bin/apt-get’: No such file or directory
+  [ERROR] stage=05-trim-package-rootfs line=3 exit_code=127 command=sudo chroot "$ROOTFS" /usr/bin/apt-get -o Dpkg::Use-Pty=0 clean
+  ```
+- The diagnostic inventory confirms `$ROOTFS/usr/bin/apt-get` exists as a regular executable (mode 0755, 67,832 bytes). Thus the chroot message does **not** prove the file itself is absent; an ELF interpreter/runtime-loader resolution problem is a leading hypothesis, not yet confirmed.
+- The next instrumentation records `readelf -l`'s requested interpreter and checks the expected ARM64 loader paths before this command. No Wine smoke rung ran; assemble was skipped. No standalone Wine experiment is justified yet.
