@@ -137,7 +137,8 @@ object WineRuntimeSession {
                     env["WINEPREFIX"] = GUEST_PREFIX
                     env["WINEARCH"] = "win64"
                     env["WINEDEBUG"] = "-all"
-                    env["BOX64_LD_LIBRARY_PATH"] = "/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib"
+                    env["BOX64_LD_LIBRARY_PATH"] = "/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib"
+                    env["BOX64_PRELOAD"] = "libmd.so.0:libbsd.so.0"
                     env["PROOT_LOADER"] = loader.absolutePath
                     env["PROOT_NO_SECCOMP"] = "1"
                     env["PATH"] = "/usr/local/bin:/usr/bin:/bin"
