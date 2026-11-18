@@ -639,7 +639,13 @@ jobs:
           sudo du -sb "$OUT/rootfs" > runtime-tree-size-after-strip.txt
           cp runtime-strip-failures.txt runtime-tree-size-before-strip.txt runtime-tree-size-after-strip.txt "$OUT/provenance/"
           file "$OUT/rootfs/usr/local/bin/box64" "$OUT/rootfs/opt/wine/bin/wine"
-          (cd "$OUT" && sha256sum \\\n  rootfs/usr/local/bin/box64 \\\n  rootfs/opt/wine/bin/wine \\\n  rootfs/usr/lib/x86_64-linux-gnu/dri/virtio_gpu_dri.so \\\n  rootfs/usr/bin/glxinfo \\\n  rootfs/usr/bin/xmessage \\\n  > provenance/RUNTIME-SHA256SUMS)
+          (cd "$OUT" && sha256sum \
+  rootfs/usr/local/bin/box64 \
+  rootfs/opt/wine/bin/wine \
+  rootfs/usr/lib/x86_64-linux-gnu/dri/virtio_gpu_dri.so \
+  rootfs/usr/bin/glxinfo \
+  rootfs/usr/bin/xmessage \
+  > provenance/RUNTIME-SHA256SUMS)
           tar --numeric-owner --xattrs --acls -czf ghost-town-wine-runtime-arm64.tar.gz -C "$OUT" .
           sha256sum ghost-town-wine-runtime-arm64.tar.gz > ghost-town-wine-runtime-arm64.tar.gz.sha256
           python3 tools/validate_runtime_archive.py ghost-town-wine-runtime-arm64.tar.gz
