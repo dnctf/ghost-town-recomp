@@ -1,0 +1,92 @@
+name: Activate Validated Runtime Manifest
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/activate-runtime-manifest.yml'
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Successful runtime build run ID
+        required: true
+        default: '44279571506'
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  activate:
+    name: Activate manifest from verified public runtime release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SOURCE_RUN_ID: ${{ inputs.source_run_id || '44279571506' }}
+      RUNTIME_URL: https://github.com/dnctf/ghost-town-recomp/releases/download/runtime-v0.5.0-alpha.2/ghost-town-wine-runtime-arm64.tar.gz
+      EXPECTED_SIZE: '354498740'
+      EXPECTED_SHA256: 9d4e17f055736c0113db1dcb355c619332a1479e84e2ca43f4fde64cc0f5c6a3
+      EXPECTED_EXPANDED_SIZE: '1541353546'
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Download validated runtime artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ghost-town-wine-runtime-0.5.0-alpha.2-arm64-debian-bookworm
+          run-id: ${{ inputs.source_run_id || '44279571506' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: runtime-artifact
+      - name: Verify archive and update manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd runtime-artifact
+          archive=ghost-town-wine-runtime-arm64.tar.gz
+          checksum=ghost-town-wine-runtime-arm64.tar.gz.sha256
+          sha256sum -c "$checksum"
+          test "$(stat -c '%s' "$archive")" = "$EXPECTED_SIZE"
+          test "$(sha256sum "$archive" | awk '{print $1}')" = "$EXPECTED_SHA256"
+          cd "$GITHUB_WORKSPACE"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path("runtime/manifest.json")
+          data = json.loads(path.read_text())
+          pack = data["runtime_pack"]
+          pack.update({
+              "status": "published",
+              "url": os.environ["RUNTIME_URL"],
+              "size_bytes": int(os.environ["EXPECTED_SIZE"]),
+              "sha256": os.environ["EXPECTED_SHA256"],
+              "expanded_size_bytes": int(os.environ["EXPECTED_EXPANDED_SIZE"]),
+              "note": "Public pre-release asset published and verified. Wine smoke rungs A-E passed in CI; Android target graphics, audio/input and game launch remain unvalidated."
+          })
+          data["components"]["box64"]["status"] = "Pinned Box64 v0.4.5 ARM64 binary reused from CI cache; Wine smoke rungs A-E passed on Debian Bookworm; device dynarec validation pending"
+          data["components"]["wine"]["status"] = "Wine 11.19 amd64 archive SHA-256 pinned; Wine smoke rungs A-E passed on Debian Bookworm CI; Android device and game validation pending"
+          path.write_text(json.dumps(data, indent=2) + "\\n")
+          print("Activated runtime manifest with verified public release metadata")
+          PY
+      - name: Run runtime manifest and archive validator unit tests
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/tests -p 'test_runtime_manifest.py' -v
+          python3 -m unittest discover -s tools/tests -p 'test_validate_runtime_archive.py' -v
+          python3 tools/validate_runtime_archive.py runtime-artifact/ghost-town-wine-runtime-arm64.tar.gz
+          git diff --check
+      - name: Commit and push manifest activation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add runtime/manifest.json
+          git commit -m "chore(runtime): activate verified 0.5.0-alpha.2 runtime pack"
+          git push origin HEAD:main
