@@ -168,13 +168,35 @@ jobs:
         run: |
           source runtime/scripts/ci-diagnostics.sh 03-extract-runtime-payloads
           : > rootfs-package-manifest-amd64.txt
+          EXTRACT_TMP="$RUNNER_TEMP/amd64-package-extract"
+          sudo rm -rf "$EXTRACT_TMP"
+          sudo mkdir -p "$EXTRACT_TMP"
           for deb in "$ROOTFS"/var/cache/apt/archives/*.deb; do
             [ -f "$deb" ] || continue
             architecture="$(dpkg-deb -f "$deb" Architecture)"
             if [ "$architecture" = "amd64" ] || [ "$architecture" = "all" ]; then
-              sudo dpkg-deb -x "$deb" "$ROOTFS"
+              package="$(dpkg-deb -f "$deb" Package)"
+              version="$(dpkg-deb -f "$deb" Version)"
+              printf '%s:%s=%s\n' "$package" "$architecture" "$version" >> rootfs-package-manifest-amd64.txt
+              sudo rm -rf "$EXTRACT_TMP"
+              sudo mkdir -p "$EXTRACT_TMP"
+              sudo dpkg-deb -x "$deb" "$EXTRACT_TMP"
+              if [ -L "$EXTRACT_TMP/lib" ]; then
+                echo "[FAIL] package=$package ships a top-level /lib symlink; refusing to alter usr-merged rootfs." | tee -a rootfs-package-extraction.log
+                exit 1
+              fi
+              if [ -d "$EXTRACT_TMP/lib" ]; then
+                echo "[INFO] package=$package remap=/lib/* -> /usr/lib/* to preserve usr-merge." | tee -a rootfs-package-extraction.log
+                sudo mkdir -p "$ROOTFS/usr/lib"
+                sudo cp -a "$EXTRACT_TMP/lib/." "$ROOTFS/usr/lib/"
+                sudo rm -rf "$EXTRACT_TMP/lib"
+              fi
+              sudo cp -a "$EXTRACT_TMP/." "$ROOTFS/"
+              sudo test -L "$ROOTFS/lib"
+              test "$(sudo readlink "$ROOTFS/lib")" = "usr/lib"
             fi
           done
+          sudo rm -rf "$EXTRACT_TMP"
           sudo cp -a "$ROOTFS/var/cache/apt/archives/." "$RUNNER_TEMP/apt-cache/archives/" 2>/dev/null || true
           sudo mkdir -p "$ROOTFS/opt/wine"
           mkdir wine-extract
@@ -347,7 +369,7 @@ jobs:
         run: |
           set +e
           mkdir -p logs runtime-failure-logs
-          for f in apt-get-download.log apt-get-elf-header.txt apt-get-elf-program-headers.txt apt-get-loader-paths.txt rootfs-usrmerge-before-amd64.txt rootfs-usrmerge-after-amd64.txt rootfs-symlinks-after-amd64.txt rootfs-symlinks-before-loader-fix.txt box64-ccache-stats.txt box64-ldd.txt box64-build-glibc.txt box64-glibc-symbols.txt box64-glibc-symbols-rootfs-check.txt glibc-compatibility.log wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt; do
+          for f in apt-get-download.log apt-get-elf-header.txt apt-get-elf-program-headers.txt apt-get-loader-paths.txt rootfs-package-manifest-amd64.txt rootfs-package-extraction.log rootfs-usrmerge-before-amd64.txt rootfs-usrmerge-after-amd64.txt rootfs-symlinks-after-amd64.txt rootfs-symlinks-before-loader-fix.txt box64-ccache-stats.txt box64-ldd.txt box64-build-glibc.txt box64-glibc-symbols.txt box64-glibc-symbols-rootfs-check.txt glibc-compatibility.log wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt; do
             [ -f "$f" ] && cp "$f" runtime-failure-logs/
           done
           sudo dpkg --audit > runtime-failure-logs/dpkg-audit.txt 2>&1
