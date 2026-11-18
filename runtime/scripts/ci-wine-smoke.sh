@@ -65,7 +65,7 @@ snapshot_d() {
     echo "### ps -eo pid,ppid,stat,pcpu,pmem,etime,args --forest"
     ps -eo pid,ppid,stat,pcpu,pmem,etime,args --forest
     echo "### ls -la rootfs/tmp"; sudo ls -la "$ROOTFS/tmp" 2>&1 || true
-    echo "### ls -la rootfs/tmp/.wine-*"; sudo find "$ROOTFS/tmp" -maxdepth 1 -mindepth 1 -name '.wine-*' -exec ls -la {} \\; 2>&1 || true
+    echo "### ls -la rootfs/tmp/.wine-*"; sudo find "$ROOTFS/tmp" -maxdepth 1 -mindepth 1 -name '.wine-*' -exec ls -la {} \; 2>&1 || true
     echo "### process status and wchan"
     local pids pid
     pids="$(ps -eo pid=,pgid=,comm= | awk -v group="$D_PGID" '$2 == group || $3 ~ /^(box64|wine|wineserver)$/ {print $1}' | sort -nu)"
