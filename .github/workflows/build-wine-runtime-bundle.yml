@@ -356,7 +356,8 @@ jobs:
           cp box64-artifact/box64-src/LICENSE "$OUT/provenance/licenses/BOX64-LICENSE"
           cp box64-artifact/box64-upstream-commit.txt box64-artifact/box64-ldd.txt box64-artifact/box64-ccache-stats.txt "$OUT/provenance/"
           cp runtime/rootfs/README.md "$OUT/README.md"
-          du -sb "$OUT/rootfs" > runtime-tree-size-before-strip.txt
+          cp runner-arm64-environment.log "$OUT/provenance/"
+          sudo du -sb "$OUT/rootfs" > runtime-tree-size-before-strip.txt
           : > runtime-strip-failures.txt
           while IFS= read -r -d '' elf; do
             if file -b "$elf" | grep -q '^ELF'; then
@@ -367,7 +368,7 @@ jobs:
               fi
             fi
           done < <(find "$OUT/rootfs" -type f -print0)
-          du -sb "$OUT/rootfs" > runtime-tree-size-after-strip.txt
+          sudo du -sb "$OUT/rootfs" > runtime-tree-size-after-strip.txt
           cp runtime-strip-failures.txt runtime-tree-size-before-strip.txt runtime-tree-size-after-strip.txt "$OUT/provenance/"
           file "$OUT/rootfs/usr/local/bin/box64" "$OUT/rootfs/opt/wine/bin/wine"
           mkdir -p runtime-smoke

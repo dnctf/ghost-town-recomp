@@ -127,3 +127,11 @@ The next diagnostics collection writes complete inventories to files before trun
 | e | NOT RUN | `wine cmd /c ver` | — | — | Assemble job skipped |
 
 - Standalone Wine remains deferred: rung c/d has not been reached and Debian Wine has not demonstrated instability.
+
+
+## Smoke runner instrumentation (next CI)
+
+- Both rootfs and assemble jobs assert a native ARM64 runner (`uname -m=aarch64`, `RUNNER_ARCH=ARM64`) and log `nproc`, `lscpu`, and a compact `/proc/cpuinfo` sample. The assemble runner record is copied into runtime provenance.
+- Chroot smoke owns its mount lifecycle: bind-mount `/dev` and `/dev/pts`, mount `/proc` and `/sys`, log `findmnt -R` before tests and after cleanup, and unmount in an EXIT trap.
+- Per-rung timeouts are a/b 30s, c 60s, d/e 180s. Each rung logs command, diagnostic environment, exit code, and elapsed seconds. The ladder stops at the first failed rung. Rung d runs `wineboot` with a fresh temporary prefix and `WINEDLLOVERRIDES=mscoree,mshtml=`.
+- The assemble-stage rootfs size measurements also use sudo because extracted root-owned directories are not readable by the runner user.

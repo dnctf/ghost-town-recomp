@@ -83,6 +83,6 @@ if [ -z "$WINEBOOT_ENTRY" ]; then
   echo "[FAIL] d-wineboot: no executable wineboot entry." | tee "$LOG_DIR/STOPPED_AT.txt"
   exit 1
 fi
-run_rung d-wineboot 180 env WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix WINEDLLOVERRIDES=mscoree,mshtml= /usr/local/bin/box64 "$WINEBOOT_ENTRY" -u
+run_rung d-wineboot 180 env WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix WINEDLLOVERRIDES=mscoree,mshtml= /usr/local/bin/box64 "$WINEBOOT_ENTRY"
 run_rung e-wine-cmd-ver 180 /usr/local/bin/box64 "$WINE_ENTRY" cmd /c ver
 echo "[PASS] all Wine smoke rungs a-e" | tee "$LOG_DIR/ALL-PASSED.txt"
