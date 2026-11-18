@@ -322,7 +322,7 @@ jobs:
           readelf -d "$LIBEDIT" | tee libedit-dynamic.txt
           grep -q 'libbsd.so.0' libedit-dynamic.txt
           lddtree -R "$ROOTFS" /usr/lib/x86_64-linux-gnu/libedit.so.2 | tee libedit-lddtree.txt
-          if grep -Eq '=> None|could not locate library|not found' libedit-lddtree.txt; then echo "[FAIL] unresolved libedit dependency"; exit 1; fi
+          if grep -Eq '^[[:space:]]+[^[:space:]]+ => None([[:space:]]|$)|could not locate library|not found' libedit-lddtree.txt; then echo "[FAIL] unresolved libedit dependency"; exit 1; fi
           echo "[PASS] Fontconfig config: $FONTS_CONF"
       - name: Validate Wine payloads (fatal) and inventory graphics (warning only)
         run: |
