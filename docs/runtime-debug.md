@@ -192,3 +192,17 @@ The next diagnostics collection writes complete inventories to files before trun
 - Root cause: GitHub Actions selected POSIX `sh` inside the Debian job container, while the step uses Bash's `pipefail` option. This is a shell-selection/configuration failure, not a package or compiler failure.
 - Fix: set job-level `defaults.run.shell: bash` for the Bookworm Box64 container job. No package, compiler, Box64 source, or runtime behavior changed.
 - Box64 compilation did not run; the rootfs dependency job was not reached. Smoke ladder a-e remains **NOT RUN**.
+
+
+## Run #45: Bookworm Box64 build dependency
+
+- Run: [44234907745](https://github.com/dnctf/ghost-town-recomp/actions/runs/44234907745), commit `7cc0e70f79263a371174042a9dcf64c472679ad6`, failed during CMake configuration in the Bookworm container.
+- Exact log:
+  ```
+  -- Could NOT find Python3 (missing: Python3_EXECUTABLE Interpreter) (Required is at least version "3.7")
+  CMake Error at CMakeLists.txt:150 (message):
+    You need a Python 3.7 or newer interpreter, CMake will exit.
+  [error] Process completed with exit code 1.
+  ```
+- Root cause: the minimal Debian Bookworm container did not include the Python 3 interpreter required by the pinned Box64 CMake configuration. The shell selection and apt package installation both succeeded; compilation did not start.
+- Fix: add `python3` to the Bookworm build-container tool installation. No Box64 source or runtime files changed.

@@ -50,7 +50,7 @@ jobs:
           set -euo pipefail
           test "$(uname -m)" = "aarch64"
           apt-get update
-          apt-get install -y git cmake ninja-build build-essential libcapstone-dev ccache file binutils
+          apt-get install -y git cmake ninja-build build-essential libcapstone-dev ccache file binutils python3
       - name: Restore Box64 compiler cache
         uses: actions/cache@v4
         with:
