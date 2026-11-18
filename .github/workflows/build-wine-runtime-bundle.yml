@@ -186,8 +186,16 @@ jobs:
           source runtime/scripts/ci-diagnostics.sh 01-bootstrap-rootfs
           mkdir -p "$ROOTFS"
           sudo debootstrap --arch=arm64 --variant=minbase \
-            --include=ca-certificates,locales,libstdc++6,libgcc-s1,libcapstone4,usrmerge \
+            --include=ca-certificates,locales,libstdc++6,libgcc-s1,libcapstone4,libbsd0,libmd0,usrmerge \
             "$DEBIAN_SUITE" "$ROOTFS" https://deb.debian.org/debian
+          ARM64_LIBBSD="$ROOTFS/usr/lib/aarch64-linux-gnu/libbsd.so.0"
+          ARM64_LIBMD="$ROOTFS/usr/lib/aarch64-linux-gnu/libmd.so.0"
+          sudo test -s "$ARM64_LIBBSD"
+          sudo test -s "$ARM64_LIBMD"
+          for symbol in vis strvis strunvis; do
+            sudo objdump -T "$ARM64_LIBBSD" | awk -v symbol="$symbol" '$NF == symbol { found=1 } END { exit !found }' || { echo "[FAIL] ARM64 libbsd missing $symbol"; exit 1; }
+            echo "[PASS] ARM64 libbsd exports $symbol"
+          done
           mkdir -p "$RUNNER_TEMP/apt-cache/archives/partial"
           sudo cp -a "$RUNNER_TEMP/apt-cache/archives/." "$ROOTFS/var/cache/apt/archives/" 2>/dev/null || true
           sudo cp /etc/resolv.conf "$ROOTFS/etc/resolv.conf"

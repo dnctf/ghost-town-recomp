@@ -75,7 +75,7 @@ run_rung() {
   start="$(date +%s)"
   {
     echo "[RUN] rung=$rung timeout_seconds=$limit"
-    echo "environment: DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe FONTCONFIG_FILE=/etc/fonts/fonts.conf BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib BOX64_PRELOAD=libmd.so.0:libbsd.so.0"
+    echo "environment: DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe FONTCONFIG_FILE=/etc/fonts/fonts.conf LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu:/usr/lib:/lib BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib BOX64_PRELOAD=libmd.so.0:libbsd.so.0"
     printf 'command='; printf '%q ' "$@"; echo
   } | tee "$log"
   set +e
@@ -125,6 +125,7 @@ run_wineboot_d() {
   sudo mkdir -p "$ROOTFS/tmp/ghost-town-wine-smoke-home"
   local -a guest_env=(
     BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib
+    LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu:/usr/lib:/lib
     BOX64_PRELOAD=libmd.so.0:libbsd.so.0
     BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all,+timestamp,+process
     DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe
@@ -143,6 +144,8 @@ run_wineboot_d() {
     printf "CHROOT_ENV DISPLAY=%s\\n" "$DISPLAY"
     printf "CHROOT_ENV BOX64_LD_LIBRARY_PATH=%s\\n" "$BOX64_LD_LIBRARY_PATH"
     printf "CHROOT_ENV BOX64_PRELOAD=%s\\n" "$BOX64_PRELOAD"
+    printf "CHROOT_ENV LD_LIBRARY_PATH=%s\\n" "$LD_LIBRARY_PATH"
+    test -n "$LD_LIBRARY_PATH"
     printf "CHROOT_ENV GALLIUM_DRIVER=%s\\n" "$GALLIUM_DRIVER"
     test "$DISPLAY" = ":99"
     test -n "$BOX64_LD_LIBRARY_PATH"
