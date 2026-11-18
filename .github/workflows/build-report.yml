@@ -50,6 +50,7 @@ jobs:
           echo "REPORT_RUNNER_MACHINE=$(uname -m)" >> "$GITHUB_ENV"
           echo "REPORT_RUNNER_NPROC=$(nproc)" >> "$GITHUB_ENV"
           echo "REPORT_RUNNER_RAM=$(awk '/MemTotal/ {printf \"%d MiB\", $2/1024}' /proc/meminfo)" >> "$GITHUB_ENV"
+          echo "REPORT_GENERATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
           gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq '.commit.message' > reports/commit-message.txt
           if [ -s reports/commit-message.txt ]; then
             echo "REPORT_COMMIT_MESSAGE<<REPORT_COMMIT_EOF" >> "$GITHUB_ENV"
@@ -88,17 +89,6 @@ jobs:
           REPORT_WORKFLOW: ${{ inputs.workflow_name }}
           REPORT_JOB_RESULTS: ${{ inputs.job_results }}
           REPORT_ARTIFACT_DIR: artifacts
-          REPORT_RUN_JSON_FILE: reports/run.json
-          REPORT_JOBS_JSON_FILE: reports/jobs.json
-          REPORT_ARTIFACTS_JSON_FILE: reports/artifacts.json
-          REPORT_API_STATUS: ${{ env.REPORT_API_STATUS }}
-          REPORT_PREVIOUS_APK_DIR: previous-apk
-          REPORT_PREVIOUS_APK_RUN: ${{ env.REPORT_PREVIOUS_APK_RUN }}
-          REPORT_COMMIT_MESSAGE: ${{ env.REPORT_COMMIT_MESSAGE }}
-          REPORT_CHANGED_FILES: ${{ env.REPORT_CHANGED_FILES }}
-          REPORT_RUNNER_MACHINE: ${{ env.REPORT_RUNNER_MACHINE }}
-          REPORT_RUNNER_NPROC: ${{ env.REPORT_RUNNER_NPROC }}
-          REPORT_RUNNER_RAM: ${{ env.REPORT_RUNNER_RAM }}
         run: |
           mkdir -p reports
           bash tools/build-report.sh reports
