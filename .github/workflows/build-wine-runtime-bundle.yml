@@ -142,12 +142,20 @@ jobs:
           source runtime/scripts/ci-diagnostics.sh 01-bootstrap-rootfs
           mkdir -p "$ROOTFS"
           sudo debootstrap --arch=arm64 --variant=minbase \
-            --include=ca-certificates,locales,libstdc++6,libgcc-s1,libcapstone4 \
+            --include=ca-certificates,locales,libstdc++6,libgcc-s1,libcapstone4,usrmerge \
             "$DEBIAN_SUITE" "$ROOTFS" https://deb.debian.org/debian
           mkdir -p "$RUNNER_TEMP/apt-cache/archives/partial"
           sudo cp -a "$RUNNER_TEMP/apt-cache/archives/." "$ROOTFS/var/cache/apt/archives/" 2>/dev/null || true
           sudo cp /etc/resolv.conf "$ROOTFS/etc/resolv.conf"
           sudo chroot "$ROOTFS" /usr/bin/dpkg --add-architecture amd64
+          sudo test -L "$ROOTFS/lib"
+          test "$(sudo readlink "$ROOTFS/lib")" = "usr/lib"
+          sudo test -e "$ROOTFS/lib/ld-linux-aarch64.so.1"
+          {
+            echo "usrmerge_pre_amd64_extraction=passed"
+            echo "lib_target=$(sudo readlink "$ROOTFS/lib")"
+            sudo ls -ld "$ROOTFS/lib" "$ROOTFS/lib/ld-linux-aarch64.so.1"
+          } | tee rootfs-usrmerge-before-amd64.txt
 
       - name: Download Debian amd64 runtime packages
         run: |
@@ -175,6 +183,14 @@ jobs:
           test -n "$WINE_BIN"
           WINE_DIR="$(dirname "$(dirname "$WINE_BIN")")"
           sudo cp -a "$WINE_DIR/." "$ROOTFS/opt/wine/"
+          sudo test -L "$ROOTFS/lib"
+          test "$(sudo readlink "$ROOTFS/lib")" = "usr/lib"
+          sudo test -e "$ROOTFS/lib/ld-linux-aarch64.so.1"
+          {
+            echo "usrmerge_post_amd64_extraction=passed"
+            echo "lib_target=$(sudo readlink "$ROOTFS/lib")"
+            sudo ls -ld "$ROOTFS/lib" "$ROOTFS/lib/ld-linux-aarch64.so.1"
+          } | tee rootfs-usrmerge-after-amd64.txt
 
       - name: Validate Wine payloads (fatal) and inventory graphics (warning only)
         run: |
@@ -211,30 +227,26 @@ jobs:
             fi
           done
           file "$ROOTFS/opt/wine/bin/wine" | tee -a wine-lddtree.txt
-      - name: Verify and repair ARM64 ELF interpreter paths
+      - name: Assert ARM64 ELF interpreter and usr-merged library paths
         run: |
-          source runtime/scripts/ci-diagnostics.sh 05-verify-arm64-loader-paths
+          source runtime/scripts/ci-diagnostics.sh 05-assert-arm64-loader-paths
           sudo readelf -h "$ROOTFS/usr/bin/apt-get" | tee apt-get-elf-header.txt
           sudo readelf -l "$ROOTFS/usr/bin/apt-get" | tee apt-get-elf-program-headers.txt
           sudo readelf -h "$ROOTFS/usr/bin/apt-get" | grep -q 'Machine:.*AArch64'
           sudo readelf -l "$ROOTFS/usr/bin/apt-get" | grep -F '[Requesting program interpreter: /lib/ld-linux-aarch64.so.1]'
+          sudo test -L "$ROOTFS/lib"
+          test "$(sudo readlink "$ROOTFS/lib")" = "usr/lib"
+          sudo test -e "$ROOTFS/lib/ld-linux-aarch64.so.1"
+          sudo test -e "$ROOTFS/lib/aarch64-linux-gnu/libc.so.6"
           {
-            for loader in /lib /lib64 /usr/lib/ld-linux-aarch64.so.1 /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1; do
+            echo "usrmerge_final_assertion=passed"
+            echo "lib_target=$(sudo readlink "$ROOTFS/lib")"
+            for loader in /lib /lib/ld-linux-aarch64.so.1 /lib/aarch64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu; do
               echo "### $loader"
               sudo ls -ld "$ROOTFS$loader" 2>&1 || true
             done
           } | tee apt-get-loader-paths.txt
-          sudo find "$ROOTFS" -type l -printf '%p -> %l\n' > rootfs-symlinks-before-loader-fix.txt
-          sudo mkdir -p "$ROOTFS/lib"
-          if [ ! -e "$ROOTFS/lib/aarch64-linux-gnu" ]; then
-            sudo ln -s /usr/lib/aarch64-linux-gnu "$ROOTFS/lib/aarch64-linux-gnu"
-          fi
-          if [ ! -e "$ROOTFS/lib/ld-linux-aarch64.so.1" ]; then
-            sudo ln -s /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1 "$ROOTFS/lib/ld-linux-aarch64.so.1"
-          fi
-          sudo test -e "$ROOTFS/lib/ld-linux-aarch64.so.1"
-          sudo test -e "$ROOTFS/lib/aarch64-linux-gnu/libc.so.6"
-          sudo ls -ld "$ROOTFS/lib/ld-linux-aarch64.so.1" "$ROOTFS/lib/aarch64-linux-gnu"
+          sudo find "$ROOTFS" -type l -printf '%p -> %l\n' > rootfs-symlinks-after-amd64.txt
       - name: Install Box64 and verify Bookworm glibc compatibility
         run: |
           source runtime/scripts/ci-diagnostics.sh 05-verify-box64-glibc
@@ -335,7 +347,7 @@ jobs:
         run: |
           set +e
           mkdir -p logs runtime-failure-logs
-          for f in apt-get-download.log apt-get-elf-header.txt apt-get-elf-program-headers.txt apt-get-loader-paths.txt rootfs-symlinks-before-loader-fix.txt box64-ccache-stats.txt box64-ldd.txt box64-build-glibc.txt box64-glibc-symbols.txt box64-glibc-symbols-rootfs-check.txt glibc-compatibility.log wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt; do
+          for f in apt-get-download.log apt-get-elf-header.txt apt-get-elf-program-headers.txt apt-get-loader-paths.txt rootfs-usrmerge-before-amd64.txt rootfs-usrmerge-after-amd64.txt rootfs-symlinks-after-amd64.txt rootfs-symlinks-before-loader-fix.txt box64-ccache-stats.txt box64-ldd.txt box64-build-glibc.txt box64-glibc-symbols.txt box64-glibc-symbols-rootfs-check.txt glibc-compatibility.log wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt; do
             [ -f "$f" ] && cp "$f" runtime-failure-logs/
           done
           sudo dpkg --audit > runtime-failure-logs/dpkg-audit.txt 2>&1

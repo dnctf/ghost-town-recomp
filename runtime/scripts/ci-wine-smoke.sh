@@ -27,9 +27,19 @@ sudo mount --bind /dev "$ROOTFS/dev"
 sudo mount --bind /dev/pts "$ROOTFS/dev/pts"
 sudo mount -t proc proc "$ROOTFS/proc"
 sudo mount -t sysfs sysfs "$ROOTFS/sys"
+for mount_path in "$ROOTFS/dev" "$ROOTFS/dev/pts" "$ROOTFS/proc" "$ROOTFS/sys"; do
+  if ! mountpoint -q "$mount_path"; then
+    echo "[FAIL] required chroot mount is missing: $mount_path" | tee "$LOG_DIR/mounts.log"
+    exit 1
+  fi
+done
 {
   echo "### active chroot mounts"
-  findmnt -R "$ROOTFS"
+  findmnt -R "$ROOTFS" || true
+  echo "### required mountpoint assertions"
+  for mount_path in "$ROOTFS/dev" "$ROOTFS/dev/pts" "$ROOTFS/proc" "$ROOTFS/sys"; do
+    mountpoint "$mount_path"
+  done
 } | tee "$LOG_DIR/mounts.log"
 find_entry() {
   local name="$1" candidate
@@ -60,7 +70,7 @@ run_rung() {
   } | tee "$log"
   set +e
   timeout --signal=TERM --kill-after=10s "$limit"s sudo chroot "$ROOTFS" env \
-    BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib \
+    BOX64_LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib \
     BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all "$@" >> "$log" 2>&1
   rc=$?
   set -e
