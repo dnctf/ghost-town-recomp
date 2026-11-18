@@ -92,6 +92,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Verify native ARM64 runner and record CPU
+        run: |
+          set -euo pipefail
+          { echo "uname_m=$(uname -m)"; echo "nproc=$(nproc)"; echo "runner_arch=${RUNNER_ARCH:-unknown}"; echo "runner_os=${RUNNER_OS:-unknown}"; echo "### lscpu"; lscpu | grep -E "^(Architecture|CPU|Model name|Vendor ID|Byte Order)" || true; echo "### cpuinfo"; grep -m 6 -E "^(processor|model name|CPU implementer|CPU part|Features)" /proc/cpuinfo; } | tee runner-arm64-environment.log
+          test "$(uname -m)" = "aarch64"
+          test "${RUNNER_ARCH}" = "ARM64"
       - name: Install host build tools
         run: |
           sudo apt-get update
@@ -316,6 +322,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Verify native ARM64 runner and record CPU
+        run: |
+          set -euo pipefail
+          { echo "uname_m=$(uname -m)"; echo "nproc=$(nproc)"; echo "runner_arch=${RUNNER_ARCH:-unknown}"; echo "runner_os=${RUNNER_OS:-unknown}"; lscpu | grep -E "^(Architecture|CPU|Model name|Vendor ID|Byte Order)" || true; grep -m 6 -E "^(processor|model name|CPU implementer|CPU part|Features)" /proc/cpuinfo; } | tee runner-arm64-environment.log
+          test "$(uname -m)" = "aarch64"
+          test "${RUNNER_ARCH}" = "ARM64"
       - name: Install runtime validation tools
         run: sudo apt-get update && sudo apt-get install -y file binutils binutils-x86-64-linux-gnu pax-utils
       - name: Download Box64 artifact
@@ -357,18 +369,10 @@ jobs:
           done < <(find "$OUT/rootfs" -type f -print0)
           du -sb "$OUT/rootfs" > runtime-tree-size-after-strip.txt
           cp runtime-strip-failures.txt runtime-tree-size-before-strip.txt runtime-tree-size-after-strip.txt "$OUT/provenance/"
-          sudo mount --bind /dev "$OUT/rootfs/dev"
-          sudo mount -t proc proc "$OUT/rootfs/proc"
-          sudo mount -t sysfs sysfs "$OUT/rootfs/sys"
-          trap 'sudo umount "$OUT/rootfs/sys" 2>/dev/null || true; sudo umount "$OUT/rootfs/proc" 2>/dev/null || true; sudo umount "$OUT/rootfs/dev" 2>/dev/null || true' EXIT
           file "$OUT/rootfs/usr/local/bin/box64" "$OUT/rootfs/opt/wine/bin/wine"
           mkdir -p runtime-smoke
           bash runtime/scripts/ci-wine-smoke.sh "$OUT/rootfs" runtime-smoke
           cp runtime-smoke/*.log "$OUT/provenance/"
-          sudo umount "$OUT/rootfs/sys"
-          sudo umount "$OUT/rootfs/proc"
-          sudo umount "$OUT/rootfs/dev"
-          trap - EXIT
           (cd "$OUT" && sha256sum rootfs/usr/local/bin/box64 rootfs/opt/wine/bin/wine > provenance/RUNTIME-SHA256SUMS)
           tar --numeric-owner --xattrs --acls -czf ghost-town-wine-runtime-arm64.tar.gz -C "$OUT" .
           sha256sum ghost-town-wine-runtime-arm64.tar.gz > ghost-town-wine-runtime-arm64.tar.gz.sha256
