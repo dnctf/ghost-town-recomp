@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "game_id": "moving-out-2",
+  "display_name": "Moving Out 2",
+  "status": "untested",
+  "resolution": {
+    "width": 1280,
+    "height": 720,
+    "render_scale": 0.75
+  },
+  "dll_overrides": [],
+  "environment": {
+    "box64": {
+      "BOX64_DYNAREC": null
+    },
+    "wine": {
+      "WINEDEBUG": "-all"
+    }
+  },
+  "gpu": {
+    "driver": "unknown",
+    "driver_version": null,
+    "dxvk": null,
+    "vkd3d": null
+  },
+  "controls": {
+    "preset": "xbox",
+    "gamepad_mapping": "xinput-default-unverified",
+    "local_coop_players": 4
+  },
+  "unity_args": [],
+  "thermal": {
+    "preset": "balanced",
+    "fps_cap": 60
+  },
+  "detection": {
+    "unity_backend": "unknown",
+    "graphics_apis": [
+      "unknown"
+    ],
+    "evidence": []
+  }
+}
