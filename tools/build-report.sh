@@ -202,7 +202,7 @@ def named_file_value(basename):
     return "TIDAK TERSEDIA"
 if runtime:
     rootfs_size = named_file_value("rootfs-size-before-trim.txt") + " / " + named_file_value("rootfs-size-after-trim.txt")
-    runtime_archive = "bytes=" + pick(r"ARCHIVE_BYTES=([0-9]+)",alltext) + "; SHA-256=" + pick(r"([0-9a-f]{64})\\s+ghost-town-wine-runtime-arm64\\.tar\\.gz",alltext) + "; expanded=" + pick(r"expanded_size_bytes=([0-9]+)",alltext)
+    runtime_archive = "bytes=" + pick(r"ARCHIVE_BYTES=([0-9]+)",alltext) + "; SHA-256=" + pick(r"([0-9a-f]{64})\s+ghost-town-wine-runtime-arm64\.tar\.gz",alltext) + "; expanded=" + pick(r"expanded_size_bytes=([0-9]+)",alltext)
 else:
     rootfs_size = "N/A (tidak berlaku)"
     runtime_archive = "N/A (tidak berlaku)"
