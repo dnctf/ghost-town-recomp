@@ -189,6 +189,30 @@ jobs:
             fi
           done
           file "$ROOTFS/opt/wine/bin/wine" | tee -a wine-lddtree.txt
+      - name: Verify and repair ARM64 ELF interpreter paths
+        run: |
+          source runtime/scripts/ci-diagnostics.sh 05-verify-arm64-loader-paths
+          sudo readelf -h "$ROOTFS/usr/bin/apt-get" | tee apt-get-elf-header.txt
+          sudo readelf -l "$ROOTFS/usr/bin/apt-get" | tee apt-get-elf-program-headers.txt
+          sudo readelf -h "$ROOTFS/usr/bin/apt-get" | grep -q 'Machine:.*AArch64'
+          sudo readelf -l "$ROOTFS/usr/bin/apt-get" | grep -F '[Requesting program interpreter: /lib/ld-linux-aarch64.so.1]'
+          {
+            for loader in /lib /lib64 /usr/lib/ld-linux-aarch64.so.1 /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1; do
+              echo "### $loader"
+              sudo ls -ld "$ROOTFS$loader" 2>&1 || true
+            done
+          } | tee apt-get-loader-paths.txt
+          sudo find "$ROOTFS" -type l -printf '%p -> %l\\n' > rootfs-symlinks-before-loader-fix.txt
+          sudo mkdir -p "$ROOTFS/lib"
+          if [ ! -e "$ROOTFS/lib/aarch64-linux-gnu" ]; then
+            sudo ln -s /usr/lib/aarch64-linux-gnu "$ROOTFS/lib/aarch64-linux-gnu"
+          fi
+          if [ ! -e "$ROOTFS/lib/ld-linux-aarch64.so.1" ]; then
+            sudo ln -s /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1 "$ROOTFS/lib/ld-linux-aarch64.so.1"
+          fi
+          sudo test -e "$ROOTFS/lib/ld-linux-aarch64.so.1"
+          sudo test -e "$ROOTFS/lib/aarch64-linux-gnu/libc.so.6"
+          sudo ls -ld "$ROOTFS/lib/ld-linux-aarch64.so.1" "$ROOTFS/lib/aarch64-linux-gnu"
       - name: Trim and package rootfs component
         run: |
           source runtime/scripts/ci-diagnostics.sh 05-trim-package-rootfs

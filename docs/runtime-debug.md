@@ -150,3 +150,22 @@ The next diagnostics collection writes complete inventories to files before trun
   ```
 - The diagnostic inventory confirms `$ROOTFS/usr/bin/apt-get` exists as a regular executable (mode 0755, 67,832 bytes). Thus the chroot message does **not** prove the file itself is absent; an ELF interpreter/runtime-loader resolution problem is a leading hypothesis, not yet confirmed.
 - The next instrumentation records `readelf -l`'s requested interpreter and checks the expected ARM64 loader paths before this command. No Wine smoke rung ran; assemble was skipped. No standalone Wine experiment is justified yet.
+
+
+## Run #39: ELF interpreter evidence and loader-path repair
+
+- Run: [44229072945](https://github.com/dnctf/ghost-town-recomp/actions/runs/44229072945), commit `c3a826917749c18532d406283c4959380fb3e1f2`, completed **failure** at trim.
+- Exact stage failure:
+  ```
+  [Requesting program interpreter: /lib/ld-linux-aarch64.so.1]
+  ls: cannot access '.../rootfs/lib/ld-linux-aarch64.so.1': No such file or directory
+  .../rootfs/usr/lib/ld-linux-aarch64.so.1 -> aarch64-linux-gnu/ld-linux-aarch64.so.1
+  .../rootfs/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1
+  chroot: failed to run command ‘/usr/bin/apt-get’: No such file or directory
+  [ERROR] stage=05-trim-package-rootfs line=11 exit_code=127
+  ```
+- Artifact: [runtime-build-diagnostics](https://github.com/dnctf/ghost-town-recomp/actions/runs/44229072945/artifacts/14394212441), 405,460 bytes. The artifact's `rootfs-find-full.txt` confirms `/usr/bin/apt-get` is a regular executable, mode 0755, 67,832 bytes; the requested interpreter path is missing while the loader file exists at `/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1`.
+- `rootfs-symlinks.txt` shows `/usr/lib/ld-linux-aarch64.so.1 -> aarch64-linux-gnu/ld-linux-aarch64.so.1`, but no `/lib -> usr/lib` merge link and no `/lib/ld-linux-aarch64.so.1`. It also shows the AMD64 `/lib64/ld-linux-x86-64.so.2` link. This proves the guest ARM64 interpreter path/layout is incomplete. It does **not** prove that AMD64 extraction caused the layout split because no pre-extraction symlink inventory was captured.
+- Classification: **(a) missing interpreter path / incomplete usr-merge layout**. (b) AMD64 package overwrite is **not proven** by this post-extraction artifact. (c) the previous artifact did not contain `readelf -h apt-get`, so its ELF machine was not yet independently captured; next run adds the header and asserts AArch64. (d) no other root cause is supported by this evidence.
+- The repair adds only the two compatibility paths required by the observed Bookworm layout: `/lib/ld-linux-aarch64.so.1` and `/lib/aarch64-linux-gnu`, both targeting the existing ARM64 files under `/usr/lib/aarch64-linux-gnu`. It records `readelf -h`, `readelf -l`, `ls -ld`, and pre-repair symlinks before applying the repair.
+- Separate confirmed compatibility finding from the same run's Box64 artifact: `objdump -T box64` reports a maximum `GLIBC_2.39` requirement, while debootstrap retrieved Bookworm `libc6 2.36-9+deb12u14`. The Ubuntu 24.04 runner build therefore is not compatible with the Bookworm rootfs; the next change moves Box64 compilation into a Debian Bookworm ARM64 container and enforces the GLIBC ceiling.
