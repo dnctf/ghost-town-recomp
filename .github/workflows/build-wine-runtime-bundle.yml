@@ -245,11 +245,44 @@ jobs:
           free -h > runtime-failure-logs/memory.txt
           printf 'DEBIAN_SUITE=%s\nROOTFS=%s\nRUNNER_TEMP=%s\nGITHUB_WORKSPACE=%s\n' "$DEBIAN_SUITE" "$ROOTFS" "$RUNNER_TEMP" "$GITHUB_WORKSPACE" > runtime-failure-logs/environment.txt
           if [ -d "$ROOTFS" ]; then
-            sudo find "$ROOTFS" -maxdepth 5 -printf '%y %m %u:%g %s %p -> %l\n' | head -n 1000 > runtime-failure-logs/rootfs-find.txt
-            sudo ls -lR "$ROOTFS" 2>&1 | head -n 1000 > runtime-failure-logs/rootfs-ls.txt
+            sudo find "$ROOTFS" -maxdepth 6 -printf '%y %m %u:%g %s %p -> %l\n' > runtime-failure-logs/rootfs-find-full.txt 2>&1
+            sed -n '1,2500p' runtime-failure-logs/rootfs-find-full.txt > runtime-failure-logs/rootfs-find.txt
+            sudo ls -lR "$ROOTFS" > runtime-failure-logs/rootfs-ls-full.txt 2>&1
+            sed -n '1,2500p' runtime-failure-logs/rootfs-ls-full.txt > runtime-failure-logs/rootfs-ls.txt
+            sudo find "$ROOTFS" -type l -printf '%p -> %l\n' > runtime-failure-logs/rootfs-symlinks.txt 2>&1
+            sudo du -sb "$ROOTFS" > runtime-failure-logs/rootfs-size-bytes.txt 2>&1
+            sudo du -sh "$ROOTFS" > runtime-failure-logs/rootfs-size-human.txt 2>&1
+            for key in opt/wine/bin usr/bin usr/lib/x86_64-linux-gnu/dri usr/lib/x86_64-linux-gnu; do
+              {
+                echo "### $key"
+                sudo ls -la "$ROOTFS/$key"
+              } >> runtime-failure-logs/rootfs-key-directories.txt 2>&1
+            done
           else
             echo "ROOTFS directory does not exist: $ROOTFS" > runtime-failure-logs/rootfs-find.txt
           fi
+          {
+            for tool in dpkg dpkg-deb ar tar xz zstd qemu-aarch64-static qemu-aarch64 update-binfmts; do
+              echo "### $tool"
+              if command -v "$tool" >/dev/null 2>&1; then
+                command -v "$tool"
+                case "$tool" in
+                  dpkg|dpkg-deb) "$tool" --version 2>&1 | head -n 2 ;;
+                  ar) "$tool" --version 2>&1 | head -n 2 ;;
+                  tar) "$tool" --version 2>&1 | head -n 2 ;;
+                  xz) "$tool" --version 2>&1 | head -n 2 ;;
+                  zstd) "$tool" --version 2>&1 | head -n 2 ;;
+                  qemu-aarch64-static|qemu-aarch64) "$tool" --version 2>&1 | head -n 2 ;;
+                  update-binfmts) "$tool" --version 2>&1 | head -n 2 ;;
+                esac
+              else
+                echo "not installed"
+              fi
+            done
+            echo "### binfmt_misc"
+            mount | grep binfmt_misc || true
+            ls -la /proc/sys/fs/binfmt_misc 2>&1 || true
+          } > runtime-failure-logs/tool-versions.txt
       - name: Upload runtime diagnostics
         if: always()
         uses: actions/upload-artifact@v4
