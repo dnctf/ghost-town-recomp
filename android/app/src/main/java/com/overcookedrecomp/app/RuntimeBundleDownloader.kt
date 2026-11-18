@@ -45,7 +45,8 @@ object RuntimeBundleDownloader {
 
         val expandedReserve = if (pack.expandedSizeBytes > Long.MAX_VALUE / 10L) Long.MAX_VALUE
             else (pack.expandedSizeBytes * 10L) / 9L
-        val required = safeAdd(safeAdd(pack.sizeBytes, expandedReserve), RESERVE_BYTES)
+        val existingRuntimeBytes = directorySizeBytes(File(context.filesDir, "runtime/wine"))
+        val required = safeAdd(safeAdd(safeAdd(pack.sizeBytes, expandedReserve), existingRuntimeBytes), RESERVE_BYTES)
         val available = StatFs(context.filesDir.absolutePath).availableBytes
         if (available < required) {
             throw IOException(
@@ -95,7 +96,7 @@ object RuntimeBundleDownloader {
     @JvmStatic
     @Throws(IOException::class)
     fun importLocalArchive(context: Context, archiveUri: Uri, progress: Consumer<String>? = null) {
-        val pack = parseManifest(fetchText(BuildConfig.RUNTIME_MANIFEST_URL))
+        val pack = parseManifest(readBundledManifest(context))
         if (compareVersions(BuildConfig.VERSION_NAME, pack.minimumAppVersion) < 0) {
             throw IOException("Runtime ini memerlukan aplikasi minimal " + pack.minimumAppVersion + ".")
         }
@@ -105,7 +106,8 @@ object RuntimeBundleDownloader {
         if (local.exists() && !local.delete()) throw IOException("Tidak dapat membersihkan impor runtime sebelumnya.")
         val expandedReserve = if (pack.expandedSizeBytes > Long.MAX_VALUE / 10L) Long.MAX_VALUE
             else (pack.expandedSizeBytes * 10L) / 9L
-        val required = safeAdd(safeAdd(pack.sizeBytes, expandedReserve), RESERVE_BYTES)
+        val existingRuntimeBytes = directorySizeBytes(File(context.filesDir, "runtime/wine"))
+        val required = safeAdd(safeAdd(safeAdd(pack.sizeBytes, expandedReserve), existingRuntimeBytes), RESERVE_BYTES)
         val available = StatFs(context.filesDir.absolutePath).availableBytes
         if (available < required) {
             throw IOException("Ruang penyimpanan tidak cukup untuk impor runtime lokal.")
@@ -158,6 +160,34 @@ object RuntimeBundleDownloader {
         if (!installed.isFile || installed.readText().trim() != BuildConfig.VERSION_NAME) {
             throw IOException("Versi runtime terpasang tidak dapat diverifikasi.")
         }
+    }
+
+
+    private fun readBundledManifest(context: Context): String {
+        return try {
+            context.assets.open("runtime-manifest.json").bufferedReader().use { it.readText() }
+        } catch (error: Exception) {
+            throw IOException("Manifest runtime lokal tidak tersedia di APK ini.", error)
+        }
+    }
+
+    /** Counts the old runtime tree so atomic replacement reserves space for the old copy too. */
+    private fun directorySizeBytes(root: File): Long {
+        if (!root.exists()) return 0L
+        var total = 0L
+        val pending = ArrayList<File>()
+        val visited = mutableSetOf<String>()
+        pending.add(root)
+        while (pending.isNotEmpty()) {
+            val current = pending.removeAt(pending.lastIndex)
+            if (current.isFile) {
+                total = safeAdd(total, current.length())
+            } else if (current.isDirectory) {
+                val canonical = current.canonicalPath
+                if (visited.add(canonical)) current.listFiles()?.forEach { pending.add(it) }
+            }
+        }
+        return total
     }
 
     private fun parseManifest(raw: String): RuntimePack {
