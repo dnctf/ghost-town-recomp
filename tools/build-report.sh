@@ -162,7 +162,9 @@ tail=tail[-50:]
 job_rows=[]
 if api_status=="ok" and jobs_api:
     for j in jobs_api:
-        job_rows.append(f"| {j.get('name','TIDAK TERSEDIA')} | {j.get('conclusion') or j.get('status','TIDAK TERSEDIA')} | {duration(j.get('started_at'),j.get('completed_at'))} | runner={j.get('runner_name','TIDAK TERSEDIA')} |")
+        end_at = j.get("completed_at") or env("REPORT_GENERATED_AT")
+        job_duration = duration(j.get("started_at"), end_at) if j.get("completed_at") else "IN PROGRESS saat report diambil; elapsed=" + duration(j.get("started_at"), end_at)
+        job_rows.append(f"| {j.get('name','TIDAK TERSEDIA')} | {j.get('conclusion') or j.get('status','TIDAK TERSEDIA')} | {job_duration} | runner={j.get('runner_name','TIDAK TERSEDIA')} |")
 elif needs:
     for j in needs: job_rows.append(f"| {j.get('name')} | {j.get('conclusion')} | TIDAK TERSEDIA | API job timing tidak tersedia |")
 else: job_rows=["| TIDAK TERSEDIA | TIDAK TERSEDIA | TIDAK TERSEDIA | API job tidak tersedia |"]
