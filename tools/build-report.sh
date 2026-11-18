@@ -57,7 +57,7 @@ if isinstance(needs, dict):
 else: needs = []
 root = pathlib.Path(env("REPORT_ARTIFACT_DIR", "artifacts"))
 files = sorted(p for p in root.rglob("*") if p.is_file()) if root.exists() else []
-texts = {p.relative_to(root).as_posix(): read_text(p) for p in files if p.suffix.lower() in (".log",".txt",".md",".json",".out")}
+texts = {p.relative_to(root).as_posix(): read_text(p) for p in files if p.suffix.lower() in (".log",".txt",".md",".json",".out",".sha256")}
 alltext = "\\n".join(texts.values())
 runtime = bool(re.search(r"runtime|wine", workflow, re.I))
 apk_workflow = bool(re.search(r"apk", workflow, re.I))
@@ -201,7 +201,7 @@ def named_file_value(basename):
             return value[0] if value else "TIDAK TERSEDIA"
     return "TIDAK TERSEDIA"
 add(f"- Rootfs sebelum/sesudah trim: {named_file_value('rootfs-size-before-trim.txt')} / {named_file_value('rootfs-size-after-trim.txt')}")
-add(f"- Runtime archive bytes: {pick(r'ARCHIVE_BYTES=([0-9]+)',alltext)}; SHA-256: {pick(r'([0-9a-f]{{64}})\s+ghost-town-wine-runtime-arm64\.tar\.gz',alltext)}; expanded bytes: {pick(r'expanded_size_bytes=([0-9]+)',alltext)}")
+add(f"- Runtime archive bytes: {pick(r'ARCHIVE_BYTES=([0-9]+)',alltext)}; SHA-256: {pick(r'([0-9a-f]{64})\s+ghost-town-wine-runtime-arm64\.tar\.gz',alltext)}; expanded bytes: {pick(r'expanded_size_bytes=([0-9]+)',alltext)}")
 add(f"- APK: {apk_status}; SHA-256 release: {apk_hash}; EMBEDDED_RUNTIME_PARTS: {apk_embedded}")
 add("\\n".join(artifacts_lines))
 add(""); add("## 6. Performa build")
