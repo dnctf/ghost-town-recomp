@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Ghost Town Game Profile",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "game_id",
+    "display_name",
+    "status",
+    "resolution",
+    "dll_overrides",
+    "environment",
+    "gpu",
+    "controls",
+    "unity_args",
+    "thermal",
+    "detection"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "game_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "untested",
+        "experimental",
+        "verified"
+      ]
+    },
+    "resolution": {
+      "type": "object",
+      "required": [
+        "width",
+        "height",
+        "render_scale"
+      ],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 640,
+          "maximum": 3840
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 360,
+          "maximum": 2160
+        },
+        "render_scale": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "dll_overrides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "dll",
+          "mode"
+        ],
+        "properties": {
+          "dll": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "mode": {
+            "enum": [
+              "native",
+              "builtin",
+              "native,builtin",
+              "builtin,native",
+              "disabled"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "box64": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "wine": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "gpu": {
+      "type": "object",
+      "required": [
+        "driver",
+        "dxvk"
+      ],
+      "properties": {
+        "driver": {
+          "enum": [
+            "system",
+            "turnip",
+            "virgl",
+            "unknown"
+          ]
+        },
+        "driver_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dxvk": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "vkd3d": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "controls": {
+      "type": "object",
+      "required": [
+        "preset",
+        "gamepad_mapping"
+      ],
+      "properties": {
+        "preset": {
+          "enum": [
+            "touch",
+            "xbox",
+            "keyboard",
+            "custom"
+          ]
+        },
+        "gamepad_mapping": {
+          "type": "string"
+        },
+        "local_coop_players": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        }
+      },
+      "additionalProperties": false
+    },
+    "unity_args": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "thermal": {
+      "type": "object",
+      "required": [
+        "preset",
+        "fps_cap"
+      ],
+      "properties": {
+        "preset": {
+          "enum": [
+            "cool",
+            "balanced",
+            "performance"
+          ]
+        },
+        "fps_cap": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 15,
+          "maximum": 120
+        }
+      },
+      "additionalProperties": false
+    },
+    "detection": {
+      "type": "object",
+      "required": [
+        "unity_backend",
+        "graphics_apis",
+        "evidence"
+      ],
+      "properties": {
+        "unity_backend": {
+          "enum": [
+            "mono",
+            "il2cpp",
+            "ambiguous",
+            "unknown"
+          ]
+        },
+        "graphics_apis": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "d3d11",
+              "d3d12",
+              "vulkan",
+              "opengl",
+              "unknown"
+            ]
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
