@@ -106,7 +106,7 @@ run_wineboot_d() {
   if [ "$D_PGID" != "$D_PID" ]; then echo "[FAIL] isolated wineboot process group mismatch pid=$D_PID pgid=$D_PGID" | tee "$LOG_DIR/STOPPED_AT.txt"; exit 1; fi
   echo "host_pid=$D_PID process_group=$D_PGID" | tee -a "$log"
   start="$(date +%s)"
-  for checkpoint in 15 45 90 180 600; do
+  for checkpoint in 15 45 90 180 300 600; do
     [ "$checkpoint" -le "$limit" ] || continue
     while kill -0 "$D_PID" 2>/dev/null; do elapsed=$(( $(date +%s) - start )); [ "$elapsed" -ge "$checkpoint" ] && break; sleep 1; done
     if kill -0 "$D_PID" 2>/dev/null; then snapshot_d "t${checkpoint}s"; else break; fi
