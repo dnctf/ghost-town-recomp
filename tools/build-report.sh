@@ -200,9 +200,15 @@ def named_file_value(basename):
             value = read_text(p).strip().splitlines()
             return value[0] if value else "TIDAK TERSEDIA"
     return "TIDAK TERSEDIA"
-add(f"- Rootfs sebelum/sesudah trim: {named_file_value('rootfs-size-before-trim.txt')} / {named_file_value('rootfs-size-after-trim.txt')}")
-add(f"- Runtime archive bytes: {pick(r'ARCHIVE_BYTES=([0-9]+)',alltext)}; SHA-256: {pick(r'([0-9a-f]{64})\s+ghost-town-wine-runtime-arm64\.tar\.gz',alltext)}; expanded bytes: {pick(r'expanded_size_bytes=([0-9]+)',alltext)}")
-add(f"- APK: {apk_status}; SHA-256 release: {apk_hash}; EMBEDDED_RUNTIME_PARTS: {apk_embedded}")
+if runtime:
+    rootfs_size = named_file_value("rootfs-size-before-trim.txt") + " / " + named_file_value("rootfs-size-after-trim.txt")
+    runtime_archive = "bytes=" + pick(r"ARCHIVE_BYTES=([0-9]+)",alltext) + "; SHA-256=" + pick(r"([0-9a-f]{64})\\s+ghost-town-wine-runtime-arm64\\.tar\\.gz",alltext) + "; expanded=" + pick(r"expanded_size_bytes=([0-9]+)",alltext)
+else:
+    rootfs_size = "N/A (tidak berlaku)"
+    runtime_archive = "N/A (tidak berlaku)"
+add("- Rootfs sebelum/sesudah trim: " + rootfs_size)
+add("- Runtime archive: " + runtime_archive)
+add("- APK: " + apk_status + "; SHA-256 release: " + (apk_hash if apk_workflow else "N/A (tidak berlaku)") + "; EMBEDDED_RUNTIME_PARTS: " + (apk_embedded if apk_workflow else "N/A (tidak berlaku)"))
 add("\n".join(artifacts_lines))
 add(""); add("## 6. Performa build")
 add("- Durasi per job berasal dari GitHub Actions jobs API pada bagian 1.")
