@@ -501,7 +501,7 @@ jobs:
           cp runtime/licenses/WINE-LICENSE runtime/licenses/WINE-COPYING.LIB runtime/licenses/WINE-NOTICES.md rootfs-artifact/provenance/licenses/
           cp wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt rootfs-package-manifest.txt rootfs-size-before-trim.txt rootfs-size-after-trim.txt glibc-compatibility.log box64-glibc-symbols-rootfs-check.txt rootfs-artifact/provenance/
           cp box64-artifact/box64-build-glibc.txt box64-artifact/box64-glibc-symbols.txt box64-artifact/box64-ldd.txt rootfs-artifact/provenance/
-          cp runtime-smoke/* rootfs-artifact/provenance/
+          cp -a runtime-smoke/. rootfs-artifact/provenance/
           EXPECTED_DRIVER="$(python3 -c 'import json,os; print(os.path.basename(json.load(open("runtime/manifest.json"))["components"]["virgl"]["driver"]))')"
           printf 'expected_guest_driver=%s\narchitecture=x86_64\nsource=Debian Bookworm libgl1-mesa-dri\ntransport=virtio-gpu DRM; Android vtest/virpipe compatibility unproven\n' "$EXPECTED_DRIVER" > rootfs-artifact/provenance/MESA-VIRGL-BUILD-INFO.txt
           sha256sum downloads/wine.tar.xz > rootfs-artifact/provenance/UPSTREAM-ARCHIVE-SHA256SUMS
