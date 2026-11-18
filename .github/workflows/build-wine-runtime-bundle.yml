@@ -58,6 +58,13 @@ jobs:
           test "$(uname -m)" = "aarch64"
           apt-get update
           apt-get install -y git cmake ninja-build build-essential libcapstone-dev ccache file binutils python3
+      - name: Restore pinned Box64 binary cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            box64-install/
+            box64-binary-cache-ref.txt
+          key: box64-binary-arm64-${{ env.BOX64_REF }}-sd888-dynarec-v2
       - name: Restore Box64 compiler cache
         uses: actions/cache@v4
         with:
@@ -71,15 +78,20 @@ jobs:
           git clone https://github.com/ptitSeb/box64.git box64-src
           git -C box64-src checkout --detach "$BOX64_REF"
           git -C box64-src rev-parse HEAD > box64-upstream-commit.txt
-          ccache --zero-stats || true
-          cmake -S box64-src -B box64-build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_INSTALL_PREFIX=/usr/local \
-            -DSD888=ON -DARM_DYNAREC=ON -DNO_LIB_INSTALL=ON -DNO_CONF_INSTALL=ON
-          cmake --build box64-build --parallel 2
-          install -D -m 0755 "$(find box64-build -type f -name box64 -perm -111 -print -quit)" box64-install/usr/local/bin/box64
+          if [ -x box64-install/usr/local/bin/box64 ] && [ "$(cat box64-binary-cache-ref.txt 2>/dev/null || true)" = "$BOX64_REF" ]; then
+            echo "Using cached pinned Box64 binary: $BOX64_REF"
+          else
+            ccache --zero-stats || true
+            cmake -S box64-src -B box64-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_INSTALL_PREFIX=/usr/local \
+              -DSD888=ON -DARM_DYNAREC=ON -DNO_LIB_INSTALL=ON -DNO_CONF_INSTALL=ON
+            cmake --build box64-build --parallel 2
+            install -D -m 0755 "$(find box64-build -type f -name box64 -perm -111 -print -quit)" box64-install/usr/local/bin/box64
+            printf '%s\n' "$BOX64_REF" > box64-binary-cache-ref.txt
+          fi
           file box64-install/usr/local/bin/box64
           readelf -h box64-install/usr/local/bin/box64 | grep -q 'Machine:.*AArch64'
           ldd --version | sed -n '1p' | tee box64-build-glibc.txt
@@ -396,6 +408,8 @@ jobs:
             echo "box64_max_required_glibc=$BOX64_GLIBC_MAX"
           } | tee glibc-compatibility.log
           dpkg --compare-versions "$BOX64_GLIBC_MAX" le "$ROOTFS_GLIBC"
+      - name: Validate Wine smoke script syntax
+        run: bash -n runtime/scripts/ci-wine-smoke.sh
       - name: Run Wine smoke ladder on untrimmed rootfs
         run: |
           source runtime/scripts/ci-diagnostics.sh 06-smoke-wine-untrimmed-rootfs

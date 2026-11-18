@@ -6,12 +6,21 @@ ROOTFS="$(realpath "$ROOTFS")"
 case "$D_TIMEOUT" in 180|600) ;; *) echo "Unsupported wineboot timeout: $D_TIMEOUT" >&2; exit 64 ;; esac
 cleanup_mounts() {
   set +e
-  sudo umount "$ROOTFS/tmp/.X11-unix" 2>/dev/null || true
+  if [ -n "${WINESERVER_ENTRY:-}" ] && [ -x "$ROOTFS/usr/local/bin/box64" ]; then
+    timeout --signal=TERM --kill-after=3s 8s sudo chroot "$ROOTFS" /usr/bin/env \
+      BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
+      BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
+      HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke \
+      WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix \
+      /usr/local/bin/box64 "$WINESERVER_ENTRY" -k >> "$LOG_DIR/cleanup-wineserver.log" 2>&1
+  fi
+  sudo rm -rf "$ROOTFS/tmp/ghost-town-wine-smoke-prefix" "$ROOTFS/tmp/ghost-town-wine-smoke-home"
   { echo "### mounts before cleanup"; findmnt -R "$ROOTFS" || true; } >> "$LOG_DIR/mounts.log" 2>&1
-  sudo umount "$ROOTFS/sys" 2>/dev/null || true
-  sudo umount "$ROOTFS/proc" 2>/dev/null || true
-  sudo umount "$ROOTFS/dev/pts" 2>/dev/null || true
-  sudo umount "$ROOTFS/dev" 2>/dev/null || true
+  sudo umount -lf "$ROOTFS/tmp/.X11-unix" 2>/dev/null || true
+  sudo umount -lf "$ROOTFS/sys" 2>/dev/null || true
+  sudo umount -lf "$ROOTFS/proc" 2>/dev/null || true
+  sudo umount -lf "$ROOTFS/dev/pts" 2>/dev/null || true
+  sudo umount -lf "$ROOTFS/dev" 2>/dev/null || true
   if [ -n "${XVFB_PID:-}" ]; then kill -TERM "$XVFB_PID" 2>/dev/null || true; wait "$XVFB_PID" 2>/dev/null || true; fi
   { echo "### mounts after cleanup"; findmnt -R "$ROOTFS" || true; } >> "$LOG_DIR/mounts.log" 2>&1
 }
@@ -60,13 +69,21 @@ run_rung() {
   local rung="$1" limit="$2"; shift 2
   local log="$LOG_DIR/$rung.log" rc=0 start end elapsed
   start="$(date +%s)"
-  { echo "[RUN] rung=$rung timeout_seconds=$limit"; echo "environment: BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all"; printf 'command='; printf '%q ' "$@"; echo; } | tee "$log"
+  {
+    echo "[RUN] rung=$rung timeout_seconds=$limit"
+    echo "environment: DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe FONTCONFIG_FILE=/etc/fonts/fonts.conf BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib BOX64_PRELOAD=libmd.so.0:libbsd.so.0"
+    printf 'command='; printf '%q ' "$@"; echo
+  } | tee "$log"
   set +e
-  timeout --signal=TERM --kill-after=10s "$limit"s sudo chroot "$ROOTFS" env \
+  timeout --signal=TERM --kill-after=10s "$limit"s sudo chroot "$ROOTFS" /usr/bin/env \
     BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
-      BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
-      LIBGL_ALWAYS_SOFTWARE=1 \
-    BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all DISPLAY=:99 WAYLAND_DISPLAY= FONTCONFIG_FILE=/etc/fonts/fonts.conf LIBGL_ALWAYS_SOFTWARE=1 BOX64_PRELOAD=libmd.so.0:libbsd.so.0 HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix "$@" >> "$log" 2>&1
+    BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
+    BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all \
+    DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+    FONTCONFIG_FILE=/etc/fonts/fonts.conf WAYLAND_DISPLAY= \
+    WINEDLLOVERRIDES=mscoree,mshtml= \
+    HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke TMPDIR=/tmp \
+    WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix "$@" >> "$log" 2>&1
   rc=$?
   set -e
   end="$(date +%s)"; elapsed=$((end-start))
@@ -77,7 +94,6 @@ run_rung() {
   if [ "$rc" -ne 0 ]; then echo "[FAIL] $rung exit_code=$rc duration_seconds=$elapsed" | tee "$LOG_DIR/STOPPED_AT.txt"; exit "$rc"; fi
   echo "[PASS] $rung duration_seconds=$elapsed" | tee -a "$LOG_DIR/PASSED.txt"
 }
-
 snapshot_d() {
   local label="$1"
   local file="$LOG_DIR/d-snapshots/${label}.txt"
@@ -98,90 +114,66 @@ snapshot_d() {
 }
 
 run_wineboot_d() {
-  local limit="$1" log="$LOG_DIR/d-wineboot.log" start elapsed rc=0 timed_out=0
+  local limit="$1" log="$LOG_DIR/d-wineboot.log" start elapsed rc=0
   if [ -z "$WINEBOOT_ENTRY" ] || [ -z "$WINESERVER_ENTRY" ]; then echo "[FAIL] d-wineboot: missing executable wineboot or wineserver entry." | tee "$LOG_DIR/STOPPED_AT.txt"; exit 1; fi
   sudo chmod 1777 "$ROOTFS/tmp"
   sudo rm -rf "$ROOTFS/tmp/ghost-town-wine-smoke-prefix" "$ROOTFS/tmp/ghost-town-wine-smoke-home"
   sudo mkdir -p "$ROOTFS/tmp/ghost-town-wine-smoke-home"
-  sudo chroot "$ROOTFS" env HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix sh -c 'test -w /tmp && mkdir -p "$HOME" && test -w "$HOME"'
+  local -a guest_env=(
+    BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib
+    BOX64_PRELOAD=libmd.so.0:libbsd.so.0
+    BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all,+timestamp,+process
+    DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe
+    FONTCONFIG_FILE=/etc/fonts/fonts.conf WAYLAND_DISPLAY=
+    WINEDLLOVERRIDES=mscoree,mshtml=
+    HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke TMPDIR=/tmp
+    WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix
+  )
   {
     echo "[RUN] rung=d-wineboot timeout_seconds=$limit"
     echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "environment: BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib BOX64_PRELOAD=libmd.so.0:libbsd.so.0 LIBGL_ALWAYS_SOFTWARE=1 DISPLAY=:99 WAYLAND_DISPLAY=<empty> FONTCONFIG_FILE=/etc/fonts/fonts.conf WINEDEBUG=err+all,+timestamp,+process"
-    echo "command=sudo chroot ROOTFS env ... box64 $WINEBOOT_ENTRY"
+    echo "environment: DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe FONTCONFIG_FILE=/etc/fonts/fonts.conf BOX64_LD_LIBRARY_PATH=${guest_env[0]#BOX64_LD_LIBRARY_PATH=} BOX64_PRELOAD=libmd.so.0:libbsd.so.0 WINEDLLOVERRIDES=mscoree,mshtml= WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix"
+    echo "command=sudo chroot ROOTFS /usr/bin/env ... box64 wineboot --init; box64 wineserver -w"
   } | tee "$log"
-  setsid --wait bash -o pipefail -c '
-    rootfs="$1"; entry="$2"; logfile="$3"; wineserver_entry="$4"
-    sudo chroot "$rootfs" env \
-      BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
-      BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
-      LIBGL_ALWAYS_SOFTWARE=1 \
-      BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all,+timestamp,+process \
-      HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke TMPDIR=/tmp \
-      WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix WINEDLLOVERRIDES=mscoree,mshtml= \
-      DISPLAY=:99 FONTCONFIG_FILE=/etc/fonts/fonts.conf WAYLAND_DISPLAY= \
-      /usr/local/bin/box64 "$entry" --init 2>&1 |
-      while IFS= read -r line; do printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$line"; done >> "$logfile"
-    rc=$?
-    if [ "$rc" -eq 0 ]; then
-      sudo chroot "$rootfs" env \
-        BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
-      BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
-      LIBGL_ALWAYS_SOFTWARE=1 \
-        HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke \
-        WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix \
-        DISPLAY=:99 FONTCONFIG_FILE=/etc/fonts/fonts.conf \
-        /usr/local/bin/box64 "$wineserver_entry" -w
-      rc=$?
-    fi
-    exit "$rc"
-  ' _ "$ROOTFS" "$WINEBOOT_ENTRY" "$log" "$WINESERVER_ENTRY" &
-  D_SUPERVISOR_PID=$!
-  D_PID="$D_SUPERVISOR_PID"
-  printf "%s\\n" "$D_PID" > "$LOG_DIR/d-process.pid"
-  D_PGID="$(ps -o pgid= -p "$D_PID" | tr -d ' ')"
-  if [ "$D_PGID" != "$D_PID" ]; then echo "[FAIL] isolated wineboot process group mismatch pid=$D_PID pgid=$D_PGID" | tee "$LOG_DIR/STOPPED_AT.txt"; exit 1; fi
-  echo "host_pid=$D_PID process_group=$D_PGID" | tee -a "$log"
+  sudo chroot "$ROOTFS" /usr/bin/env "${guest_env[@]}" /bin/sh -c '
+    printf "CHROOT_ENV DISPLAY=%s\\n" "$DISPLAY"
+    printf "CHROOT_ENV BOX64_LD_LIBRARY_PATH=%s\\n" "$BOX64_LD_LIBRARY_PATH"
+    printf "CHROOT_ENV BOX64_PRELOAD=%s\\n" "$BOX64_PRELOAD"
+    printf "CHROOT_ENV GALLIUM_DRIVER=%s\\n" "$GALLIUM_DRIVER"
+    test "$DISPLAY" = ":99"
+    test -n "$BOX64_LD_LIBRARY_PATH"
+    test -S /tmp/.X11-unix/X99
+  ' | tee -a "$log"
   start="$(date +%s)"
-  for checkpoint in 15 45 90 180 300 600; do
-    [ "$checkpoint" -le "$limit" ] || continue
-    while kill -0 "$D_PID" 2>/dev/null; do elapsed=$(( $(date +%s) - start )); [ "$elapsed" -ge "$checkpoint" ] && break; sleep 1; done
-    if kill -0 "$D_PID" 2>/dev/null; then snapshot_d "t${checkpoint}s"; else break; fi
-  done
-  if kill -0 "$D_PID" 2>/dev/null; then
-    timed_out=1; echo "[TIMEOUT] rung=d-wineboot elapsed_seconds=$limit" | tee -a "$log"
-    {
-      echo "[CLEANUP] wineserver -k via Box64 timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-      timeout --signal=TERM --kill-after=3s 15s sudo chroot "$ROOTFS" env \
-        BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
-      BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
-      LIBGL_ALWAYS_SOFTWARE=1 \
-        BOX64_LOG=1 BOX64_SHOWSEGV=1 HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke \
-        WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix /usr/local/bin/box64 "$WINESERVER_ENTRY" -k
-      echo "wineserver_kill_exit_code=$?"
-    } > "$LOG_DIR/d-wineserver-kill.log" 2>&1 || true
-    echo "[CLEANUP] terminate remaining diagnostic process group=$D_PGID" | tee -a "$log"
-    kill -TERM -- "-$D_PGID" 2>/dev/null || true; sleep 3; kill -KILL -- "-$D_PGID" 2>/dev/null || true
-  fi
-  set +e; wait "$D_SUPERVISOR_PID"; rc=$?; set -e
-  [ "$timed_out" -eq 0 ] || rc=124
+  set +e
+  timeout --signal=TERM --kill-after=10s "${limit}s" sudo chroot "$ROOTFS" /usr/bin/env "${guest_env[@]}" /bin/sh -c '
+    set -e
+    box64="$1"; wineboot_entry="$2"; wineserver_entry="$3"
+    "$box64" "$wineboot_entry" --init
+    /usr/bin/timeout --signal=TERM --kill-after=5s 45s "$box64" "$wineserver_entry" -w
+    test -s "$WINEPREFIX/system.reg"
+    test -s "$WINEPREFIX/user.reg"
+  ' _ /usr/local/bin/box64 "$WINEBOOT_ENTRY" "$WINESERVER_ENTRY" >> "$log" 2>&1
+  rc=$?
+  set -e
+  elapsed=$(( $(date +%s) - start ))
   if [ "$rc" -eq 0 ]; then
     for registry in system.reg user.reg; do
       if ! sudo test -s "$ROOTFS/tmp/ghost-town-wine-smoke-prefix/$registry"; then
-        echo "[FAIL] missing or empty registry: $registry" | tee -a "$log"
-        rc=66
+        echo "[FAIL] missing or empty registry: $registry" | tee -a "$log"; rc=66
       else
         bytes="$(sudo stat -c %s "$ROOTFS/tmp/ghost-town-wine-smoke-prefix/$registry")"
         echo "[PASS] registry=$registry bytes=$bytes" | tee -a "$log"
       fi
     done
   fi
-  snapshot_d final
-  grep -E '\[BOX64\]' "$log" > "$LOG_DIR/d-box64.log" || true
-  grep -E 'wineserver|wineboot|wine ' "$LOG_DIR/d-snapshots"/*-wine-processes.txt > "$LOG_DIR/d-wineserver-processes.log" || true
-  elapsed=$(( $(date +%s) - start ))
-  { echo "exit_code=$rc"; echo "duration_seconds=$elapsed"; echo "timeout_seconds=$limit"; echo "box64_log_lines=$(wc -l < "$LOG_DIR/d-box64.log")"; echo "process_snapshot_files=$(find "$LOG_DIR/d-snapshots" -maxdepth 1 -name '*.txt' | wc -l)"; } | tee -a "$log"
-  if [ "$rc" -ne 0 ]; then echo "[FAIL] d-wineboot exit_code=$rc duration_seconds=$elapsed" | tee "$LOG_DIR/STOPPED_AT.txt"; exit "$rc"; fi
+  timeout --signal=TERM --kill-after=3s 8s sudo chroot "$ROOTFS" /usr/bin/env "${guest_env[@]}" /usr/local/bin/box64 "$WINESERVER_ENTRY" -k >> "$LOG_DIR/d-wineserver-kill.log" 2>&1 || true
+  grep -F '[BOX64]' "$log" > "$LOG_DIR/d-box64.log" || true
+  { echo "exit_code=$rc"; echo "duration_seconds=$elapsed"; echo "timeout_seconds=$limit"; echo "box64_log_lines=$(wc -l < "$LOG_DIR/d-box64.log")"; } | tee -a "$log"
+  if [ "$rc" -ne 0 ]; then
+    if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then echo "[TIMEOUT] rung=d-wineboot elapsed_seconds=$elapsed" | tee -a "$log"; fi
+    echo "[FAIL] d-wineboot exit_code=$rc duration_seconds=$elapsed" | tee "$LOG_DIR/STOPPED_AT.txt"; exit "$rc"
+  fi
   echo "[PASS] d-wineboot duration_seconds=$elapsed" | tee -a "$LOG_DIR/PASSED.txt"
 }
 ASSERT_OUTPUT_REGEX=''
