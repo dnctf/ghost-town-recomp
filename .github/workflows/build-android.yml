@@ -44,7 +44,9 @@ jobs:
       - name: Validate Python tools and runtime manifest
         run: |
           python -m json.tool runtime/manifest.json >/dev/null
-          python -m py_compile tools/audit_apk_size.py tools/validate_runtime_archive.py tools/audit_runtime_tree.py
+          python -m py_compile tools/audit_apk_size.py tools/validate_runtime_archive.py tools/audit_runtime_tree.py tools/ingest_feasibility.py
+          bash -n runtime/scripts/ci-wine-smoke.sh
+          bash -n tools/build-report.sh
       - name: Run probe unit tests
         run: python -m unittest discover -s tools/tests -v
 
