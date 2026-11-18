@@ -66,7 +66,8 @@ run_rung() {
 }
 
 snapshot_d() {
-  local label="$1" file="$LOG_DIR/d-snapshots/${label}.txt"
+  local label="$1"
+  local file="$LOG_DIR/d-snapshots/${label}.txt"
   {
     echo "snapshot=$label"; echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "wineboot_log_bytes=$(stat -c '%s' "$LOG_DIR/d-wineboot.log" 2>/dev/null || echo 0)"
