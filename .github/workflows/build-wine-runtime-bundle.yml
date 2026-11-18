@@ -109,10 +109,18 @@ jobs:
           if ! mountpoint -q /proc/sys/fs/binfmt_misc; then
             sudo mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc
           fi
-          sudo update-binfmts --enable qemu-x86_64
-          sudo update-binfmts --display qemu-x86_64
-          test -r /proc/sys/fs/binfmt_misc/qemu-x86_64
-          grep -q '^enabled' /proc/sys/fs/binfmt_misc/qemu-x86_64
+          # GitHub's ARM64 runner may pre-register QEMU in the kernel without
+          # shipping a matching update-binfmts database entry. Prefer the live
+          # kernel registration; only import/enable a descriptor when absent.
+          if [ -r /proc/sys/fs/binfmt_misc/qemu-x86_64 ]; then
+            cat /proc/sys/fs/binfmt_misc/qemu-x86_64
+            grep -q '^enabled' /proc/sys/fs/binfmt_misc/qemu-x86_64
+          else
+            sudo update-binfmts --import qemu-x86_64 || true
+            sudo update-binfmts --enable qemu-x86_64
+            test -r /proc/sys/fs/binfmt_misc/qemu-x86_64
+            grep -q '^enabled' /proc/sys/fs/binfmt_misc/qemu-x86_64
+          fi
       - name: Build Box64 for ARM64 glibc
         run: |
           set -euo pipefail
