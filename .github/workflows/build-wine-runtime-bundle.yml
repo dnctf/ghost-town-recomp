@@ -25,7 +25,7 @@ on:
       wineboot_timeout_seconds:
         description: Diagnostic wineboot timeout; choose 600 for the extended diagnostic run
         required: true
-        default: '180'
+        default: '600'
         type: choice
         options: ['180', '600']
 
