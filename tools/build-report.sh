@@ -42,7 +42,7 @@ def redact(s):
     s = re.sub(r"/Users/[^\s:]+", "[PRIVATE_PATH]", s)
     return s
 def quote(s):
-    return "\\n".join("> " + line if line else ">" for line in s.splitlines())
+    return "\n".join("> " + line if line else ">" for line in s.splitlines())
 workflow = env("REPORT_WORKFLOW")
 slug = re.sub(r"[^a-z0-9]+", "-", workflow.lower()).strip("-") or "workflow"
 api_status = env("REPORT_API_STATUS", "failed")
@@ -58,7 +58,7 @@ else: needs = []
 root = pathlib.Path(env("REPORT_ARTIFACT_DIR", "artifacts"))
 files = sorted(p for p in root.rglob("*") if p.is_file()) if root.exists() else []
 texts = {p.relative_to(root).as_posix(): read_text(p) for p in files if p.suffix.lower() in (".log",".txt",".md",".json",".out",".sha256")}
-alltext = "\\n".join(texts.values())
+alltext = "\n".join(texts.values())
 runtime = bool(re.search(r"runtime|wine", workflow, re.I))
 apk_workflow = bool(re.search(r"apk", workflow, re.I))
 conclusion = run.get("conclusion") if api_status == "ok" else None
@@ -177,13 +177,13 @@ add(f"**Commit:** {sha} — {commit_message}")
 add(f"**Run:** https://github.com/{env('GITHUB_REPOSITORY')}/actions/runs/{env('GITHUB_RUN_ID')} | **Pemicu:** {run.get('event',env('GITHUB_EVENT_NAME')) if api_status=='ok' else env('GITHUB_EVENT_NAME')} | **Runner:** {runner}")
 add("**Hasil keseluruhan:** "+overall); add("")
 add("## 1. Ringkasan tahap (tabel)"); add("| Tahap/Job | Status | Durasi | Catatan |"); add("|---|---|---|---|")
-add("\\n".join(job_rows))
+add("\n".join(job_rows))
 add(""); add("## 2. Smoke ladder (khusus runtime)"); add("| Rung | Perintah | Exit code | Durasi | Status | Kutipan log kunci (maks 3 baris) |"); add("|---|---|---|---|---|---|")
-add("\\n".join(rung_rows))
+add("\n".join(rung_rows))
 add(""); add("## 3. Kegagalan (jika ada)")
 add("- stage/line/exit_code/command: "+("; ".join(error_lines[:5]) if error_lines else "TIDAK TERSEDIA"))
 add("- 50 baris log terakhir (disanitasi):")
-add("\\n".join("> " + x for x in tail) if tail else "> TIDAK TERSEDIA")
+add("\n".join("> " + x for x in tail) if tail else "> TIDAK TERSEDIA")
 add("- Klasifikasi penyebab: "+("bukti log tersedia; klasifikasi manual diperlukan, jangan menyimpulkan di luar bukti." if error_lines else "belum diketahui / tidak ada log kegagalan yang tersedia."))
 add(""); add("## 4. Versi komponen")
 add(f"- VERSION: {version_file}; app versionName: {app_version}")
@@ -203,7 +203,7 @@ def named_file_value(basename):
 add(f"- Rootfs sebelum/sesudah trim: {named_file_value('rootfs-size-before-trim.txt')} / {named_file_value('rootfs-size-after-trim.txt')}")
 add(f"- Runtime archive bytes: {pick(r'ARCHIVE_BYTES=([0-9]+)',alltext)}; SHA-256: {pick(r'([0-9a-f]{64})\s+ghost-town-wine-runtime-arm64\.tar\.gz',alltext)}; expanded bytes: {pick(r'expanded_size_bytes=([0-9]+)',alltext)}")
 add(f"- APK: {apk_status}; SHA-256 release: {apk_hash}; EMBEDDED_RUNTIME_PARTS: {apk_embedded}")
-add("\\n".join(artifacts_lines))
+add("\n".join(artifacts_lines))
 add(""); add("## 6. Performa build")
 add("- Durasi per job berasal dari GitHub Actions jobs API pada bagian 1.")
 add(f"- Cache Box64/rootfs/Gradle: {pick(r'(?i)(?:cache[^\n]*(?:hit|miss)|cache hit[^\n]*)',alltext)}")
@@ -231,11 +231,11 @@ add(f"- Run: https://github.com/{env('GITHUB_REPOSITORY')}/actions/runs/{env('GI
 add(f"- Commit: https://github.com/{env('GITHUB_REPOSITORY')}/commit/{sha}")
 add("- Artifact: "+", ".join(a.get("name","TIDAK TERSEDIA") for a in artifacts_api) if artifacts_api else "- Artifact: TIDAK TERSEDIA")
 add("- Log mentah: buka run > Jobs > View raw logs; dokumen: docs/runtime-debug.md, docs/build-reports.md, docs/feasibility-spike.md")
-body=quote("\\n".join(lines)+"\\n")
+body=quote("\n".join(lines)+"\n")
 report_path=out/f"build-report-{slug}-{env('GITHUB_RUN_NUMBER')}.md"
-report_path.write_text(body+"\\n")
+report_path.write_text(body+"\n")
 summary=os.environ.get("GITHUB_STEP_SUMMARY")
 if summary:
-    with open(summary,"a") as f: f.write(body+"\\n")
+    with open(summary,"a") as f: f.write(body+"\n")
 print(body)
 PY
