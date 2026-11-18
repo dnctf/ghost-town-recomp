@@ -243,3 +243,32 @@ The next diagnostics collection writes complete inventories to files before trun
 - Root cause category: smoke setup/diagnostic failure before rung a. It is distinct from the earlier trim and loader failures. No standalone Wine experiment is justified because rung c/d has not run.
 - Corrective commit: [49c4833](https://github.com/dnctf/ghost-town-recomp/commit/49c48338298d170d7247e889128da8d3a0b2455b) adds explicit `usrmerge` installation and pre-/post-amd64-extraction assertions that `/lib -> usr/lib`; removes the ad-hoc loader symlink repair; asserts all four chroot mountpoints before treating the mount inventory as diagnostic; and adds both `/lib/x86_64-linux-gnu` and `/usr/lib/x86_64-linux-gnu` to `BOX64_LD_LIBRARY_PATH`.
 - Validation of that correction is pending in [runtime run 44242702116](https://github.com/dnctf/ghost-town-recomp/actions/runs/44242702116). Do not count it as a fix until the workflow completes and logs prove the assertions and smoke ladder.
+
+
+## Run #47: ekstraksi paket mengubah usr-merged /lib
+
+- Run: [44242702116](https://github.com/dnctf/ghost-town-recomp/actions/runs/44242702116), commit `49c48338298d170d7247e889128da8d3a0b2455b`, completed **failure**.
+- Box64 build job succeeded. Rootfs bootstrap, native ARM64 runner check, download Wine, dan download paket berhasil.
+- Pemeriksaan sebelum ekstraksi berhasil:
+  ```
+  usrmerge_pre_amd64_extraction=passed
+  lib_target=usr/lib
+  lrwxrwxrwx ... rootfs/lib -> usr/lib
+  ```
+- Pemeriksaan sesudah ekstraksi gagal pada baris:
+  ```
+  sudo test -L "$ROOTFS/lib"
+  [ERROR] stage=03-extract-runtime-payloads line=18 exit_code=1 command=sudo test -L "$ROOTFS/lib"
+  ```
+- Log trace menunjukkan semua paket `amd64` dan `all` diekstrak langsung ke rootfs dengan `sudo dpkg-deb -x "$deb" "$ROOTFS"`. Karena validasi sebelum ekstraksi lulus dan sesudah ekstraksi gagal, kerusakan terjadi di jalur ekstraksi langsung. Run ini tidak menandai paket tertentu karena pemeriksaan dilakukan setelah loop selesai.
+- Tidak ada Wine rung yang dijalankan; smoke, trim, dan assemble dilewati. Rung a-e: **semua NOT RUN**, tanpa durasi/log rung.
+- Koreksi berikutnya pada [commit b3e012d](https://github.com/dnctf/ghost-town-recomp/commit/b3e012daae07e8ffd1a811a5d78b935c7cf4b1f6): setiap paket diekstrak ke direktori staging terpisah; jika staging berisi direktori `/lib`, kontennya dipetakan ke `/usr/lib` sebelum sisa payload disalin ke rootfs. Symlink rootfs `/lib -> usr/lib` diperiksa setelah setiap paket. Nama paket/arsitektur/versi dan remapping dicatat untuk diagnosis.
+- [Run #48](https://github.com/dnctf/ghost-town-recomp/actions/runs/44243158612) sedang memvalidasi strategi staging tersebut. Sampai workflow selesai, hasilnya belum dapat dianggap lolos.
+
+| Rung | Status | Durasi | Bukti |
+|---|---|---:|---|
+| a — `box64 --version` | **NOT RUN** | — | Ekstraksi berhenti sebelum tahap smoke |
+| b — x86_64 `wineserver --version` | **NOT RUN** | — | Tidak ada log rung b |
+| c — `wine --version` | **NOT RUN** | — | Tidak ada log rung c |
+| d — `wineboot` | **NOT RUN** | — | Tidak ada log rung d |
+| e — `wine cmd /c ver` | **NOT RUN** | — | Tidak ada log rung e |

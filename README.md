@@ -8,7 +8,7 @@ Ghost Town Recomp adalah proyek launcher Android dan riset runtime untuk menjala
 
 | Gerbang | Status | Bukti CI | Emulator | MatePad Air 2023 |
 |---|---|---|---|---|
-| **R — Runtime CI** | **Gagal / belum hijau** | Run [#44235028738](https://github.com/dnctf/ghost-town-recomp/actions/runs/44235028738): Box64 build berhasil, smoke runner berhenti sebelum rung a | Belum diuji | Belum diuji |
+| **R — Runtime CI** | **Gagal / belum hijau** | Run [#44242702116](https://github.com/dnctf/ghost-town-recomp/actions/runs/44242702116) gagal pada validasi `/lib` setelah ekstraksi paket; perbaikan staging diuji pada [run #44243158612](https://github.com/dnctf/ghost-town-recomp/actions/runs/44243158612) (masih berjalan saat README diperbarui) | Belum diuji | Belum diuji |
 | **P — Runtime pack & installer** | **Belum diuji; manifest pending** | Belum ada archive runtime terverifikasi atau asset release | Belum diuji terhadap archive nyata | Belum diuji |
 | **D — Display X11/VirGL** | **Belum diuji** | Belum ada self-test window/GLX/frame yang lolos | Belum diuji | Belum diuji |
 | **G — Game** | **Belum diuji** | Belum ada D3D11/game/audio/input/stability evidence | Belum diuji | Belum diuji |
