@@ -55,6 +55,7 @@ run_rung() {
   start="$(date +%s)"
   {
     echo "[RUN] rung=$rung timeout_seconds=$limit"
+    echo "environment: BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all"
     printf 'command='; printf '%q ' "$@"; echo
   } | tee "$log"
   set +e
