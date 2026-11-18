@@ -92,9 +92,9 @@
     "status": "published",
     "version": "0.5.0-alpha.2",
     "url": "https://github.com/dnctf/ghost-town-recomp/releases/download/runtime-v0.5.0-alpha.2/ghost-town-wine-runtime-arm64.tar.gz",
-    "size_bytes": 354498740,
-    "sha256": "9d4e17f055736c0113db1dcb355c619332a1479e84e2ca43f4fde64cc0f5c6a3",
-    "expanded_size_bytes": 1541353546,
+    "size_bytes": 354535881,
+    "sha256": "7a9600a22e0ef6ebef799cb4031c0c33310d1b2f7164d8d7aac70ed20f99edaf",
+    "expanded_size_bytes": 1541355744,
     "minimum_app_version": "0.5.0-alpha.2",
     "compression": "tar.gz",
     "note": "Public pre-release asset published and verified. Wine smoke rungs A-E passed in CI; Android target graphics, audio/input and game launch remain unvalidated."
