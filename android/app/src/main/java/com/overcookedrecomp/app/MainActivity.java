@@ -539,9 +539,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         final GameStorageVerifier.VerificationResult selectedGame = installed;
         String statusMessage = selectedGame == null
-                ? "DATA NOT FOUND\\nImpor data game ini terlebih dahulu."
-                : "DATA FOUND\\n" + selectedGame.message
-                    + "\\n\\nEXECUTION BLOCKED: Wine/Box64 masih pada tahap runtime bring-up; display, D3D11 presentation, audio/input, dan game launch belum tervalidasi. Folder _Data dan metadata saja tidak dapat menjalankan game PC.\\n\\nImpor lengkap game PC (EXE, UnityPlayer.dll, folder _Data) tetap diperlukan; runtime Windows dipasang terpisah.";
+                ? "DATA NOT FOUND\nImpor data game ini terlebih dahulu."
+                : "DATA FOUND\n" + selectedGame.message
+                    + "\n\nEXECUTION BLOCKED: Wine/Box64 masih pada tahap runtime bring-up; display, D3D11 presentation, audio/input, dan game launch belum tervalidasi. Folder _Data dan metadata saja tidak dapat menjalankan game PC.\n\nImpor lengkap game PC (EXE, UnityPlayer.dll, folder _Data) tetap diperlukan; runtime Windows dipasang terpisah.";
         File executableRoot = null;
         if (extDir != null) {
             File zipRoot = new File(extDir, title.name() + "_PC");
@@ -550,14 +550,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
         File gameExecutable = GameStorageVerifier.findGameExecutable(executableRoot, title);
         if (gameExecutable == null) {
-            statusMessage += "\\n\\nGAME EXECUTABLE: .exe yang cocok belum ditemukan.";
+            statusMessage += "\n\nGAME EXECUTABLE: .exe yang cocok belum ditemukan.";
         } else {
             GameStorageVerifier.ExecutableVerificationResult exeInfo =
                     GameStorageVerifier.inspectGameExecutable(gameExecutable, title);
-            statusMessage += "\\n\\nGAME EXECUTABLE: " + exeInfo.message
-                    + "\\nPath: " + gameExecutable.getAbsolutePath()
-                    + (exeInfo.sha256.isEmpty() ? "" : "\\nSHA-256: " + exeInfo.sha256)
-                    + "\\nCatatan: header PE dibaca saja; executable tidak dijalankan.";
+            statusMessage += "\n\nGAME EXECUTABLE: " + exeInfo.message
+                    + "\nPath: " + gameExecutable.getAbsolutePath()
+                    + (exeInfo.sha256.isEmpty() ? "" : "\nSHA-256: " + exeInfo.sha256)
+                    + "\nCatatan: header PE dibaca saja; executable tidak dijalankan.";
         }
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(cardTitle)
@@ -655,7 +655,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     new AlertDialog.Builder(this)
                             .setTitle("IMPOR RUNTIME GAGAL")
                             .setMessage((error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())
-                                    + "\\n\\nPastikan file .tar.gz berasal dari rilis runtime yang sama dengan versi aplikasi.")
+                                    + "\n\nPastikan file .tar.gz berasal dari rilis runtime yang sama dengan versi aplikasi.")
                             .setPositiveButton("TUTUP", null)
                             .show();
                 });

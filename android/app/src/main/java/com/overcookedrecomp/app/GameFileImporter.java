@@ -59,7 +59,7 @@ public final class GameFileImporter {
             try {
                 String name = getDisplayName(context, exeUri);
                 if (!name.toLowerCase(Locale.ROOT).endsWith(".exe") || name.contains("/") ||
-                        name.contains("\\\\") || name.equals(".exe") || name.equals("..") ||
+                        name.contains("\\") || name.equals(".exe") || name.equals("..") ||
                         name.trim().isEmpty()) {
                     throw new IOException("Pilih satu file executable Windows (.exe) dengan nama file valid.");
                 }
@@ -100,7 +100,7 @@ public final class GameFileImporter {
                 }
                 temporary = null;
                 if (listener != null) listener.onComplete(true,
-                        "PE32+ AMD64 terdeteksi dan SHA-256 dihitung. File belum dijalankan; UnityPlayer.dll dan folder *_Data juga diperlukan.\\n" +
+                        "PE32+ AMD64 terdeteksi dan SHA-256 dihitung. File belum dijalankan; UnityPlayer.dll dan folder *_Data juga diperlukan.\n" +
                                 destination.getName() + " • " + parsed.sha256);
             } catch (Exception error) {
                 if (temporary != null && temporary.exists()) temporary.delete();
