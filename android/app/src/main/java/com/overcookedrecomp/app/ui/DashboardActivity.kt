@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalDensity
@@ -160,7 +161,7 @@ private fun ConsoleDashboard() {
 
     Box(
         Modifier.fillMaxSize().background(C.Storm)
-            .onPreviewKeyEvent { event ->
+            .focusable().onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.nativeKeyEvent.keyCode) {
                     AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -407,11 +408,12 @@ private fun GamesHome(
 private fun GameCard(game: DemoGame, selected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     val width = if (selected) 252.dp else 174.dp
     val height = if (selected) 188.dp else 148.dp
+    val animatedWidth by androidx.compose.animation.core.animateDpAsState(targetValue = width, animationSpec = tween(GhostTownSpace.FocusDuration), label = "card-width")
+    val animatedHeight by androidx.compose.animation.core.animateDpAsState(targetValue = height, animationSpec = tween(GhostTownSpace.FocusDuration), label = "card-height")
     val borderColor = if (selected) C.FocusBorder else Color.White.copy(alpha = 0.10f)
     val elevation = if (selected) 16.dp else 2.dp
-    androidx.compose.animation.core.animateDpAsState(targetValue = width, animationSpec = tween(GhostTownSpace.FocusDuration), label = "card-width")
     Box(
-        Modifier.width(width).height(height).shadow(elevation, RoundedCornerShape(18.dp), ambientColor = C.Accent.copy(alpha = if (selected) 0.22f else 0f), spotColor = C.Accent.copy(alpha = if (selected) 0.24f else 0f))
+        Modifier.width(animatedWidth).height(animatedHeight).shadow(elevation, RoundedCornerShape(18.dp), ambientColor = C.Accent.copy(alpha = if (selected) 0.22f else 0f), spotColor = C.Accent.copy(alpha = if (selected) 0.24f else 0f))
             .clip(RoundedCornerShape(18.dp))
             .border(if (selected) 2.dp else 1.dp, borderColor, RoundedCornerShape(18.dp))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
@@ -442,6 +444,7 @@ private fun GameCard(game: DemoGame, selected: Boolean, onClick: () -> Unit, onL
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun UtilityCard(icon: String, title: String, subtitle: String, onClick: () -> Unit) {
     Column(
@@ -588,6 +591,8 @@ private fun RuntimeRow(label: String, status: String, ready: Boolean) {
 
 @Composable
 private fun LibraryScreen(libraryUri: String?, onPick: () -> Unit) {
+    val context = LocalContext.current
+    val folderName = libraryUri?.let { uri -> runCatching { DocumentFile.fromTreeUri(context, android.net.Uri.parse(uri))?.name }.getOrNull() ?: uri } ?: "Belum ada folder yang dipilih"
     Column(Modifier.fillMaxSize().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Text("LIBRARY", color = C.Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
         Text("Folder data game milikmu", color = C.TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
@@ -597,7 +602,7 @@ private fun LibraryScreen(libraryUri: String?, onPick: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("PILIH LOKASI DATA", color = C.TextSecondary, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Bold)
-            Text(libraryUri?.let { runCatching { DocumentFile.fromTreeUri(LocalContext.current, android.net.Uri.parse(it))?.name }.getOrNull() ?: it } ?: "Belum ada folder yang dipilih", color = C.TextPrimary, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(folderName, color = C.TextPrimary, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Button(onClick = onPick, modifier = Modifier.heightIn(min = 52.dp)) { Text("PILIH FOLDER  ·  SAF") }
             Text("Akses folder disimpan melalui Storage Access Framework. Preview tidak menyalin atau mendistribusikan data game.", color = C.TextMuted, fontSize = 11.sp)
         }
