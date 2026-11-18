@@ -72,3 +72,29 @@ Runtime workflow stages are now separated into bootstrap, Debian package downloa
 ## Diagnostic follow-up
 
 The next diagnostics collection writes complete inventories to files before truncating display copies (no producer-to-`head` SIGPIPE), captures symlinks, key directories, rootfs byte size, and host tool versions including dpkg, dpkg-deb, ar, tar, xz, zstd, QEMU and binfmt_misc. This is instrumentation-only; package selection and validation behavior remain unchanged until the current evidence is recorded and reviewed.
+
+
+## Run #37: collector verified; repeated graphics filename assumption
+
+- Run: [44226671035](https://github.com/dnctf/ghost-town-recomp/actions/runs/44226671035), commit `8263d9b50f24222b8a1fa4c378e14222eb056032`, completed **failure**.
+- Box64 build, ARM64 rootfs bootstrap, Debian amd64 package download, Wine download/checksum, and payload extraction succeeded. The validation step failed again.
+- Exact log evidence from job `134541397722` / `logs/04-validate-runtime-payloads.log`:
+  ```
+  + ...sh:2:main: test -x .../opt/wine/bin/wine
+  + ...sh:3:main: sudo readelf -h .../opt/wine/bin/wine
+  + ...sh:3:main: grep -q 'Machine:.*Advanced Micro Devices X86-64'
+  + ...sh:4:main: test -s .../usr/lib/x86_64-linux-gnu/dri/virgl_dri.so
+  [ERROR] stage=04-validate-runtime-payloads line=4 exit_code=1 command=test -s "$ROOTFS/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so"
+  ```
+- This is the second consecutive occurrence of the same known root cause (Run #36 and #37), not a new package-extraction fault. Stop threshold remains three identical failures.
+- Diagnostic artifact: [runtime-build-diagnostics](https://github.com/dnctf/ghost-town-recomp/actions/runs/44226671035/artifacts/14392094201), 400,395 bytes. The full artifact was inspected: no `Broken pipe` or `SIGPIPE` text; full find/list inventories, symlink inventory, key directories, tool versions and rootfs sizes were all written. Rootfs size at failure: 1,724,121,646 bytes (1.7G). `dpkg --audit` was empty. `/opt/wine/bin` includes executable `wine` and `wineboot -> wine`.
+- Host diagnostic tools: dpkg/dpkg-deb 1.22.6 (arm64), GNU ar 2.42, GNU tar 1.35, xz 5.4.5, zstd 1.5.7; qemu-aarch64, qemu-aarch64-static and update-binfmts were not installed on the host runner.
+- Collector verification: successful always-upload step; no SIGPIPE observed. Full inventory files are saved, with concise first-2500-line views retained for convenience.
+- Corrective change is now to make Wine/ELF/dependency checks fatal and graphics-driver inventory advisory. The actual package filename is represented in the manifest as `virtio_gpu_dri.so`; absence of an expected driver is not allowed to block the Wine smoke ladder.
+- The graphics transport risk and source references are recorded in `docs/graphics-plan.md`. See also [Mesa VirGL](https://docs.mesa3d.org/drivers/virgl.html), [Mesa vtest/virpipe driver commit](https://cgit.freedesktop.org/mesa/mesa/commit/?id=b3b82fe8ea1f7d02c93513920143cba2fe145b6c), and [virglrenderer vtest protocol](https://android.googlesource.com/platform/external/virglrenderer/+/68429e8e1106d0861d9f9f180583bd8381b8bf96/vtest/vtest_protocol.h).
+
+## Smoke ladder implementation
+
+- Added `runtime/scripts/ci-wine-smoke.sh`: sequential rungs a-e; exits at first failed rung; dynamic `wine`/`wine64` and `wineboot` detection; per-rung logs and selected entry-point listing.
+- Runtime smoke logs upload with `if: always()`. The smoke is executed on a native ARM64 CI runner and does not imply Android-device validation.
+- Standalone Wine experiment is deferred until rung c or d fails, or Debian Wine proves unstable. No alternate Wine build is added now.

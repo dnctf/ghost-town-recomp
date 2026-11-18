@@ -63,10 +63,11 @@
     },
     "virgl": {
       "upstream": "Debian Bookworm Mesa package libgl1-mesa-dri:amd64",
-      "driver": "/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so",
+      "driver": "/usr/lib/x86_64-linux-gnu/dri/virtio_gpu_dri.so",
+      "driver_inventory": "Enumerate all *.so files in the DRI directory during CI; absence of the expected driver is a warning, not a Wine smoke blocker.",
       "architecture": "x86_64 Wine guest",
-      "transport": "VirGL over X11/DRI3 to Android GLES host renderer",
-      "status": "Debian Bookworm amd64 Mesa VirGL driver included; X11/GLX presentation still requires physical-device validation",
+      "transport": "virtio-gpu DRM path in Debian guest; compatibility with Android vtest/virpipe socket transport is unproven",
+      "status": "Debian Bookworm amd64 Mesa package provides virtio_gpu_dri.so; renderer transport compatibility and X11/GLX presentation are unproven pending device glxinfo and visible-frame tests",
       "license": "Mesa component licenses; preserve Debian copyright files"
     }
   },

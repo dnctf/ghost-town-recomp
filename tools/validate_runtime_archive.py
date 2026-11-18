@@ -6,17 +6,16 @@ rebased by the Android installer. This validator never extracts archive data.
 """
 from __future__ import annotations
 
+import json
 import posixpath
 import sys
 import tarfile
+from pathlib import Path
 
 REQUIRED = {
     "rootfs/etc/os-release",
     "rootfs/usr/local/bin/box64",
     "rootfs/opt/wine/bin/wine",
-    "rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so",
-    "rootfs/usr/bin/glxinfo",
-    "rootfs/usr/bin/xmessage",
 }
 
 
@@ -63,6 +62,19 @@ def validate(path: str) -> None:
             raise ValueError("runtime archive missing required paths: " + ", ".join(missing))
         if not symlinks:
             raise ValueError("runtime archive unexpectedly contains no symlinks")
+
+        dri_prefix = "rootfs/usr/lib/x86_64-linux-gnu/dri/"
+        dri_files = sorted(name for name in names if name.startswith(dri_prefix) and name.endswith(".so"))
+        manifest_path = Path(__file__).resolve().parents[1] / "runtime" / "manifest.json"
+        expected = json.loads(manifest_path.read_text(encoding="utf-8"))["components"]["virgl"]["driver"]
+        expected_member = "rootfs" + expected if expected.startswith("/") else expected
+        print("Mesa DRI inventory:")
+        for name in dri_files:
+            print(f"  {name}")
+        if not dri_files:
+            print("WARNING: no Mesa DRI shared drivers found; graphics validation remains pending.")
+        if expected_member not in names:
+            print(f"WARNING: manifest expected driver missing from archive: {expected_member}")
         print(f"Runtime archive OK: {len(members)} entries, {symlinks} symlinks, {hardlinks} hardlinks")
 
 

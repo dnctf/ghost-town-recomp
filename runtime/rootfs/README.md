@@ -8,7 +8,7 @@ The archive contains:
 - `rootfs/`: Debian Bookworm ARM64/glibc userspace plus the amd64 libraries needed by WineD3D and Mesa VirGL
 - `rootfs/usr/local/bin/box64`: pinned ARM64 Box64 build using the Snapdragon 888 profile
 - `rootfs/opt/wine`: pinned Wine 11.19 amd64 payload
-- `rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so`: guest Mesa VirGL driver
+- `rootfs/usr/lib/x86_64-linux-gnu/dri/virtio_gpu_dri.so`: Mesa DRI driver file present in the pinned Debian Bookworm package; the archive validator inventories all DRI `.so` files and treats missing graphics drivers as a warning, not a Wine smoke blocker
 - `provenance/`: upstream commits, license notices, package versions, dependency reports, hashes, size measurements and Wine-under-Box64 smoke log
 
 PRoot and its Android loader are deliberately not duplicated in this archive. DXVK is deliberately not included until guest Vulkan and a visible D3D11 frame are independently validated. The runtime pack is extracted into app-private `filesDir/runtime/wine/`; Box64 and Wine guest binaries are invoked through PRoot, not executed directly from writable app data.
@@ -19,7 +19,7 @@ PRoot and its Android loader are deliberately not duplicated in this archive. DX
 - Package list: `runtime/rootfs/packages-amd64.txt`; packages are downloaded without running foreign-architecture maintainer scripts, then unpacked with `dpkg-deb -x`
 - Box64: pinned commit `7fab05334445948c918281b54f2a604ff63337f7`, built in a separate cached ARM64 job and reused as an artifact
 - Wine: Kron4ek Wine 11.19 amd64, SHA-256 pinned in the workflow
-- Mesa VirGL: Debian Bookworm amd64 packages, exact package versions recorded in provenance
+- Mesa: Debian Bookworm amd64 packages, exact package versions and the complete DRI driver directory inventory recorded in provenance; `virtio_gpu_dri.so` is the observed package driver name, not proof that it matches the Android socket renderer
 - PRoot: pinned commit `6f8ebfd8e24887dfba64c3f2d7d5fe9dc059b60e`, built into the APK's read-only native library directory
 
 The rootfs package step does not execute amd64 maintainer scripts under QEMU. This avoids the previous QEMU/binfmt configuration failure and avoids running foreign post-install hooks. It also means generated package caches such as GSettings schemas are not assumed to exist unless a runtime test proves they are needed.
@@ -38,4 +38,4 @@ Do not create a GitHub Release/tag or mark the pack published until the app/runt
 
 ## Scope and non-claims
 
-The CI smoke test executes Wine's version probe through Box64 on a native ARM64 GitHub runner. It does not prove that PRoot executes under Android/HarmonyOS app sandbox rules, that X11/VirGL displays a visible frame on Adreno 660, or that Overcooked! 2 is playable. No physical HarmonyOS 4.2 test is claimed. Keep `GHOST_TOWN_DISPLAY_READY=1` mandatory until the X11 display session and VirGL presentation self-tests pass.
+The CI smoke ladder executes Box64, a simple x86_64 binary, Wine version, wineboot and `wine cmd /c ver` on a native ARM64 GitHub runner. It does not prove that PRoot executes under Android/HarmonyOS app sandbox rules, that X11/VirGL displays a visible frame on Adreno 660, or that Overcooked! 2 is playable. No physical HarmonyOS 4.2 test is claimed. Keep `GHOST_TOWN_DISPLAY_READY=1` mandatory until the X11 display session and the selected guest-to-host graphics transport are proven by `glxinfo` and a visible-frame test on the target device.

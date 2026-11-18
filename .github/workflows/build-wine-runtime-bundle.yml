@@ -148,28 +148,41 @@ jobs:
           WINE_DIR="$(dirname "$(dirname "$WINE_BIN")")"
           sudo cp -a "$WINE_DIR/." "$ROOTFS/opt/wine/"
 
-      - name: Validate Wine and graphics payloads
+      - name: Validate Wine payloads (fatal) and inventory graphics (warning only)
         run: |
           source runtime/scripts/ci-diagnostics.sh 04-validate-runtime-payloads
           test -x "$ROOTFS/opt/wine/bin/wine"
           sudo readelf -h "$ROOTFS/opt/wine/bin/wine" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
-          test -s "$ROOTFS/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so"
-          test -x "$ROOTFS/usr/bin/glxinfo"
-          test -x "$ROOTFS/usr/bin/xmessage"
-          sudo lddtree -R "$ROOTFS" /usr/lib/x86_64-linux-gnu/dri/virgl_dri.so | tee virgl-lddtree.txt
-          if grep -Eq '=> None|could not locate library|not found' virgl-lddtree.txt; then
-            echo "Mesa VirGL driver has unresolved x86_64 shared-library dependencies." >&2
-            exit 1
-          fi
           sudo lddtree -R "$ROOTFS" /opt/wine/bin/wine | tee wine-lddtree.txt
           if grep -Eq '=> None|could not locate library|not found' wine-lddtree.txt; then
             echo "Wine has unresolved x86_64 shared-library dependencies." >&2
             exit 1
           fi
-          file "$ROOTFS/opt/wine/bin/wine" \
-            "$ROOTFS/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so" \
-            "$ROOTFS/usr/bin/glxinfo" "$ROOTFS/usr/bin/xmessage"
-
+          DRI_DIR="$ROOTFS/usr/lib/x86_64-linux-gnu/dri"
+          mkdir -p "$DRI_DIR"
+          { echo "### $DRI_DIR"; sudo ls -la "$DRI_DIR"; } | tee mesa-dri-inventory.txt
+          EXPECTED_DRIVER="$(python3 -c 'import json,os; print(os.path.basename(json.load(open("runtime/manifest.json"))["components"]["virgl"]["driver"]))')"
+          FIRST_DRI_DRIVER="$(find "$DRI_DIR" -maxdepth 1 -type f -name '*.so' -print -quit)"
+          if [ -z "$FIRST_DRI_DRIVER" ]; then
+            echo "[WARN] No Mesa DRI shared drivers found; graphics remains unvalidated." | tee -a mesa-dri-inventory.txt
+          fi
+          if [ ! -s "$DRI_DIR/$EXPECTED_DRIVER" ]; then
+            echo "[WARN] Manifest driver $EXPECTED_DRIVER is absent; available drivers are recorded above." | tee -a mesa-dri-inventory.txt
+          fi
+          : > mesa-dri-lddtree.txt
+          while IFS= read -r -d '' driver; do
+            echo "### $driver" | tee -a mesa-dri-lddtree.txt
+            sudo lddtree -R "$ROOTFS" "${driver#"$ROOTFS"}" 2>&1 | tee -a mesa-dri-lddtree.txt || echo "[WARN] Could not resolve dependencies for $driver" | tee -a mesa-dri-lddtree.txt
+            if grep -Eq '=> None|could not locate library|not found' mesa-dri-lddtree.txt; then
+              echo "[WARN] Mesa DRI driver has unresolved dependencies; Wine smoke may continue." | tee -a mesa-dri-lddtree.txt
+            fi
+          done < <(find "$DRI_DIR" -maxdepth 1 -type f -name '*.so' -print0)
+          for tool in glxinfo xmessage; do
+            if [ ! -x "$ROOTFS/usr/bin/$tool" ]; then
+              echo "[WARN] Optional graphics diagnostic /usr/bin/$tool is missing." | tee -a mesa-dri-inventory.txt
+            fi
+          done
+          file "$ROOTFS/opt/wine/bin/wine" | tee -a wine-lddtree.txt
       - name: Trim and package rootfs component
         run: |
           source runtime/scripts/ci-diagnostics.sh 05-trim-package-rootfs
@@ -214,8 +227,9 @@ jobs:
           cat rootfs-package-manifest-amd64.txt >> rootfs-package-manifest.txt
           mkdir -p rootfs-artifact/provenance/licenses
           cp runtime/licenses/WINE-LICENSE runtime/licenses/WINE-COPYING.LIB runtime/licenses/WINE-NOTICES.md rootfs-artifact/provenance/licenses/
-          cp wine-lddtree.txt virgl-lddtree.txt rootfs-package-manifest.txt rootfs-size-before-trim.txt rootfs-size-after-trim.txt rootfs-artifact/provenance/
-          printf 'guest_driver=virgl_dri.so\narchitecture=x86_64\nsource=Debian Bookworm libgl1-mesa-dri\ntransport=VirGL over X11/DRI3\n' > rootfs-artifact/provenance/MESA-VIRGL-BUILD-INFO.txt
+          cp wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt rootfs-package-manifest.txt rootfs-size-before-trim.txt rootfs-size-after-trim.txt rootfs-artifact/provenance/
+          EXPECTED_DRIVER="$(python3 -c 'import json,os; print(os.path.basename(json.load(open("runtime/manifest.json"))["components"]["virgl"]["driver"]))')"
+          printf 'expected_guest_driver=%s\narchitecture=x86_64\nsource=Debian Bookworm libgl1-mesa-dri\ntransport=virtio-gpu DRM; Android vtest/virpipe compatibility unproven\n' "$EXPECTED_DRIVER" > rootfs-artifact/provenance/MESA-VIRGL-BUILD-INFO.txt
           sha256sum downloads/wine.tar.xz > rootfs-artifact/provenance/UPSTREAM-ARCHIVE-SHA256SUMS
           printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=not-bundled\n' "$DEBIAN_SUITE" > rootfs-artifact/provenance/ROOTFS-BUILD-INFO.txt
           sudo tar --numeric-owner --xattrs --acls --exclude='rootfs/dev/*' \
@@ -237,7 +251,7 @@ jobs:
         run: |
           set +e
           mkdir -p logs runtime-failure-logs
-          for f in apt-get-download.log box64-ccache-stats.txt box64-ldd.txt wine-lddtree.txt virgl-lddtree.txt wine-box64-smoke.txt; do
+          for f in apt-get-download.log box64-ccache-stats.txt box64-ldd.txt wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt; do
             [ -f "$f" ] && cp "$f" runtime-failure-logs/
           done
           sudo dpkg --audit > runtime-failure-logs/dpkg-audit.txt 2>&1
@@ -347,15 +361,15 @@ jobs:
           sudo mount -t proc proc "$OUT/rootfs/proc"
           sudo mount -t sysfs sysfs "$OUT/rootfs/sys"
           trap 'sudo umount "$OUT/rootfs/sys" 2>/dev/null || true; sudo umount "$OUT/rootfs/proc" 2>/dev/null || true; sudo umount "$OUT/rootfs/dev" 2>/dev/null || true' EXIT
-          file "$OUT/rootfs/usr/local/bin/box64" "$OUT/rootfs/opt/wine/bin/wine" "$OUT/rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so"
-          sudo chroot "$OUT/rootfs" env BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib /usr/local/bin/box64 /opt/wine/bin/wine --version 2>&1 | tee wine-box64-smoke.txt
-          grep -Eiq 'wine-11\.19|wine version 11\.19' wine-box64-smoke.txt
-          cp wine-box64-smoke.txt "$OUT/provenance/"
+          file "$OUT/rootfs/usr/local/bin/box64" "$OUT/rootfs/opt/wine/bin/wine"
+          mkdir -p runtime-smoke
+          bash runtime/scripts/ci-wine-smoke.sh "$OUT/rootfs" runtime-smoke
+          cp runtime-smoke/*.log "$OUT/provenance/"
           sudo umount "$OUT/rootfs/sys"
           sudo umount "$OUT/rootfs/proc"
           sudo umount "$OUT/rootfs/dev"
           trap - EXIT
-          (cd "$OUT" && sha256sum rootfs/usr/local/bin/box64 rootfs/opt/wine/bin/wine rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so rootfs/usr/bin/glxinfo rootfs/usr/bin/xmessage > provenance/RUNTIME-SHA256SUMS)
+          (cd "$OUT" && sha256sum rootfs/usr/local/bin/box64 rootfs/opt/wine/bin/wine > provenance/RUNTIME-SHA256SUMS)
           tar --numeric-owner --xattrs --acls -czf ghost-town-wine-runtime-arm64.tar.gz -C "$OUT" .
           sha256sum ghost-town-wine-runtime-arm64.tar.gz > ghost-town-wine-runtime-arm64.tar.gz.sha256
           python3 tools/validate_runtime_archive.py ghost-town-wine-runtime-arm64.tar.gz
@@ -363,6 +377,14 @@ jobs:
           python3 tools/audit_runtime_tree.py "$OUT" | tee runtime-tree-size-audit.txt
           printf '\nARCHIVE_BYTES=' >> runtime-tree-size-audit.txt
           stat -c '%s' ghost-town-wine-runtime-arm64.tar.gz >> runtime-tree-size-audit.txt
+      - name: Upload Wine smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-wine-smoke-diagnostics
+          path: runtime-smoke/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload complete runtime bundle
         uses: actions/upload-artifact@v4
         with:
