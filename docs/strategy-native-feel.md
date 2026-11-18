@@ -121,7 +121,9 @@ Kutipan di bawah disalin langsung dari berkas lisensi pada URL yang ditautkan. T
 **Mesa / Turnip — `mesa/mesa`, branch `main`**
 
 - Berkas repository: [LICENSE (raw)](https://raw.githubusercontent.com/mesa/mesa/main/LICENSE) dan [NOTICE (raw)](https://raw.githubusercontent.com/mesa/mesa/main/NOTICE).
-- Cuplikan langsung dari NOTICE:
+- Cuplikan langsung dari [LICENSE](https://raw.githubusercontent.com/mesa/mesa/main/LICENSE):
+  > Apache License Version 2.0, January 2004
+- Cuplikan langsung dari [NOTICE](https://raw.githubusercontent.com/mesa/mesa/main/NOTICE):
   > Licensed under the Apache License, Version 2.0 (the "License");
 - Metadata repository menunjukkan Apache-2.0 untuk berkas LICENSE tingkat repo. **Ini bukan bukti bahwa seluruh source Mesa/Turnip atau setiap binary driver hanya Apache-2.0**: Mesa memuat file/komponen dengan header lisensi berbeda. Sebelum bundling Turnip, audit source file yang masuk build, subproject, firmware, generated code, dan notices binary. Lisensi final driver build belum diverifikasi file-per-file.
 
