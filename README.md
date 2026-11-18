@@ -114,6 +114,12 @@ Dokumen teknis:
 - [Graphics transport plan](docs/graphics-plan.md)
 - [Device bring-up — draft, belum untuk dijalankan](docs/device-bringup.md)
 - [UI Preview guide](docs/ui-preview.md)
+- [Strategi native-feel dan perbandingan lisensi](docs/strategy-native-feel.md)
+- [Feasibility spike MatePad](docs/feasibility-spike.md)
+- [Profil game dan deteksi Unity](docs/game-profiles.md)
+- [Rencana native-feel UX](docs/native-experience.md)
+- [Dev loop perangkat](docs/dev-loop.md)
+- [Laporan build otomatis](docs/build-reports.md)
 
 ## Roadmap berbasis gerbang
 
