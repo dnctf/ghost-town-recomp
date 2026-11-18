@@ -204,6 +204,89 @@ jobs:
               test "$(sudo readlink "$ROOTFS/lib")" = "usr/lib"
             fi
           done
+
+          # Rootfs configuration exception: fontconfig-config is native ARM64.
+          # Keep the Wine shared-library extraction filter above strictly amd64|all.
+          CONFIG_DEB="$(find "$ROOTFS/var/cache/apt/archives" -maxdepth 1 -type f -name 'fontconfig-config_*_arm64.deb' -print -quit)"
+          if [ -z "$CONFIG_DEB" ]; then
+            echo "[FAIL] expected fontconfig-config_*_arm64.deb was not downloaded." | tee -a rootfs-package-extraction.log
+            exit 1
+          fi
+          CONFIG_PACKAGE="$(dpkg-deb -f "$CONFIG_DEB" Package)"
+          CONFIG_ARCH="$(dpkg-deb -f "$CONFIG_DEB" Architecture)"
+          CONFIG_VERSION="$(dpkg-deb -f "$CONFIG_DEB" Version)"
+          test "$CONFIG_PACKAGE" = "fontconfig-config"
+          test "$CONFIG_ARCH" = "arm64"
+          printf '%s:%s=%s\n' "$CONFIG_PACKAGE" "$CONFIG_ARCH" "$CONFIG_VERSION" > rootfs-package-manifest-config.txt
+          echo "[INFO] extracting whitelisted rootfs config package $CONFIG_PACKAGE:$CONFIG_ARCH=$CONFIG_VERSION" | tee -a rootfs-package-extraction.log
+          sudo rm -rf "$EXTRACT_TMP"
+          sudo mkdir -p "$EXTRACT_TMP"
+          sudo dpkg-deb -x "$CONFIG_DEB" "$EXTRACT_TMP"
+          sudo python3 - "$EXTRACT_TMP" "$ROOTFS" <<'PY'
+          import os
+          import shutil
+          import sys
+
+          stage = os.path.realpath(sys.argv[1])
+          rootfs = os.path.realpath(sys.argv[2])
+          source = os.path.join(stage, "etc", "fonts")
+          if not os.path.isdir(source) or not os.path.isfile(os.path.join(source, "fonts.conf")):
+              raise SystemExit("[FAIL] fontconfig-config payload lacks etc/fonts/fonts.conf")
+
+          entries = []
+          for current, dirs, files in os.walk(source, topdown=True, followlinks=False):
+              for name in list(dirs) + files:
+                  path = os.path.join(current, name)
+                  rel = os.path.relpath(path, stage)
+                  normalized = os.path.normpath(rel)
+                  if normalized == "." or normalized.startswith(".." + os.sep) or os.path.isabs(normalized):
+                      raise SystemExit("[FAIL] unsafe package path: " + rel)
+                  if not (normalized == os.path.join("etc", "fonts") or normalized.startswith(os.path.join("etc", "fonts") + os.sep)):
+                      raise SystemExit("[FAIL] package path outside /etc/fonts whitelist: " + rel)
+                  if os.path.islink(path):
+                      link = os.readlink(path)
+                      mapped = os.path.normpath(os.path.join(rootfs, link.lstrip(os.sep))) if os.path.isabs(link) else os.path.normpath(os.path.join(rootfs, normalized, os.pardir, link))
+                      if os.path.commonpath((rootfs, mapped)) != rootfs:
+                          raise SystemExit("[FAIL] symlink escapes rootfs: %s -> %s" % (rel, link))
+                  entries.append((normalized, path))
+
+          for rel, src in sorted(entries, key=lambda item: (item[0].count(os.sep), item[0])):
+              dst = os.path.join(rootfs, rel)
+              os.makedirs(os.path.dirname(dst), exist_ok=True)
+              if os.path.islink(src):
+                  link = os.readlink(src)
+                  if os.path.lexists(dst):
+                      if not os.path.islink(dst) or os.readlink(dst) != link:
+                          raise SystemExit("[FAIL] refusing conflicting overwrite: " + dst)
+                  else:
+                      os.symlink(link, dst)
+              elif os.path.isdir(src):
+                  if os.path.lexists(dst) and (os.path.islink(dst) or not os.path.isdir(dst)):
+                      raise SystemExit("[FAIL] refusing directory overwrite: " + dst)
+                  os.makedirs(dst, exist_ok=True)
+                  shutil.copystat(src, dst, follow_symlinks=False)
+              elif os.path.isfile(src):
+                  if os.path.lexists(dst):
+                      if os.path.islink(dst) or not os.path.isfile(dst):
+                          raise SystemExit("[FAIL] refusing file overwrite: " + dst)
+                      with open(src, "rb") as a, open(dst, "rb") as b:
+                          if a.read() != b.read():
+                              raise SystemExit("[FAIL] refusing different-content overwrite: " + dst)
+                  else:
+                      shutil.copy2(src, dst)
+              else:
+                  raise SystemExit("[FAIL] unsupported filesystem object: " + src)
+
+          if not os.path.isfile(os.path.join(rootfs, "etc/fonts/fonts.conf")):
+              raise SystemExit("[FAIL] /etc/fonts/fonts.conf missing after config extraction")
+          if not os.path.isdir(os.path.join(rootfs, "etc/fonts/conf.d")):
+              raise SystemExit("[FAIL] /etc/fonts/conf.d missing after config extraction")
+          print("[PASS] whitelisted fontconfig-config:arm64 extracted safely into rootfs")
+          PY
+          sudo test -s "$ROOTFS/etc/fonts/fonts.conf"
+          sudo test -d "$ROOTFS/etc/fonts/conf.d"
+          echo "[PASS] Fontconfig rootfs paths exist after ARM64 config extraction" | tee -a rootfs-package-extraction.log
+
           sudo rm -rf "$EXTRACT_TMP"
           sudo cp -a "$ROOTFS/var/cache/apt/archives/." "$RUNNER_TEMP/apt-cache/archives/" 2>/dev/null || true
           sudo mkdir -p "$ROOTFS/opt/wine"
@@ -367,7 +450,7 @@ jobs:
           print("Rewrote %d absolute symlinks; all symlinks remain rootfs-confined." % rewritten)
           PY
           sudo dpkg-query --admindir="$ROOTFS/var/lib/dpkg" -W -f='${Package}:${Architecture}=${Version}\n' > rootfs-package-manifest.txt
-          cat rootfs-package-manifest-amd64.txt >> rootfs-package-manifest.txt
+          cat rootfs-package-manifest-amd64.txt rootfs-package-manifest-config.txt >> rootfs-package-manifest.txt
           mkdir -p rootfs-artifact/provenance/licenses
           cp runtime/licenses/WINE-LICENSE runtime/licenses/WINE-COPYING.LIB runtime/licenses/WINE-NOTICES.md rootfs-artifact/provenance/licenses/
           cp wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt rootfs-package-manifest.txt rootfs-size-before-trim.txt rootfs-size-after-trim.txt glibc-compatibility.log box64-glibc-symbols-rootfs-check.txt rootfs-artifact/provenance/
@@ -396,7 +479,7 @@ jobs:
         run: |
           set +e
           mkdir -p logs runtime-failure-logs
-          for f in apt-get-download.log apt-get-elf-header.txt apt-get-elf-program-headers.txt apt-get-loader-paths.txt rootfs-package-manifest-amd64.txt rootfs-package-extraction.log rootfs-usrmerge-before-amd64.txt rootfs-usrmerge-after-amd64.txt rootfs-symlinks-after-amd64.txt rootfs-symlinks-before-loader-fix.txt box64-ccache-stats.txt box64-ldd.txt box64-build-glibc.txt box64-glibc-symbols.txt box64-glibc-symbols-rootfs-check.txt glibc-compatibility.log wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt; do
+          for f in apt-get-download.log apt-get-elf-header.txt apt-get-elf-program-headers.txt apt-get-loader-paths.txt rootfs-package-manifest-amd64.txt rootfs-package-manifest-config.txt rootfs-package-extraction.log rootfs-usrmerge-before-amd64.txt rootfs-usrmerge-after-amd64.txt rootfs-symlinks-after-amd64.txt rootfs-symlinks-before-loader-fix.txt box64-ccache-stats.txt box64-ldd.txt box64-build-glibc.txt box64-glibc-symbols.txt box64-glibc-symbols-rootfs-check.txt glibc-compatibility.log wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt; do
             [ -f "$f" ] && cp "$f" runtime-failure-logs/
           done
           sudo dpkg --audit > runtime-failure-logs/dpkg-audit.txt 2>&1
