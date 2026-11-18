@@ -111,6 +111,21 @@ jobs:
       - name: Run Android lint
         working-directory: android
         run: gradle lint --no-daemon --stacktrace
+      - name: Audit APK contents and record package sizes
+        run: |
+          set -euo pipefail
+          mkdir -p size-audit
+          for apk in android/app/build/outputs/apk/debug/*.apk android/app/build/outputs/apk/release/*.apk; do
+            [ -f "$apk" ] || continue
+            python3 tools/audit_apk_size.py "$apk" | tee "size-audit/$(basename "$apk").txt"
+          done
+          test -s size-audit/app-release.apk.txt
+      - name: Upload APK size audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-size-audit
+          path: size-audit/
+          if-no-files-found: error
       - name: Upload APKs and native library
         uses: actions/upload-artifact@v4
         with:
