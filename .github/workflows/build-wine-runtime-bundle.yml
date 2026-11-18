@@ -102,7 +102,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y debootstrap git cmake ninja-build build-essential \
             file binutils libcapstone-dev curl xz-utils tar python3 pax-utils \
-            qemu-user-static binfmt-support
+            qemu-user-static binfmt-support ccache
           # Register the x86_64 ELF handler on this ARM64 runner before any
           # amd64 package maintainer script is executed inside the chroot.
           sudo modprobe binfmt_misc || true
@@ -121,14 +121,29 @@ jobs:
             test -r /proc/sys/fs/binfmt_misc/qemu-x86_64
             grep -q '^enabled' /proc/sys/fs/binfmt_misc/qemu-x86_64
           fi
+      - name: Restore Box64 compiler cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: box64-arm64-${{ env.BOX64_REF }}-sd888-dynarec-release-v1
+          restore-keys: |
+            box64-arm64-${{ env.BOX64_REF }}-sd888-dynarec-
+      - name: Restore Debian package archive cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/apt-cache
+          key: debian-bookworm-arm64-amd64-runtime-packages-v1
       - name: Build Box64 for ARM64 glibc
         run: |
           set -euo pipefail
           git clone https://github.com/ptitSeb/box64.git box64-src
           git -C box64-src checkout --detach "$BOX64_REF"
           git -C box64-src rev-parse HEAD > box64-upstream-commit.txt
+          ccache --zero-stats || true
           cmake -S box64-src -B box64-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_INSTALL_PREFIX=/usr/local \
             -DSD888=ON \
             -DARM_DYNAREC=ON \
@@ -139,6 +154,7 @@ jobs:
           file box64-install/usr/local/bin/box64
           readelf -h box64-install/usr/local/bin/box64 | grep -q 'Machine:.*AArch64'
           ldd box64-install/usr/local/bin/box64 | tee box64-ldd.txt
+          ccache --show-stats | tee box64-ccache-stats.txt
 
       - name: Download and verify pinned Wine and DXVK
         run: |
@@ -157,6 +173,8 @@ jobs:
           sudo debootstrap --arch=arm64 --variant=minbase \
             --include=ca-certificates,locales,libstdc++6,libgcc-s1,libcapstone4 \
             "$DEBIAN_SUITE" "$ROOTFS" https://deb.debian.org/debian
+          mkdir -p "$RUNNER_TEMP/apt-cache/archives/partial"
+          sudo cp -a "$RUNNER_TEMP/apt-cache/archives/." "$ROOTFS/var/cache/apt/archives/" 2>/dev/null || true
           sudo cp /etc/resolv.conf "$ROOTFS/etc/resolv.conf"
           # Keep a private emulator copy in the guest root while dpkg runs.
           # The host binfmt registration handles normal execve from maintainer scripts.
@@ -181,6 +199,7 @@ jobs:
             libunwind8:amd64 libatomic1:amd64 libglib2.0-0:amd64 \
             libgstreamer1.0-0:amd64 libgstreamer-plugins-base1.0-0:amd64 \
             libkrb5-3:amd64 libldap-2.5-0:amd64
+          sudo cp -a "$ROOTFS/var/cache/apt/archives/." "$RUNNER_TEMP/apt-cache/archives/" 2>/dev/null || true
           sudo install -D -m 0755 box64-install/usr/local/bin/box64 "$ROOTFS/usr/local/bin/box64"
           sudo mkdir -p "$ROOTFS/opt/wine" "$ROOTFS/opt/dxvk"
           mkdir wine-extract dxvk-extract
@@ -256,7 +275,7 @@ jobs:
           mkdir -p rootfs-artifact/provenance/licenses
           cp box64-src/LICENSE rootfs-artifact/provenance/licenses/BOX64-LICENSE
           cp runtime/licenses/WINE-LICENSE runtime/licenses/WINE-COPYING.LIB runtime/licenses/WINE-NOTICES.md runtime/licenses/DXVK-LICENSE rootfs-artifact/provenance/licenses/
-          cp box64-upstream-commit.txt box64-ldd.txt wine-lddtree.txt virgl-lddtree.txt rootfs-package-manifest.txt wine-box64-smoke.txt rootfs-artifact/provenance/
+          cp box64-upstream-commit.txt box64-ldd.txt box64-ccache-stats.txt wine-lddtree.txt virgl-lddtree.txt rootfs-package-manifest.txt wine-box64-smoke.txt rootfs-artifact/provenance/
           printf 'guest_driver=virgl_dri.so\narchitecture=x86_64\nsource=Debian Bookworm libgl1-mesa-dri\ntransport=VirGL over X11/DRI3\n' > rootfs-artifact/provenance/MESA-VIRGL-BUILD-INFO.txt
           sha256sum downloads/wine.tar.xz downloads/dxvk.tar.gz > rootfs-artifact/provenance/UPSTREAM-ARCHIVE-SHA256SUMS
           printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=3.1.1\n' "$DEBIAN_SUITE" > rootfs-artifact/provenance/ROOTFS-BUILD-INFO.txt
