@@ -49,6 +49,7 @@ jobs:
     timeout-minutes: 60
     env:
       BOX64_REF: ${{ inputs.box64_ref || '7fab05334445948c918281b54f2a604ff63337f7' }}
+      BOX64_PATCH_REV: bsd-vis-wrapper-v1
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -64,12 +65,13 @@ jobs:
           path: |
             box64-install/
             box64-binary-cache-ref.txt
-          key: box64-binary-arm64-${{ env.BOX64_REF }}-sd888-dynarec-v2
+            box64-patch-revision.txt
+          key: box64-binary-arm64-${{ env.BOX64_REF }}-${{ env.BOX64_PATCH_REV }}-sd888-dynarec-v1
       - name: Restore Box64 compiler cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
-          key: box64-arm64-${{ env.BOX64_REF }}-sd888-dynarec-release-v2
+          key: box64-arm64-${{ env.BOX64_REF }}-${{ env.BOX64_PATCH_REV }}-sd888-dynarec-release-v1
           restore-keys: |
             box64-arm64-${{ env.BOX64_REF }}-sd888-dynarec-
       - name: Build pinned Box64
@@ -78,9 +80,29 @@ jobs:
           git clone https://github.com/ptitSeb/box64.git box64-src
           git -C box64-src checkout --detach "$BOX64_REF"
           git -C box64-src rev-parse HEAD > box64-upstream-commit.txt
-          if [ -x box64-install/usr/local/bin/box64 ] && [ "$(cat box64-binary-cache-ref.txt 2>/dev/null || true)" = "$BOX64_REF" ]; then
-            echo "Using cached pinned Box64 binary: $BOX64_REF"
+          if [ -x box64-install/usr/local/bin/box64 ] && [ "$(cat box64-binary-cache-ref.txt 2>/dev/null || true)" = "$BOX64_REF:$BOX64_PATCH_REV" ]; then
+            echo "Using cached pinned Box64 binary: $BOX64_REF (patch=$BOX64_PATCH_REV)"
           else
+            python3 - <<'PY'
+          from pathlib import Path
+          header = Path("box64-src/src/wrapped/wrappedlibbsd_private.h")
+          source = header.read_text()
+          replacements = {
+              "//GO(strunvis, ": "GO(strunvis, iFpp)",
+              "//GO(strvis, ": "GO(strvis, iFppi)",
+              "//GO(vis, ": "GO(vis, pFpiii)",
+          }
+          for old, new in replacements.items():
+              if old not in source:
+                  raise SystemExit(f"expected Box64 wrapper marker not found: {old!r}")
+              source = source.replace(old, new, 1)
+          header.write_text(source)
+          print("Enabled libbsd wrappers: strunvis, strvis, vis")
+          PY
+            (cd box64-src && python3 rebuild_wrappers.py)
+            grep -q 'GO(strunvis, iFpp)' box64-src/src/wrapped/wrappedlibbsd_private.h
+            grep -q 'GO(strvis, iFppi)' box64-src/src/wrapped/wrappedlibbsd_private.h
+            grep -q 'GO(vis, pFpiii)' box64-src/src/wrapped/wrappedlibbsd_private.h
             ccache --zero-stats || true
             cmake -S box64-src -B box64-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
@@ -90,7 +112,8 @@ jobs:
               -DSD888=ON -DARM_DYNAREC=ON -DNO_LIB_INSTALL=ON -DNO_CONF_INSTALL=ON
             cmake --build box64-build --parallel 2
             install -D -m 0755 "$(find box64-build -type f -name box64 -perm -111 -print -quit)" box64-install/usr/local/bin/box64
-            printf '%s\n' "$BOX64_REF" > box64-binary-cache-ref.txt
+            printf '%s\n' "$BOX64_REF:$BOX64_PATCH_REV" > box64-binary-cache-ref.txt
+            printf '%s\n' "$BOX64_PATCH_REV" > box64-patch-revision.txt
           fi
           file box64-install/usr/local/bin/box64
           readelf -h box64-install/usr/local/bin/box64 | grep -q 'Machine:.*AArch64'
@@ -109,6 +132,7 @@ jobs:
             box64-install/
             box64-src/LICENSE
             box64-upstream-commit.txt
+            box64-patch-revision.txt
             box64-ldd.txt
             box64-build-glibc.txt
             box64-glibc-symbols.txt
