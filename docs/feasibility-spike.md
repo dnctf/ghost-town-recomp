@@ -47,3 +47,36 @@ Checklist: instalasi/first-run, container start/stop, frame game terlihat, audio
 - FAIL: aplikasi/container tidak dapat start atau OS menolak komponen.
 - Jangan menyimpulkan kompatibilitas dari FPS menu saja. Ulangi perubahan satu variabel setiap percobaan.
 Jangan kirim APK proprietary, game executable, asset, save data, serial, akun, token atau path pribadi.
+
+
+## Matriks keputusan pra-hasil (semua ambang adalah USULAN)
+
+Matriks ini ditetapkan sebelum menerima hasil pengguna. Ini alat triase, bukan keputusan final arsitektur. Jangan memilih fork/rewrite sebelum tabel hasil dan log perangkat diterima.
+
+| Hasil uji Winlator | Interpretasi awal (USULAN) | Tindak lanjut |
+|---|---|---|
+| Tidak terpasang atau aplikasi tidak dapat dijalankan pada HarmonyOS 4.2 | Blocker tingkat OS/sandbox sampai terbukti penyebab spesifik | Catat pesan error lengkap, HarmonyOS build, izin yang diminta, sumber APK dan SHA-256; cari penyebab sebelum memilih jalur. Jangan simpulkan semua Wine/Box64 mustahil dari satu error instalasi. |
+| Terpasang, tetapi game tidak tampil atau crash saat start | Masalah jalur grafis/runtime/komponen (USULAN) | Simpan log dan identifikasi tahap terakhir; ulangi dengan satu perubahan per sesi: driver GPU atau DXVK, bukan keduanya sekaligus. |
+| Menu tampil, FPS < 20 | Performa belum memadai; tuning (USULAN) | Uji skala resolusi dan preset performa satu per satu. Belum cukup untuk memutuskan arsitektur; bedakan FPS menu dari gameplay. |
+| Gameplay >= 30 FPS stabil selama >= 15 menit tanpa crash fatal | Jalur hybrid pinned layak dievaluasi (USULAN) | Catat dan salin konfigurasi yang benar-benar terbukti ke catatan kandidat/profil Overcooked! 2. **Jangan ubah status profil Ghost Town dari `untested`** sampai stack Ghost Town sendiri membuktikan konfigurasi itu. |
+
+### Format input untuk ingest
+
+Gunakan tabel Markdown atau CSV dengan header berikut (alias umum juga diterima): `installed`, `game_visible`, `menu_visible`, `gameplay`, `fps_median`, `stable_minutes`, `crash`, `error`, `driver`, `dxvk`, `notes`.
+
+Contoh CSV:
+
+```csv
+installed,game_visible,menu_visible,gameplay,fps_median,stable_minutes,crash,error,driver,dxvk,notes
+yes,yes,yes,yes,32,15,no,,Turnip,off,contoh data saja
+```
+
+Jalankan:
+
+```bash
+python3 tools/ingest_feasibility.py hasil-matepad.csv
+python3 tools/ingest_feasibility.py hasil-matepad.md --output ringkasan.md
+python3 -m unittest tools.tests.test_feasibility_ingest -v
+```
+
+Tool hanya membaca tabel dan menghasilkan ringkasan/rekomendasi. Tool tidak mengedit profil game, manifest, runtime, atau memutuskan arsitektur otomatis. Semua angka ambang di atas adalah usulan dan harus dipertimbangkan bersama log/error serta pengulangan pengujian.
