@@ -124,7 +124,7 @@ Dokumen teknis:
 
 ## Cara melaporkan masalah
 
-Fitur **Ekspor diagnostik ZIP direncanakan pada P3 tetapi belum tersedia**. Jangan mengirim file game atau data pribadi. Untuk kondisi build saat ini, sertakan:
+Fitur **Ekspor diagnostik ZIP direncanakan pada P3 tetapi belum tersedia**. Setiap workflow build juga menyediakan artifact laporan otomatis bernama build-report-<workflow>-<run_number> (jika report job sempat berjalan), berisi ringkasan tahap, smoke ladder, versi, ukuran, artefak, dan gerbang. Unduh dari tab Actions > run > Artifacts; lihat [Cara membaca laporan](docs/build-reports.md). Jangan mengirim file game atau data pribadi. Untuk kondisi build saat ini, sertakan:
 - versi aplikasi dan model/versi OS perangkat;
 - langkah reproduksi dan waktu kejadian;
 - log CI yang relevan atau `adb logcat` yang sudah disaring dari informasi pribadi;

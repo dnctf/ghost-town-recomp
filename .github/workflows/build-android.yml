@@ -162,3 +162,13 @@ jobs:
             proot-upstream-commit.txt
             android/app/src/main/assets/licenses/PROOT-COPYING
           if-no-files-found: error
+
+
+  build-report:
+    name: Build report (always)
+    if: always()
+    needs: [probe-tests, android-build]
+    uses: ./.github/workflows/build-report.yml
+    with:
+      workflow_name: ${{ github.workflow }}
+      job_results: ${{ toJSON(needs) }}

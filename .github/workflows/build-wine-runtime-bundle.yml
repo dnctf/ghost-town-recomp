@@ -508,3 +508,13 @@ jobs:
             runtime-tree-size-audit.txt
           if-no-files-found: error
           retention-days: 30
+
+
+  build-report:
+    name: Build report (always)
+    if: always()
+    needs: [build-box64, build-rootfs, assemble]
+    uses: ./.github/workflows/build-report.yml
+    with:
+      workflow_name: ${{ github.workflow }}
+      job_results: ${{ toJSON(needs) }}
