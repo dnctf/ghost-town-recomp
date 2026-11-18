@@ -1,65 +1,229 @@
 #!/usr/bin/env bash
 set -euo pipefail
-OUT="${1:-reports}"; mkdir -p "$OUT"
+OUT="${1:-reports}"
+mkdir -p "$OUT"
 python3 - "$OUT" <<'PY'
-import os,re,json,pathlib,sys
-out=pathlib.Path(sys.argv[1])
-def env(k):return os.environ.get(k) or "TIDAK TERSEDIA"
-def read(p):
- try:return pathlib.Path(p).read_text(errors="replace")
- except:return ""
-def pick(pat,txt):
- m=re.search(pat,txt,re.I|re.M);return (m.group(1) if m.lastindex else m.group(0)).strip() if m else "TIDAK TERSEDIA"
-def quote(txt):return "\n".join("> "+line if line else ">" for line in txt.splitlines())
-workflow=env("REPORT_WORKFLOW")
-slug=re.sub(r"[^a-z0-9]+","-",workflow.lower()).strip("-") or "workflow"
-try:jobs=json.loads(env("REPORT_JOB_RESULTS"))
-except:jobs={}
-states=[v.get("result") if isinstance(v,dict) else v for v in jobs.values()] if isinstance(jobs,dict) else []
-result="SUKSES" if states and all(x=="success" for x in states) else "DIBATALKAN" if "cancelled" in states else "GAGAL" if "failure" in states else "TIDAK TERSEDIA"
-root=pathlib.Path(env("REPORT_ARTIFACT_DIR") if env("REPORT_ARTIFACT_DIR")!="TIDAK TERSEDIA" else "artifacts")
-files=[p for p in root.rglob("*") if p.is_file()] if root.exists() else []
-texts={p.name:read(p) for p in files}; alltext="\n".join(texts.values())
-a=[]
-add=a.append
+import csv, datetime as dt, json, os, pathlib, re, sys
+out = pathlib.Path(sys.argv[1])
+def env(k, default="TIDAK TERSEDIA"):
+    return os.environ.get(k) or default
+def load_json(key, fallback=None):
+    raw = os.environ.get(key, "")
+    if not raw:
+        p = os.environ.get(key + "_FILE")
+        if p and pathlib.Path(p).exists():
+            raw = pathlib.Path(p).read_text(errors="replace")
+    try:
+        return json.loads(raw) if raw else (fallback if fallback is not None else {})
+    except Exception:
+        return fallback if fallback is not None else {}
+def read_text(p):
+    try: return p.read_text(errors="replace")
+    except Exception: return ""
+def pick(pattern, text, default="TIDAK TERSEDIA"):
+    m = re.search(pattern, text, re.I | re.M)
+    if not m: return default
+    return (m.group(1) if m.lastindex else m.group(0)).strip()
+def parse_time(value):
+    if not value: return None
+    try: return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except Exception: return None
+def duration(start, end):
+    a, b = parse_time(start), parse_time(end)
+    if not a or not b: return "TIDAK TERSEDIA"
+    sec = max(0, int((b-a).total_seconds()))
+    h, rem = divmod(sec, 3600); m, s = divmod(rem, 60)
+    return (f"{h}h " if h else "") + (f"{m}m " if m or h else "") + f"{s}s ({sec}s)"
+def redact(s):
+    s = re.sub(r"(?i)(gh[pousr]_[A-Za-z0-9_]{20,})", "[REDACTED_TOKEN]", s)
+    s = re.sub(r"(?i)(authorization|token|password|secret|api_key)=([^\\s]+)", r"\1=[REDACTED]", s)
+    s = re.sub(r"(?i)Bearer\\s+[^\\s]+", "Bearer [REDACTED]", s)
+    s = re.sub(r"/home/runner/[^\\s:]+", "[RUNNER_PATH]", s)
+    s = re.sub(r"/Users/[^\\s:]+", "[PRIVATE_PATH]", s)
+    return s
+def quote(s):
+    return "\\n".join("> " + line if line else ">" for line in s.splitlines())
+workflow = env("REPORT_WORKFLOW")
+slug = re.sub(r"[^a-z0-9]+", "-", workflow.lower()).strip("-") or "workflow"
+api_status = env("REPORT_API_STATUS", "failed")
+run = load_json("REPORT_RUN_JSON")
+jobs_api = load_json("REPORT_JOBS_JSON", [])
+artifacts_api = load_json("REPORT_ARTIFACTS_JSON", [])
+needs = load_json("REPORT_JOB_RESULTS")
+if isinstance(jobs_api, dict): jobs_api = jobs_api.get("jobs", [])
+if isinstance(artifacts_api, dict): artifacts_api = artifacts_api.get("artifacts", [])
+if isinstance(needs, dict):
+    needs = [{"name": k, "conclusion": (v or {}).get("result", "TIDAK TERSEDIA")} for k,v in needs.items()]
+else: needs = []
+root = pathlib.Path(env("REPORT_ARTIFACT_DIR", "artifacts"))
+files = sorted(p for p in root.rglob("*") if p.is_file()) if root.exists() else []
+texts = {p.relative_to(root).as_posix(): read_text(p) for p in files if p.suffix.lower() in (".log",".txt",".md",".json",".out")}
+alltext = "\\n".join(texts.values())
+runtime = bool(re.search(r"runtime|wine", workflow, re.I))
+apk_workflow = bool(re.search(r"apk", workflow, re.I))
+conclusion = run.get("conclusion") if api_status == "ok" else None
+if conclusion == "success": overall = "SUKSES"
+elif conclusion in ("cancelled", "canceled"): overall = "DIBATALKAN"
+elif conclusion in ("timed_out", "startup_failure"): overall = "TIMEOUT"
+elif conclusion == "failure": overall = "GAGAL"
+else:
+    states = [x.get("conclusion") for x in jobs_api] or [x.get("conclusion") for x in needs]
+    overall = "DIBATALKAN" if any(x in ("cancelled","canceled") for x in states) else "TIMEOUT" if "timed_out" in states else "GAGAL" if "failure" in states else "SUKSES" if states and all(x=="success" for x in states) else "TIDAK TERSEDIA"
+started = run.get("run_started_at") or run.get("created_at")
+finished = run.get("updated_at") if run.get("status") == "completed" else None
+total_duration = duration(started, finished) if api_status == "ok" else "TIDAK TERSEDIA"
+branch = run.get("head_branch") or env("GITHUB_REF_NAME")
+sha = run.get("head_sha") or env("GITHUB_SHA")
+commit_message = env("REPORT_COMMIT_MESSAGE")
+if commit_message == "TIDAK TERSEDIA":
+    commit_message = env("GITHUB_EVENT_HEAD_COMMIT_MESSAGE")
+runner_os = env("RUNNER_OS")
+runner_arch = env("RUNNER_ARCH")
+runner_machine = env("REPORT_RUNNER_MACHINE")
+runner_nproc = env("REPORT_RUNNER_NPROC")
+runner_ram = env("REPORT_RUNNER_RAM")
+runner = f"{runner_os}/{runner_arch} ({runner_machine}), nproc={runner_nproc}, RAM={runner_ram}; job runner labels: " + ", ".join(str(x.get("name","")) + " [" + ",".join(x.get("labels",[])) + "]" for x in jobs_api)
+manifest = {}
+try: manifest = json.loads(pathlib.Path("runtime/manifest.json").read_text())
+except Exception: pass
+rp = manifest.get("runtime_pack", {}) if isinstance(manifest,dict) else {}
+components = manifest.get("components", {}) if isinstance(manifest,dict) else {}
+version_file = read_text(pathlib.Path("VERSION")).strip() if pathlib.Path("VERSION").exists() else "TIDAK TERSEDIA"
+gradle = read_text(pathlib.Path("android/app/build.gradle")) if pathlib.Path("android/app/build.gradle").exists() else ""
+app_version = pick(r'versionName\\s+"([^"]+)"', gradle)
+box64_commit = components.get("box64",{}).get("source_commit","TIDAK TERSEDIA")
+wine_version = components.get("wine",{}).get("version","TIDAK TERSEDIA")
+rootfs_distro = components.get("rootfs",{}).get("distribution","TIDAK TERSEDIA")
+box64_version = pick(r"Box64 arm64 v[0-9.]+[^\\n]*", alltext)
+wine_seen = pick(r"wine-[0-9][^\\s]*", alltext)
+libc = pick(r"rootfs_libc6_package=([^\\s]+)", alltext)
+glibc = pick(r"box64_max_required_glibc=([^\\s]+)", alltext)
+if box64_version != "TIDAK TERSEDIA": box64_commit += " / " + box64_version
+if wine_seen != "TIDAK TERSEDIA": wine_version += " / CI: " + wine_seen
+if not libc: libc = "TIDAK TERSEDIA"
+if not glibc: glibc = "TIDAK TERSEDIA"
+artifacts_lines = []
+for a in artifacts_api:
+    artifacts_lines.append(f"- {a.get('name','TIDAK TERSEDIA')}: {a.get('size_in_bytes','TIDAK TERSEDIA')} byte (artifact ZIP)")
+if not artifacts_lines:
+    artifacts_lines = ["- TIDAK TERSEDIA (API artifact tidak tersedia)"]
+def audit_size(folder, name):
+    candidates = list(folder.rglob(name)) if folder.exists() else []
+    for p in candidates:
+        t = read_text(p)
+        m = re.search(r"^archive_bytes=(\\d+)", t, re.M)
+        if m: return int(m.group(1)), t
+    return None, ""
+apk_release, release_audit = audit_size(root, "app-release.apk.txt")
+apk_debug, debug_audit = audit_size(root, "app-debug.apk.txt")
+previous_root = pathlib.Path(env("REPORT_PREVIOUS_APK_DIR", "previous-apk"))
+prev_release, prev_audit = audit_size(previous_root, "app-release.apk.txt")
+prev_run = env("REPORT_PREVIOUS_APK_RUN")
+if apk_release is not None and prev_release is not None:
+    delta = apk_release - prev_release
+    delta_text = f"{delta:+,} byte vs run {prev_run} (current {apk_release:,}; previous {prev_release:,})"
+else: delta_text = "TIDAK TERSEDIA (APK audit/baseline sebelumnya tidak ditemukan)"
+apk_hash = pick(r"SHA256=([^\\s]+)", release_audit)
+if apk_hash == "TIDAK TERSEDIA":
+    apk_hash = pick(r"([0-9a-f]{64})\\s+android/app/build/outputs/apk/release/[^\\s]+", release_audit)
+apk_embedded = pick(r"EMBEDDED_RUNTIME_PARTS=([^\\s]+)", release_audit + "\\n" + debug_audit)
+if not apk_workflow: apk_status = "N/A (tidak berlaku)"
+else: apk_status = f"release={apk_release if apk_release is not None else 'TIDAK TERSEDIA'} byte; debug={apk_debug if apk_debug is not None else 'TIDAK TERSEDIA'} byte; delta={delta_text}"
+rungs = [("a","box64 --version"),("b","box64 wineserver --version"),("c","box64 wine --version"),("d","box64 wineboot"),("e","box64 wine cmd /c ver")]
+rung_rows=[]
+if not runtime:
+    rung_rows=["| N/A | N/A (tidak berlaku untuk workflow ini) | N/A | N/A | N/A | N/A |"]
+else:
+    for rung,cmd in rungs:
+        hit = next(((n,t) for n,t in texts.items() if re.search(rf"(^|/){rung}-[^/]*\\.log$", n)), None)
+        if not hit:
+            rung_rows.append(f"| {rung} | {cmd} | TIDAK TERSEDIA | TIDAK TERSEDIA | NOT RUN | Log rung tidak tersedia |")
+            continue
+        name, txt = hit
+        ec = pick(r"^exit_code=([^\\s]+)", txt)
+        dur = pick(r"^duration_seconds=([^\\s]+)", txt)
+        state = "PASS" if ec=="0" else "TIMEOUT" if ec in ("124","137") else "FAIL" if ec!="TIDAK TERSEDIA" else "NOT RUN"
+        excerpt = [redact(x[:160]) for x in txt.splitlines() if re.search(r"\\[RUN\\]|\\[FAIL\\]|SIGSEGV|eglChooseConfig|wine-[0-9]|Box64 arm|\\[TIMEOUT\\]",x,re.I)][:3]
+        rung_rows.append(f"| {rung} | {cmd} | {ec} | {dur} | {state} | {'; '.join(excerpt) if excerpt else 'TIDAK TERSEDIA'} |")
+error_lines=[]
+for n,txt in texts.items():
+    for line in txt.splitlines():
+        if "[ERROR]" in line or "Process completed with exit code" in line:
+            error_lines.append(redact(line[:350]))
+tail=[]
+for n,txt in texts.items():
+    if n.lower().endswith((".log",".out")):
+        tail.extend((n+": "+redact(line[:250])) for line in txt.splitlines()[-50:])
+tail=tail[-50:]
+job_rows=[]
+if api_status=="ok" and jobs_api:
+    for j in jobs_api:
+        job_rows.append(f"| {j.get('name','TIDAK TERSEDIA')} | {j.get('conclusion') or j.get('status','TIDAK TERSEDIA')} | {duration(j.get('started_at'),j.get('completed_at'))} | runner={j.get('runner_name','TIDAK TERSEDIA')} |")
+elif needs:
+    for j in needs: job_rows.append(f"| {j.get('name')} | {j.get('conclusion')} | TIDAK TERSEDIA | API job timing tidak tersedia |")
+else: job_rows=["| TIDAK TERSEDIA | TIDAK TERSEDIA | TIDAK TERSEDIA | API job tidak tersedia |"]
+lines=[]
+add=lines.append
 add("# LAPORAN BUILD — "+workflow+" #"+env("GITHUB_RUN_NUMBER"))
-add("**Waktu:** "+env("REPORT_STARTED_AT")+" – "+env("REPORT_COMPLETED_AT")+", durasi total "+env("REPORT_DURATION"))
-add("**Repo/Branch:** "+env("GITHUB_REPOSITORY")+" / "+env("GITHUB_REF_NAME"))
-add("**Commit:** "+env("GITHUB_SHA")+" — "+env("REPORT_COMMIT_MESSAGE"))
-add("**Run:** https://github.com/"+env("GITHUB_REPOSITORY")+"/actions/runs/"+env("GITHUB_RUN_ID")+" | **Pemicu:** "+env("GITHUB_EVENT_NAME")+" | **Runner:** OS "+pick(r"runner_os=(\S+)",alltext)+", arch "+pick(r"uname_m=(\S+)",alltext)+", nproc "+pick(r"nproc=(\S+)",alltext)+", RAM "+pick(r"Mem:\s+(\S+)",alltext))
-add("**Hasil keseluruhan:** "+result);add("")
-add("## 1. Ringkasan tahap (tabel)");add("| Tahap/Job | Status | Durasi | Catatan |");add("|---|---|---|---|")
-for k,v in (jobs.items() if isinstance(jobs,dict) else []):
- status=v.get("result","TIDAK TERSEDIA") if isinstance(v,dict) else v
- add(f"| {k} | {status} | TIDAK TERSEDIA | needs result |")
-if not jobs:add("| TIDAK TERSEDIA | TIDAK TERSEDIA | TIDAK TERSEDIA | job result tidak dikirim |")
-add("");add("## 2. Smoke ladder (khusus runtime)");add("| Rung | Perintah | Exit code | Durasi | Status | Kutipan log kunci (maks 3 baris) |");add("|---|---|---|---|---|")
-for rung,cmd in [("a","box64 --version"),("b","box64 wineserver --version"),("c","box64 wine --version"),("d","box64 wineboot"),("e","box64 wine cmd /c ver")]:
- hit=next(((n,t) for n,t in texts.items() if re.match(rung+r"-.*\.log$",n)),None)
- if not hit:add(f"| {rung} | {cmd} | TIDAK TERSEDIA | TIDAK TERSEDIA | NOT RUN / TIDAK TERSEDIA | log tidak ditemukan |");continue
- n,t=hit;ec=pick(r"exit_code=([^\s]+)",t);dur=pick(r"duration_seconds=([^\s]+)",t)
- status="PASS" if ec=="0" else "TIMEOUT" if ec=="124" else "FAIL" if ec!="TIDAK TERSEDIA" else "TIDAK TERSEDIA"
- excerpt="; ".join([x[:150] for x in t.splitlines() if re.search(r"\[RUN\]|\[FAIL\]|SIGSEGV|eglChooseConfig|wine-[0-9]|Box64 arm",x,re.I)][:3]) or "TIDAK TERSEDIA"
- add(f"| {rung} | {cmd} | {ec} | {dur} | {status} | {excerpt.replace('|','/')} |")
-add("");add("## 3. Kegagalan (jika ada)");add("- stage/line/exit_code/command: "+pick(r"\[ERROR\].*",alltext));add("- 50 baris log terakhir:")
-for line in alltext.splitlines()[-50:]:add("  "+line[:220])
-add("- Klasifikasi penyebab: belum diketahui kecuali didukung bukti eksplisit pada log.")
-add("");add("## 4. Versi komponen")
-for label,pat in [("Box64",r"Box64[^\n]{0,100}"),("Wine",r"wine-[0-9][^\n]*"),("rootfs distro",r"debian_suite=[^\n]+"),("libc6",r"libc6[^\n]+"),("glibc maksimum Box64",r"box64_max_required_glibc=[^\n]+"),("VERSION",r"VERSION=[^\n]+"),("versi manifest",r'"version"\s*:\s*"[^"]+"'),("status manifest",r'"status"\s*:\s*"(pending|active)"')]:add("- "+label+": "+pick(pat,alltext))
-add("");add("## 5. Ukuran dan artefak")
-for label,pat in [("rootfs sebelum trim",r"rootfs-size-before-trim[^\n]*"),("rootfs sesudah trim",r"rootfs-size-after-trim[^\n]*"),("archive bytes",r"ARCHIVE_BYTES=([0-9]+)")]:add("- "+label+": "+pick(pat,alltext))
-for p in files:add("- "+p.relative_to(root).as_posix()+": "+str(p.stat().st_size)+" byte")
-add("- APK bytes/delta, SHA-256: "+pick(r"APK_BYTES=([^\s]+)",alltext)+" / "+pick(r"APK_DELTA_BYTES=([^\s]+)",alltext)+" / "+pick(r"SHA256=([^\s]+)",alltext))
-add("- EMBEDDED_RUNTIME_PARTS: "+pick(r"EMBEDDED_RUNTIME_PARTS=([^\s]+)",alltext))
-add("");add("## 6. Performa build");add("- Durasi per job: TIDAK TERSEDIA bila tidak dicatat. Cache Box64/rootfs/Gradle: "+pick(r"cache[^\n]*(?:hit|miss)[^\n]*",alltext));add("- Perbandingan run sukses sebelumnya: TIDAK TERSEDIA jika baseline tidak tersedia.")
-add("");add("## 7. Perubahan sejak run sebelumnya");add("- Commit: "+env("GITHUB_SHA")+" — "+env("REPORT_COMMIT_MESSAGE"));add("- Berkas berubah: TIDAK TERSEDIA jika event/API tidak memasok daftar perubahan.")
-add("");add("## 8. Tingkat bukti dan gerbang");add("| Gerbang R/P/D/G | Status | Bukti (CI / emulator / MatePad) |");add("|---|---|---|");add("| R | lihat smoke ladder | CI artifact/log |");add("| P | TIDAK TERSEDIA | runtime archive/installer evidence |");add("| D | TIDAK TERSEDIA | emulator/MatePad evidence tidak dikumpulkan CI |");add("| G | TIDAK TERSEDIA | game evidence tidak dikumpulkan CI |");add("- Belum diuji di MatePad jika belum ada laporan pengguna. GHOST_TOWN_DISPLAY_READY=1 tetap wajib.")
-add("");add("## 9. Observasi dan rekomendasi");add("- TIDAK TERSEDIA tidak sama dengan PASS.");add("- Periksa log mentah untuk memastikan akar masalah; report tidak menebak penyebab.");add("- Lanjutkan dari rung/gerbang pertama yang belum lolos.")
-add("");add("## 10. Tautan");add("- Run: https://github.com/"+env("GITHUB_REPOSITORY")+"/actions/runs/"+env("GITHUB_RUN_ID"));add("- Commit: https://github.com/"+env("GITHUB_REPOSITORY")+"/commit/"+env("GITHUB_SHA"));add("- Dokumen: docs/runtime-debug.md, docs/build-reports.md, docs/feasibility-spike.md")
-body=quote("\n".join(a)+"\n")
-path=out/f"build-report-{slug}-{env('GITHUB_RUN_NUMBER')}.md";path.write_text(body+"\n")
+add(f"**Waktu:** {started if api_status=='ok' and started else 'TIDAK TERSEDIA'} – {finished if api_status=='ok' and finished else 'TIDAK TERSEDIA'}, durasi total {total_duration}")
+add(f"**Repo/Branch:** {env('GITHUB_REPOSITORY')} / {branch}")
+add(f"**Commit:** {sha} — {commit_message}")
+add(f"**Run:** https://github.com/{env('GITHUB_REPOSITORY')}/actions/runs/{env('GITHUB_RUN_ID')} | **Pemicu:** {run.get('event',env('GITHUB_EVENT_NAME')) if api_status=='ok' else env('GITHUB_EVENT_NAME')} | **Runner:** {runner}")
+add("**Hasil keseluruhan:** "+overall); add("")
+add("## 1. Ringkasan tahap (tabel)"); add("| Tahap/Job | Status | Durasi | Catatan |"); add("|---|---|---|---|")
+add("\\n".join(job_rows))
+add(""); add("## 2. Smoke ladder (khusus runtime)"); add("| Rung | Perintah | Exit code | Durasi | Status | Kutipan log kunci (maks 3 baris) |"); add("|---|---|---|---|---|---|")
+add("\\n".join(rung_rows))
+add(""); add("## 3. Kegagalan (jika ada)")
+add("- stage/line/exit_code/command: "+("; ".join(error_lines[:5]) if error_lines else "TIDAK TERSEDIA"))
+add("- 50 baris log terakhir (disanitasi):")
+add("\\n".join("> " + x for x in tail) if tail else "> TIDAK TERSEDIA")
+add("- Klasifikasi penyebab: "+("bukti log tersedia; klasifikasi manual diperlukan, jangan menyimpulkan di luar bukti." if error_lines else "belum diketahui / tidak ada log kegagalan yang tersedia."))
+add(""); add("## 4. Versi komponen")
+add(f"- VERSION: {version_file}; app versionName: {app_version}")
+add(f"- Box64 (commit/version): {box64_commit}")
+add(f"- Wine (manifest/CI): {wine_version}")
+add(f"- Rootfs: {rootfs_distro}; libc6 package: {libc}")
+add(f"- glibc maksimum yang diminta Box64: {glibc}")
+add(f"- Versi manifest/runtime pack: {rp.get('version','TIDAK TERSEDIA')}")
+add(f"- Status manifest runtime_pack: {rp.get('status','TIDAK TERSEDIA')}")
+add(""); add("## 5. Ukuran dan artefak")
+add(f"- Rootfs sebelum/sesudah trim: {pick(r'rootfs-size-before-trim[^\\n]*',alltext)} / {pick(r'rootfs-size-after-trim[^\\n]*',alltext)}")
+add(f"- Runtime archive bytes: {pick(r'ARCHIVE_BYTES=([0-9]+)',alltext)}; SHA-256: {pick(r'([0-9a-f]{{64}})\\s+ghost-town-wine-runtime-arm64\\.tar\\.gz',alltext)}; expanded bytes: {pick(r'expanded_size_bytes=([0-9]+)',alltext)}")
+add(f"- APK: {apk_status}; SHA-256 release: {apk_hash}; EMBEDDED_RUNTIME_PARTS: {apk_embedded}")
+add("\\n".join(artifacts_lines))
+add(""); add("## 6. Performa build")
+add("- Durasi per job berasal dari GitHub Actions jobs API pada bagian 1.")
+add(f"- Cache Box64/rootfs/Gradle: {pick(r'(?i)(?:cache[^\\n]*(?:hit|miss)|cache hit[^\\n]*)',alltext)}")
+add(f"- Perbandingan APK: {delta_text}")
+add(""); add("## 7. Perubahan sejak run sebelumnya")
+add("- Commit: "+sha+" — "+commit_message)
+add("- Berkas berubah: "+env("REPORT_CHANGED_FILES"))
+add(""); add("## 8. Tingkat bukti dan gerbang")
+add("| Gerbang R/P/D/G | Status | Bukti (CI / emulator / MatePad) |"); add("|---|---|---|")
+if runtime:
+    rung_d=next((x for x in rung_rows if x.startswith("| d |")),"")
+    r_status="PASS" if "| PASS |" in rung_d else "FAIL/NOT RUN"
+else: r_status="R tidak diuji oleh workflow ini"
+add(f"| R | {r_status} | CI log/artifact; bukan bukti perangkat |")
+add("| P | TIDAK TERSEDIA | runtime pack/installer hanya jika artifact dan device evidence tersedia |")
+add("| D | TIDAK TERSEDIA | visible-frame self-test belum dibuktikan oleh report ini |")
+add("| G | TIDAK TERSEDIA | gameplay/audio/input fisik belum dibuktikan oleh report ini |")
+add("- Belum diuji di MatePad bila belum ada laporan pengguna. GHOST_TOWN_DISPLAY_READY=1 tetap wajib; laporan tidak membuat marker.")
+add(""); add("## 9. Observasi dan rekomendasi")
+add("- API GitHub: "+("berhasil" if api_status=="ok" else "gagal; waktu/durasi/job/artifact metadata yang memerlukan API ditulis TIDAK TERSEDIA."))
+add("- N/A menandakan bagian tidak relevan; NOT RUN hanya untuk rung runtime yang seharusnya berjalan namun tidak menghasilkan log.")
+add("- Tindak lanjut: periksa rung pertama yang belum PASS dan gunakan hanya bukti dari artifact/log.")
+add(""); add("## 10. Tautan")
+add(f"- Run: https://github.com/{env('GITHUB_REPOSITORY')}/actions/runs/{env('GITHUB_RUN_ID')}")
+add(f"- Commit: https://github.com/{env('GITHUB_REPOSITORY')}/commit/{sha}")
+add("- Artifact: "+", ".join(a.get("name","TIDAK TERSEDIA") for a in artifacts_api) if artifacts_api else "- Artifact: TIDAK TERSEDIA")
+add("- Log mentah: buka run > Jobs > View raw logs; dokumen: docs/runtime-debug.md, docs/build-reports.md, docs/feasibility-spike.md")
+body=quote("\\n".join(lines)+"\\n")
+report_path=out/f"build-report-{slug}-{env('GITHUB_RUN_NUMBER')}.md"
+report_path.write_text(body+"\\n")
 summary=os.environ.get("GITHUB_STEP_SUMMARY")
 if summary:
- with open(summary,"a") as f:f.write(body+"\n")
+    with open(summary,"a") as f: f.write(body+"\\n")
 print(body)
 PY
