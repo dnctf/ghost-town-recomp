@@ -67,10 +67,14 @@ elif conclusion in ("cancelled", "canceled"): overall = "DIBATALKAN"
 elif conclusion in ("timed_out", "startup_failure"): overall = "TIMEOUT"
 elif conclusion == "failure": overall = "GAGAL"
 else:
-    states = [x.get("conclusion") for x in jobs_api] or [x.get("conclusion") for x in needs]
+    states = [x.get("conclusion") for x in needs] or [x.get("conclusion") for x in jobs_api]
     overall = "DIBATALKAN" if any(x in ("cancelled","canceled") for x in states) else "TIMEOUT" if "timed_out" in states else "GAGAL" if "failure" in states else "SUKSES" if states and all(x=="success" for x in states) else "TIDAK TERSEDIA"
 started = run.get("run_started_at") or run.get("created_at")
-finished = run.get("updated_at") if run.get("status") == "completed" else None
+if run.get("status") == "completed":
+    finished = run.get("updated_at")
+else:
+    completed = [j.get("completed_at") for j in jobs_api if j.get("completed_at") and "report" not in j.get("name","").lower()]
+    finished = max(completed) if completed else None
 total_duration = duration(started, finished) if api_status == "ok" else "TIDAK TERSEDIA"
 branch = run.get("head_branch") or env("GITHUB_REF_NAME")
 sha = run.get("head_sha") or env("GITHUB_SHA")
@@ -188,7 +192,13 @@ add(f"- glibc maksimum yang diminta Box64: {glibc}")
 add(f"- Versi manifest/runtime pack: {rp.get('version','TIDAK TERSEDIA')}")
 add(f"- Status manifest runtime_pack: {rp.get('status','TIDAK TERSEDIA')}")
 add(""); add("## 5. Ukuran dan artefak")
-add(f"- Rootfs sebelum/sesudah trim: {pick(r'rootfs-size-before-trim[^\n]*',alltext)} / {pick(r'rootfs-size-after-trim[^\n]*',alltext)}")
+def named_file_value(basename):
+    for p in files:
+        if p.name == basename:
+            value = read_text(p).strip().splitlines()
+            return value[0] if value else "TIDAK TERSEDIA"
+    return "TIDAK TERSEDIA"
+add(f"- Rootfs sebelum/sesudah trim: {named_file_value('rootfs-size-before-trim.txt')} / {named_file_value('rootfs-size-after-trim.txt')}")
 add(f"- Runtime archive bytes: {pick(r'ARCHIVE_BYTES=([0-9]+)',alltext)}; SHA-256: {pick(r'([0-9a-f]{{64}})\s+ghost-town-wine-runtime-arm64\.tar\.gz',alltext)}; expanded bytes: {pick(r'expanded_size_bytes=([0-9]+)',alltext)}")
 add(f"- APK: {apk_status}; SHA-256 release: {apk_hash}; EMBEDDED_RUNTIME_PARTS: {apk_embedded}")
 add("\\n".join(artifacts_lines))
