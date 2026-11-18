@@ -26,7 +26,7 @@ class ReportTests(unittest.TestCase):
   run={"status":"completed","conclusion":"success","created_at":"2026-11-18T00:00:00Z","run_started_at":"2026-11-18T00:00:01Z","updated_at":"2026-11-18T00:01:01Z","head_branch":"main","head_sha":"abc","event":"push"}
   jobs=[{"name":"Build Android ARM64 APK","status":"completed","conclusion":"success","started_at":"2026-11-18T00:00:10Z","completed_at":"2026-11-18T00:01:00Z","runner_name":"runner","labels":["ubuntu-latest"]}]
   x=self.run_report({},'{"android-build":{"result":"success"}}',workflow="Ghost Town Android APK",api_status="ok",run=run,api_jobs=jobs)
-  self.assertIn("N/A (tidak berlaku untuk workflow ini)",x)
+  self.assertIn("N/A (tidak berlaku untuk workflow ini)",x)\n  self.assertIn("Runtime archive: N/A (tidak berlaku)",x)\n  self.assertIn("Rootfs sebelum/sesudah trim: N/A (tidak berlaku)",x)
   self.assertNotIn("| a | box64 --version | TIDAK TERSEDIA | TIDAK TERSEDIA | NOT RUN |",x)
   self.assertIn("durasi total 1m 0s (60s)",x)
   self.assertIn("50s (50s)",x)
