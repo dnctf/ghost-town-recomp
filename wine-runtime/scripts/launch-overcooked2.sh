@@ -10,6 +10,8 @@ set -eu
 LOG_DIR="${GHOST_TOWN_LOG_DIR:-$WINEPREFIX/logs}"
 mkdir -p "$LOG_DIR"
 export WINEPREFIX WINEDEBUG="${WINEDEBUG:--all}"
+export BOX64_LD_LIBRARY_PATH="${BOX64_LD_LIBRARY_PATH:-/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib}"
+export BOX64_PRELOAD="${BOX64_PRELOAD:-libmd.so.0:libbsd.so.0}"
 export DXVK_CONFIG_FILE="${DXVK_CONFIG_FILE:-$WINEPREFIX/dxvk.conf}"
 export DXVK_LOG_LEVEL="${DXVK_LOG_LEVEL:-info}"
 export DXVK_LOG_PATH="${DXVK_LOG_PATH:-$LOG_DIR/dxvk}"
