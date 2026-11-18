@@ -17,9 +17,9 @@ jobs:
     timeout-minutes: 10
     env:
       RUNTIME_URL: https://github.com/dnctf/ghost-town-recomp/releases/download/runtime-v0.5.0-alpha.2/ghost-town-wine-runtime-arm64.tar.gz
-      EXPECTED_SIZE: '354498740'
-      EXPECTED_SHA256: 9d4e17f055736c0113db1dcb355c619332a1479e84e2ca43f4fde64cc0f5c6a3
-      EXPECTED_EXPANDED_SIZE: '1541353546'
+      EXPECTED_SIZE: '354535881'
+      EXPECTED_SHA256: 7a9600a22e0ef6ebef799cb4031c0c33310d1b2f7164d8d7aac70ed20f99edaf
+      EXPECTED_EXPANDED_SIZE: '1541355744'
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
