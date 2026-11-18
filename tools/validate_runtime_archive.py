@@ -16,6 +16,10 @@ REQUIRED = {
     "rootfs/etc/os-release",
     "rootfs/usr/local/bin/box64",
     "rootfs/opt/wine/bin/wine",
+    "rootfs/usr/lib/x86_64-linux-gnu/dri/virtio_gpu_dri.so",
+    "rootfs/usr/bin/glxinfo",
+    "rootfs/usr/bin/xmessage",
+    "provenance/RUNTIME-SHA256SUMS",
 }
 
 

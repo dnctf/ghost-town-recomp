@@ -130,6 +130,11 @@ object RuntimeBundleInstaller {
                         if (entries > MAX_ENTRIES) throw IOException("Arsip memiliki terlalu banyak entri.")
                         val relative = safeRelativePath(entry.name)
                         if (relative != null) {
+                            val entryName = relative.toString().replace(File.separatorChar, '/')
+                            if (entryName == "rootfs/usr/bin/Xvfb" || entryName == "rootfs/usr/bin/xvfb-run" ||
+                                entryName.startsWith("rootfs/tmp/.X11-unix/")) {
+                                throw IOException("Xvfb executable atau X11 socket tidak boleh ada di runtime pack: $entryName")
+                            }
                             val destination = stage.toPath().resolve(relative).normalize()
                             val root = stage.toPath().toAbsolutePath().normalize()
                             if (!destination.toAbsolutePath().normalize().startsWith(root)) {
@@ -217,8 +222,7 @@ object RuntimeBundleInstaller {
                                         }
                                     }
                                     val executable = (entry.mode and 0b001001001) != 0
-                                    if (executable) destination.toFile().setExecutable(true, false)
-                                    destination.toFile().setReadable(true, false)
+                                    applySafePermissions(destination.toFile(), executable)
                                 }
                                 else -> throw IOException("Tipe entri arsip tidak didukung: ${entry.name}")
                             }
@@ -247,6 +251,26 @@ object RuntimeBundleInstaller {
             deleteTree(stage)
             if (!target.exists() && backup.exists()) backup.renameTo(target)
             throw if (t is IOException) t else IOException("Instalasi runtime gagal: ${t.message}", t)
+        }
+    }
+
+    /** Executable files are immutable and executable only by the owning app UID. */
+    private fun applySafePermissions(file: File, executable: Boolean) {
+        if (!file.setReadable(true, true) && !file.canRead()) {
+            throw IOException("Tidak dapat mengatur izin baca file runtime: ${file.name}")
+        }
+        if (executable) {
+            if (!file.setWritable(false, true) && file.canWrite()) {
+                throw IOException("Tidak dapat mengunci file executable runtime: ${file.name}")
+            }
+            if (!file.setExecutable(true, true) && !file.canExecute()) {
+                throw IOException("Tidak dapat mengatur izin executable runtime: ${file.name}")
+            }
+        } else {
+            file.setExecutable(false, true)
+            if (!file.setWritable(true, true) && !file.canWrite()) {
+                throw IOException("Tidak dapat mengatur izin tulis file runtime: ${file.name}")
+            }
         }
     }
 
@@ -298,7 +322,7 @@ object RuntimeBundleInstaller {
             "rootfs/etc/os-release",
             "rootfs/usr/local/bin/box64",
             "rootfs/opt/wine/bin/wine",
-            "rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so",
+            "rootfs/usr/lib/x86_64-linux-gnu/dri/virtio_gpu_dri.so",
             "rootfs/usr/bin/glxinfo",
             "rootfs/usr/bin/xmessage"
         )
@@ -310,7 +334,7 @@ object RuntimeBundleInstaller {
             "rootfs/etc/os-release",
             "rootfs/usr/local/bin/box64",
             "rootfs/opt/wine/bin/wine",
-            "rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so",
+            "rootfs/usr/lib/x86_64-linux-gnu/dri/virtio_gpu_dri.so",
             "rootfs/usr/bin/glxinfo",
             "rootfs/usr/bin/xmessage"
         )
@@ -333,7 +357,7 @@ object RuntimeBundleInstaller {
         val required = setOf(
             "rootfs/usr/local/bin/box64",
             "rootfs/opt/wine/bin/wine",
-            "rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so",
+            "rootfs/usr/lib/x86_64-linux-gnu/dri/virtio_gpu_dri.so",
             "rootfs/usr/bin/glxinfo",
             "rootfs/usr/bin/xmessage"
         )

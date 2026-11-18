@@ -1,6 +1,7 @@
 package com.overcookedrecomp.app
 
 import android.content.Context
+import android.net.Uri
 import android.os.StatFs
 import org.json.JSONObject
 import java.io.BufferedInputStream
@@ -84,8 +85,72 @@ object RuntimeBundleDownloader {
             throw IOException("SHA-256 runtime tidak cocok. File parsial yang korup dihapus.")
         }
 
+        installVerifiedArchive(context, pack, partial, progress)
+        partial.delete()
+        progress?.accept("Runtime " + pack.version + " berhasil diunduh, diverifikasi, dan dipasang.")
+    }
+
+
+    /** Imports a SAF-selected archive only when it exactly matches the published manifest. */
+    @JvmStatic
+    @Throws(IOException::class)
+    fun importLocalArchive(context: Context, archiveUri: Uri, progress: Consumer<String>? = null) {
+        val pack = parseManifest(fetchText(BuildConfig.RUNTIME_MANIFEST_URL))
+        if (compareVersions(BuildConfig.VERSION_NAME, pack.minimumAppVersion) < 0) {
+            throw IOException("Runtime ini memerlukan aplikasi minimal " + pack.minimumAppVersion + ".")
+        }
+        val cache = File(context.cacheDir, "runtime-download")
+        if (!cache.exists() && !cache.mkdirs()) throw IOException("Tidak dapat membuat cache impor runtime.")
+        val local = File(cache, "runtime-local.tar.gz.part")
+        if (local.exists() && !local.delete()) throw IOException("Tidak dapat membersihkan impor runtime sebelumnya.")
+        val expandedReserve = if (pack.expandedSizeBytes > Long.MAX_VALUE / 10L) Long.MAX_VALUE
+            else (pack.expandedSizeBytes * 10L) / 9L
+        val required = safeAdd(safeAdd(pack.sizeBytes, expandedReserve), RESERVE_BYTES)
+        val available = StatFs(context.filesDir.absolutePath).availableBytes
+        if (available < required) {
+            throw IOException("Ruang penyimpanan tidak cukup untuk impor runtime lokal.")
+        }
+
+        progress?.accept("Menyalin runtime lokal untuk verifikasi...")
+        try {
+            val raw = context.contentResolver.openInputStream(archiveUri)
+                ?: throw IOException("Tidak dapat membuka arsip runtime lokal.")
+            var total = 0L
+            raw.use { input ->
+                FileOutputStream(local, false).use { output ->
+                    val buffer = ByteArray(256 * 1024)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        if (total > pack.sizeBytes || total > MAX_ARCHIVE_BYTES) {
+                            throw IOException("Arsip lokal melebihi ukuran runtime pada manifest.")
+                        }
+                        output.write(buffer, 0, count)
+                        if (total / (16L * 1024L * 1024L) != (total - count) / (16L * 1024L * 1024L)) {
+                            progress?.accept("Menyalin runtime lokal: " + (total / (1024 * 1024)) + " MiB")
+                        }
+                    }
+                    output.fd.sync()
+                }
+            }
+            if (total != pack.sizeBytes) throw IOException("Ukuran file runtime lokal tidak cocok dengan manifest.")
+            if (!sha256(local).equals(pack.sha256, ignoreCase = true)) {
+                throw IOException("SHA-256 file runtime lokal tidak cocok dengan manifest.")
+            }
+            installVerifiedArchive(context, pack, local, progress)
+            progress?.accept("Runtime lokal berhasil diverifikasi dan dipasang.")
+        } catch (error: Throwable) {
+            local.delete()
+            throw if (error is IOException) error else IOException("Impor runtime lokal gagal: ${error.message}", error)
+        } finally {
+            local.delete()
+        }
+    }
+
+    private fun installVerifiedArchive(context: Context, pack: RuntimePack, archive: File, progress: Consumer<String>?) {
         progress?.accept("Checksum cocok. Mengekstrak runtime secara atomik...")
-        FileInputStream(partial).use { input ->
+        FileInputStream(archive).use { input ->
             RuntimeBundleInstaller.install(context, input, progress)
         }
         val installed = File(context.filesDir, "runtime/wine/.runtime-version")
@@ -93,8 +158,6 @@ object RuntimeBundleDownloader {
         if (!installed.isFile || installed.readText().trim() != BuildConfig.VERSION_NAME) {
             throw IOException("Versi runtime terpasang tidak dapat diverifikasi.")
         }
-        partial.delete()
-        progress?.accept("Runtime " + pack.version + " berhasil diunduh, diverifikasi, dan dipasang.")
     }
 
     private fun parseManifest(raw: String): RuntimePack {

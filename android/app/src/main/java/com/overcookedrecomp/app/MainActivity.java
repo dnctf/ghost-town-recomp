@@ -86,7 +86,16 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     // File pickers untuk ZIP dan Folder PC
     private final ActivityResultLauncher<String[]> openZipLauncher =
             registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
-                if (uri != null) handleImportZipUri(uri);
+                if (uri != null) {
+                    String name = GameFileImporter.getDisplayName(this, uri).toLowerCase(java.util.Locale.ROOT);
+                    if (name.endsWith(".exe")) handleImportExecutableUri(uri);
+                    else handleImportZipUri(uri);
+                }
+            });
+
+    private final ActivityResultLauncher<String[]> openRuntimeArchiveLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
+                if (uri != null) handleImportRuntimeUri(uri);
             });
 
     private final ActivityResultLauncher<Uri> openFolderLauncher =
@@ -391,6 +400,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         runtimeRepairParams.topMargin = dp(8);
         container.addView(runtimeRepairBtn, runtimeRepairParams);
 
+        Button runtimeImportBtn = createDashboardButton("IMPORT LOCAL RUNTIME (.TAR.GZ)", "#28445D");
+        runtimeImportBtn.setOnClickListener(v -> openRuntimeArchiveLauncher.launch(new String[]{
+                "application/gzip", "application/x-gzip", "application/x-tar", "application/octet-stream", "*/*"
+        }));
+        LinearLayout.LayoutParams runtimeImportParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
+        runtimeImportParams.topMargin = dp(8);
+        container.addView(runtimeImportBtn, runtimeImportParams);
+
         Button diagnosticsBtn = createDashboardButton("BAGIKAN LOG DIAGNOSTIK", "#493018");
         diagnosticsBtn.setOnClickListener(v -> shareDiagnosticReport());
         LinearLayout.LayoutParams diagnosticsParams = new LinearLayout.LayoutParams(
@@ -521,16 +539,33 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         final GameStorageVerifier.VerificationResult selectedGame = installed;
         String statusMessage = selectedGame == null
-                ? "DATA NOT FOUND\nImpor data game ini terlebih dahulu."
-                : "DATA FOUND\n" + selectedGame.message
-                    + "\n\nEXECUTION BLOCKED: build ini sudah memiliki instalasi runtime Wine/Box64 opsional dan probe headless, tetapi belum memiliki X11/Wayland display server, Android Vulkan presentation bridge, audio/input bridge, atau peluncur PE game. Folder _Data dan metadata saja tidak dapat menjalankan game PC.\n\nImpor lengkap game PC (EXE, UnityPlayer.dll, folder _Data) tetap diperlukan; runtime Windows dipasang terpisah.";
+                ? "DATA NOT FOUND\\nImpor data game ini terlebih dahulu."
+                : "DATA FOUND\\n" + selectedGame.message
+                    + "\\n\\nEXECUTION BLOCKED: Wine/Box64 masih pada tahap runtime bring-up; display, D3D11 presentation, audio/input, dan game launch belum tervalidasi. Folder _Data dan metadata saja tidak dapat menjalankan game PC.\\n\\nImpor lengkap game PC (EXE, UnityPlayer.dll, folder _Data) tetap diperlukan; runtime Windows dipasang terpisah.";
+        File executableRoot = null;
+        if (extDir != null) {
+            File zipRoot = new File(extDir, title.name() + "_PC");
+            File folderRoot = new File(extDir, title.defaultFolderName);
+            executableRoot = zipRoot.isDirectory() ? zipRoot : folderRoot;
+        }
+        File gameExecutable = GameStorageVerifier.findGameExecutable(executableRoot, title);
+        if (gameExecutable == null) {
+            statusMessage += "\\n\\nGAME EXECUTABLE: .exe yang cocok belum ditemukan.";
+        } else {
+            GameStorageVerifier.ExecutableVerificationResult exeInfo =
+                    GameStorageVerifier.inspectGameExecutable(gameExecutable, title);
+            statusMessage += "\\n\\nGAME EXECUTABLE: " + exeInfo.message
+                    + "\\nPath: " + gameExecutable.getAbsolutePath()
+                    + (exeInfo.sha256.isEmpty() ? "" : "\\nSHA-256: " + exeInfo.sha256)
+                    + "\\nCatatan: header PE dibaca saja; executable tidak dijalankan.";
+        }
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(cardTitle)
                 .setMessage(statusMessage)
                 .setPositiveButton("EXECUTION STATUS", (d, which) -> {
                     if (selectedGame != null) showExecutionRequirements(selectedGame);
                 })
-                .setNeutralButton("IMPORT FULL PC ZIP", (d, which) -> {
+                .setNeutralButton("IMPORT PC ZIP / EXE", (d, which) -> {
                     pendingImportTitle = title;
                     openZipLauncher.launch(new String[]{"application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*"});
                 })
@@ -591,6 +626,41 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 });
             }
         }, userRequested ? "runtime-repair" : "bundled-runtime-provisioner").start();
+    }
+
+
+    /** Imports a local runtime archive after manifest size and SHA-256 verification. */
+    private void handleImportRuntimeUri(Uri uri) {
+        showImportProgress(true, "Memverifikasi arsip runtime lokal...");
+        new Thread(() -> {
+            try {
+                RuntimeBundleDownloader.importLocalArchive(this, uri,
+                        message -> runOnUiThread(() -> {
+                            if (importProgressText != null) importProgressText.setText(message);
+                        }));
+                DiagnosticLog.info(this, "RUNTIME", "Local runtime archive verified and installed.");
+                runOnUiThread(() -> {
+                    showImportProgress(false, "Runtime lokal berhasil dipasang.");
+                    new AlertDialog.Builder(this)
+                            .setTitle("RUNTIME SIAP")
+                            .setMessage("Arsip runtime lokal cocok dengan ukuran dan SHA-256 manifest, lalu diekstrak secara atomik. Validasi ini belum membuktikan game dapat berjalan.")
+                            .setPositiveButton("PERIKSA STATUS", (dialog, which) -> showWineRuntimeStatus())
+                            .setNegativeButton("TUTUP", null)
+                            .show();
+                });
+            } catch (Throwable error) {
+                DiagnosticLog.error(this, "RUNTIME", "Local runtime import failed", error);
+                runOnUiThread(() -> {
+                    showImportProgress(false, "Impor runtime lokal gagal.");
+                    new AlertDialog.Builder(this)
+                            .setTitle("IMPOR RUNTIME GAGAL")
+                            .setMessage((error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())
+                                    + "\\n\\nPastikan file .tar.gz berasal dari rilis runtime yang sama dengan versi aplikasi.")
+                            .setPositiveButton("TUTUP", null)
+                            .show();
+                });
+            }
+        }, "runtime-local-import").start();
     }
 
     private void showWineBootstrap() {
@@ -965,6 +1035,35 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 });
             }
         });
+    }
+
+
+    private void handleImportExecutableUri(Uri uri) {
+        File extDir = getExternalFilesDir(null);
+        if (extDir == null) {
+            Toast.makeText(this, "Penyimpanan aplikasi tidak tersedia.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        File targetDir = new File(extDir, pendingImportTitle.name() + "_PC");
+        showImportProgress(true, "Membaca header PE executable...");
+        GameFileImporter.importExecutableUri(this, uri, targetDir, pendingImportTitle,
+                new GameFileImporter.ProgressListener() {
+                    @Override
+                    public void onProgress(int percent, String currentFileName) {
+                        runOnUiThread(() -> {
+                            if (importProgressText != null) importProgressText.setText("Memeriksa: " + currentFileName);
+                        });
+                    }
+
+                    @Override
+                    public void onComplete(boolean success, String message) {
+                        runOnUiThread(() -> {
+                            showImportProgress(false, "");
+                            Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+                            refreshInstalledGamesStatus();
+                        });
+                    }
+                });
     }
 
     private void handleImportFolderUri(Uri uri) {

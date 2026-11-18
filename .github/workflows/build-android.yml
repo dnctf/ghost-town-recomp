@@ -134,7 +134,7 @@ jobs:
 
       - name: Build debug and release APK
         working-directory: android
-        run: gradle assembleDebug assembleRelease --no-daemon --stacktrace
+        run: gradle testDebugUnitTest assembleDebug assembleRelease --no-daemon --stacktrace
       - name: Run Android lint
         working-directory: android
         run: gradle lint --no-daemon --stacktrace

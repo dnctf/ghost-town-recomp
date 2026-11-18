@@ -4,10 +4,14 @@ import android.util.Log;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 public final class GameStorageVerifier {
     private static final String TAG = "GameStorageVerifier";
@@ -58,6 +62,34 @@ public final class GameStorageVerifier {
         public String toString() {
             return String.format("[%s] Valid: %b | Backend: %s | Pesan: %s",
                     gameTitle.displayName, valid, backendType, message);
+        }
+    }
+
+
+    /** Parsed PE/COFF metadata for a user-supplied Windows executable. */
+    public static final class ExecutableVerificationResult {
+        public final boolean valid;
+        public final boolean supportedByBox64;
+        public final GameTitle gameTitle;
+        public final String architecture;
+        public final int machine;
+        public final int optionalHeaderMagic;
+        public final String message;
+        public final String sha256;
+        public final File executable;
+
+        public ExecutableVerificationResult(boolean valid, boolean supportedByBox64, GameTitle gameTitle,
+                                             String architecture, int machine, int optionalHeaderMagic,
+                                             String message, String sha256, File executable) {
+            this.valid = valid;
+            this.supportedByBox64 = supportedByBox64;
+            this.gameTitle = gameTitle;
+            this.architecture = architecture;
+            this.machine = machine;
+            this.optionalHeaderMagic = optionalHeaderMagic;
+            this.message = message;
+            this.sha256 = sha256;
+            this.executable = executable;
         }
     }
 
@@ -206,6 +238,145 @@ public final class GameStorageVerifier {
 
         return new VerificationResult(false, resolvedTitle, RuntimeBackendType.UNKNOWN,
                 "Tidak ditemukan Assembly-CSharp.dll maupun global-metadata.dat di " + dataDir.getName(), "", dataDir);
+    }
+
+
+    /** Reads a Windows PE header without executing the file. Only PE32+ AMD64 is supported. */
+    public static ExecutableVerificationResult inspectGameExecutable(File executable, GameTitle hint) {
+        GameTitle resolved = resolveExecutableTitle(executable, hint);
+        if (executable == null || !executable.isFile()) {
+            return new ExecutableVerificationResult(false, false, resolved, "unknown", 0, 0,
+                    "File executable tidak ditemukan.", "", executable);
+        }
+        if (!executable.getName().toLowerCase(Locale.ROOT).endsWith(".exe")) {
+            return new ExecutableVerificationResult(false, false, resolved, "unknown", 0, 0,
+                    "File yang dipilih bukan berkas .exe.", "", executable);
+        }
+        try (RandomAccessFile input = new RandomAccessFile(executable, "r")) {
+            if (input.length() < 128 || readU16LE(input) != 0x5A4D) {
+                return new ExecutableVerificationResult(false, false, resolved, "unknown", 0, 0,
+                        "Header DOS MZ tidak valid atau file terlalu kecil.", "", executable);
+            }
+            input.seek(0x3C);
+            long peOffset = readU32LE(input);
+            if (peOffset < 64 || peOffset + 26L > input.length()) {
+                return new ExecutableVerificationResult(false, false, resolved, "unknown", 0, 0,
+                        "Offset header PE tidak valid.", "", executable);
+            }
+            input.seek(peOffset);
+            if (input.readUnsignedByte() != 'P' || input.readUnsignedByte() != 'E'
+                    || input.readUnsignedByte() != 0 || input.readUnsignedByte() != 0) {
+                return new ExecutableVerificationResult(false, false, resolved, "unknown", 0, 0,
+                        "Signature PE tidak ditemukan.", "", executable);
+            }
+            int machine = readU16LE(input);
+            int sections = readU16LE(input);
+            input.seek(peOffset + 20L);
+            int optionalHeaderSize = readU16LE(input);
+            input.seek(peOffset + 24L);
+            if (optionalHeaderSize < 2 || input.getFilePointer() + optionalHeaderSize > input.length()) {
+                return new ExecutableVerificationResult(false, false, resolved, "unknown", machine, 0,
+                        "Optional header PE terpotong atau tidak valid.", "", executable);
+            }
+            int optionalMagic = readU16LE(input);
+            boolean magicMatches = (machine == 0x8664 || machine == 0xAA64)
+                    ? optionalMagic == 0x020B
+                    : machine == 0x014C ? optionalMagic == 0x010B
+                    : (optionalMagic == 0x010B || optionalMagic == 0x020B);
+            if (sections <= 0 || !magicMatches) {
+                return new ExecutableVerificationResult(false, false, resolved, "unknown", machine, optionalMagic,
+                        "Struktur PE/COFF tidak konsisten.", "", executable);
+            }
+            String architecture;
+            switch (machine) {
+                case 0x8664: architecture = "x86_64"; break;
+                case 0x014C: architecture = "x86"; break;
+                case 0xAA64: architecture = "ARM64"; break;
+                default: architecture = String.format(Locale.ROOT, "unknown-0x%04x", machine);
+            }
+            boolean supported = machine == 0x8664 && optionalMagic == 0x020B;
+            String message = supported
+                    ? "PE32+ AMD64 valid; header executable terbaca. File belum dijalankan."
+                    : "PE valid (" + architecture + "), tetapi runtime saat ini hanya mendukung PE32+ AMD64 melalui Box64/Wine.";
+            return new ExecutableVerificationResult(true, supported, resolved, architecture, machine,
+                    optionalMagic, message, computeSha256(executable), executable);
+        } catch (IOException error) {
+            Log.e(TAG, "Gagal membaca header PE: " + executable.getAbsolutePath(), error);
+            return new ExecutableVerificationResult(false, false, resolved, "unknown", 0, 0,
+                    "Gagal membaca header PE: " + error.getMessage(), "", executable);
+        }
+    }
+
+    /** Finds the title-matching .exe in an imported ZIP/folder tree without launching it. */
+    public static File findGameExecutable(File root, GameTitle title) {
+        if (root == null || !root.exists() || !root.isDirectory()) return null;
+        List<File> candidates = new ArrayList<>();
+        collectExecutables(root, 0, new HashSet<>(), candidates);
+        File best = null;
+        int bestScore = 0;
+        for (File candidate : candidates) {
+            int score = executableNameScore(candidate, title);
+            if (score > bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+        return best;
+    }
+
+    private static void collectExecutables(File directory, int depth, Set<String> visited, List<File> output) {
+        if (depth > 8 || output.size() >= 5000) return;
+        try {
+            if (!visited.add(directory.getCanonicalPath())) return;
+        } catch (IOException ignored) {
+            return;
+        }
+        File[] children = directory.listFiles();
+        if (children == null) return;
+        for (File child : children) {
+            if (output.size() >= 5000) return;
+            if (child.isFile() && child.getName().toLowerCase(Locale.ROOT).endsWith(".exe")) {
+                output.add(child);
+            } else if (child.isDirectory() && !child.isHidden()) {
+                collectExecutables(child, depth + 1, visited, output);
+            }
+        }
+    }
+
+    private static int executableNameScore(File executable, GameTitle title) {
+        String name = executable.getName().toLowerCase(Locale.ROOT).replace("_", "").replace(" ", "");
+        switch (title) {
+            case OVERCOOKED_2: return name.equals("overcooked2.exe") ? 100 : name.contains("overcooked2") ? 80 : 0;
+            case OVERCOOKED_1: return name.equals("overcooked.exe") ? 100 : (name.contains("overcooked") && !name.contains("2")) ? 80 : 0;
+            case MOVING_OUT_2: return name.equals("movingout2.exe") ? 100 : name.contains("movingout2") ? 80 : 0;
+            case MOVING_OUT: return name.equals("movingout.exe") ? 100 : (name.contains("movingout") && !name.contains("2")) ? 80 : 0;
+            default: return 1;
+        }
+    }
+
+    private static GameTitle resolveExecutableTitle(File executable, GameTitle hint) {
+        if (executable != null) {
+            String name = executable.getName().toLowerCase(Locale.ROOT).replace("_", "").replace(" ", "");
+            if (name.contains("movingout2")) return GameTitle.MOVING_OUT_2;
+            if (name.contains("movingout")) return GameTitle.MOVING_OUT;
+            if (name.contains("overcooked2")) return GameTitle.OVERCOOKED_2;
+            if (name.contains("overcooked")) return GameTitle.OVERCOOKED_1;
+        }
+        return hint == null ? GameTitle.UNKNOWN : hint;
+    }
+
+    private static int readU16LE(RandomAccessFile input) throws IOException {
+        int low = input.readUnsignedByte();
+        int high = input.readUnsignedByte();
+        return low | (high << 8);
+    }
+
+    private static long readU32LE(RandomAccessFile input) throws IOException {
+        long b0 = input.readUnsignedByte();
+        long b1 = input.readUnsignedByte();
+        long b2 = input.readUnsignedByte();
+        long b3 = input.readUnsignedByte();
+        return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
     }
 
     /**
