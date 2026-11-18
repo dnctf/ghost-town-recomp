@@ -6,7 +6,7 @@ class ReportTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as t:
    for n,c in artifacts.items():Path(t,n).write_text(c)
    env=os.environ.copy();env.update({"REPORT_WORKFLOW":"Example","GITHUB_RUN_NUMBER":"4","GITHUB_RUN_ID":"44","GITHUB_REPOSITORY":"dnctf/ghost-town-recomp","GITHUB_REF_NAME":"main","GITHUB_SHA":"abc","GITHUB_EVENT_NAME":"push","REPORT_JOB_RESULTS":jobs,"REPORT_ARTIFACT_DIR":t})
-   subprocess.run(["bash",str(ROOT/"tools/build-report.sh"),t],env=env,check=True,capture_output=True,text=True)
+   result=subprocess.run(["bash",str(ROOT/"tools/build-report.sh"),t],env=env,capture_output=True,text=True)\n   if result.returncode: raise AssertionError(result.stderr+"\\n"+result.stdout)
    return next(Path(t).glob("*.md")).read_text()
  def test_failure_missing_data(self):
   x=self.run_report({},'{"compile":{"result":"failure","outputs":{}}}')
