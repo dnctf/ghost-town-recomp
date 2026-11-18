@@ -387,6 +387,7 @@ private fun GamesHome(
     onLongSelect: (Int) -> Unit,
     onAddGame: () -> Unit,
     onRuntime: () -> Unit,
+    onSearch: () -> Unit,
     selected: DemoGame,
     onDetails: () -> Unit
 ) {
