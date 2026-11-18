@@ -39,7 +39,7 @@ for rung,cmd in [("a","box64 --version"),("b","box64 wineserver --version"),("c"
  if not hit:add(f"| {rung} | {cmd} | TIDAK TERSEDIA | TIDAK TERSEDIA | NOT RUN / TIDAK TERSEDIA | log tidak ditemukan |");continue
  n,t=hit;ec=pick(r"exit_code=([^\s]+)",t);dur=pick(r"duration_seconds=([^\s]+)",t)
  status="PASS" if ec=="0" else "TIMEOUT" if ec=="124" else "FAIL" if ec!="TIDAK TERSEDIA" else "TIDAK TERSEDIA"
- excerpt="; ".join(x[:150] for x in t.splitlines() if re.search(r"\[RUN\]|\[FAIL\]|SIGSEGV|eglChooseConfig|wine-[0-9]|Box64 arm",x,re.I)][:3]) or "TIDAK TERSEDIA"
+ excerpt="; ".join([x[:150] for x in t.splitlines() if re.search(r"\\[RUN\\]|\\[FAIL\\]|SIGSEGV|eglChooseConfig|wine-[0-9]|Box64 arm",x,re.I)][:3]) or "TIDAK TERSEDIA"
  add(f"| {rung} | {cmd} | {ec} | {dur} | {status} | {excerpt.replace('|','/')} |")
 add("");add("## 3. Kegagalan (jika ada)");add("- stage/line/exit_code/command: "+pick(r"\[ERROR\].*",alltext));add("- 50 baris log terakhir:")
 for line in alltext.splitlines()[-50:]:add("  "+line[:220])
