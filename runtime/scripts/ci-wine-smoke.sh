@@ -87,8 +87,9 @@ run_wineboot_d() {
     echo "environment: BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all,+timestamp,+process HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix TMPDIR=/tmp DISPLAY=<unset> WAYLAND_DISPLAY=<unset>"
     echo "command=sudo chroot ROOTFS env ... box64 $WINEBOOT_ENTRY"
   } | tee "$log"
-  setsid bash -o pipefail -c '
-    rootfs="$1"; entry="$2"; logfile="$3"
+  setsid --wait bash -o pipefail -c '
+    rootfs="$1"; entry="$2"; logfile="$3"; pidfile="$4"
+    printf "%s\\n" "$" > "$pidfile"
     sudo chroot "$rootfs" env \
       BOX64_LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib \
       BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all,+timestamp,+process \
@@ -96,8 +97,13 @@ run_wineboot_d() {
       WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix WINEDLLOVERRIDES=mscoree,mshtml= \
       DISPLAY= WAYLAND_DISPLAY= /usr/local/bin/box64 "$entry" 2>&1 |
       while IFS= read -r line; do printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$line"; done >> "$logfile"
-  ' _ "$ROOTFS" "$WINEBOOT_ENTRY" "$log" &
-  D_PID=$!; D_PGID="$(ps -o pgid= -p "$D_PID" | tr -d ' ')"
+  ' _ "$ROOTFS" "$WINEBOOT_ENTRY" "$log" "$LOG_DIR/d-process.pid" &
+  D_SUPERVISOR_PID=$!
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do [ -s "$LOG_DIR/d-process.pid" ] && break; sleep 0.1; done
+  if [ ! -s "$LOG_DIR/d-process.pid" ]; then echo "[FAIL] wineboot diagnostic worker did not publish PID" | tee "$LOG_DIR/STOPPED_AT.txt"; exit 1; fi
+  D_PID="$(cat "$LOG_DIR/d-process.pid")"
+  D_PGID="$(ps -o pgid= -p "$D_PID" | tr -d ' ')"
+  if [ "$D_PGID" != "$D_PID" ]; then echo "[FAIL] isolated wineboot process group mismatch pid=$D_PID pgid=$D_PGID" | tee "$LOG_DIR/STOPPED_AT.txt"; exit 1; fi
   echo "host_pid=$D_PID process_group=$D_PGID" | tee -a "$log"
   start="$(date +%s)"
   for checkpoint in 15 45 90 180 600; do
@@ -118,7 +124,7 @@ run_wineboot_d() {
     echo "[CLEANUP] terminate remaining diagnostic process group=$D_PGID" | tee -a "$log"
     kill -TERM -- "-$D_PGID" 2>/dev/null || true; sleep 3; kill -KILL -- "-$D_PGID" 2>/dev/null || true
   fi
-  set +e; wait "$D_PID"; rc=$?; set -e
+  set +e; wait "$D_SUPERVISOR_PID"; rc=$?; set -e
   [ "$timed_out" -eq 0 ] || rc=124
   snapshot_d final
   grep -E '\[BOX64\]' "$log" > "$LOG_DIR/d-box64.log" || true
