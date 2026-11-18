@@ -36,10 +36,10 @@ def duration(start, end):
     return (f"{h}h " if h else "") + (f"{m}m " if m or h else "") + f"{s}s ({sec}s)"
 def redact(s):
     s = re.sub(r"(?i)(gh[pousr]_[A-Za-z0-9_]{20,})", "[REDACTED_TOKEN]", s)
-    s = re.sub(r"(?i)(authorization|token|password|secret|api_key)=([^\\s]+)", r"\1=[REDACTED]", s)
-    s = re.sub(r"(?i)Bearer\\s+[^\\s]+", "Bearer [REDACTED]", s)
-    s = re.sub(r"/home/runner/[^\\s:]+", "[RUNNER_PATH]", s)
-    s = re.sub(r"/Users/[^\\s:]+", "[PRIVATE_PATH]", s)
+    s = re.sub(r"(?i)(authorization|token|password|secret|api_key)=([^\s]+)", r"\1=[REDACTED]", s)
+    s = re.sub(r"(?i)Bearer\s+[^\s]+", "Bearer [REDACTED]", s)
+    s = re.sub(r"/home/runner/[^\s:]+", "[RUNNER_PATH]", s)
+    s = re.sub(r"/Users/[^\s:]+", "[PRIVATE_PATH]", s)
     return s
 def quote(s):
     return "\\n".join("> " + line if line else ">" for line in s.splitlines())
@@ -90,14 +90,14 @@ rp = manifest.get("runtime_pack", {}) if isinstance(manifest,dict) else {}
 components = manifest.get("components", {}) if isinstance(manifest,dict) else {}
 version_file = read_text(pathlib.Path("VERSION")).strip() if pathlib.Path("VERSION").exists() else "TIDAK TERSEDIA"
 gradle = read_text(pathlib.Path("android/app/build.gradle")) if pathlib.Path("android/app/build.gradle").exists() else ""
-app_version = pick(r'versionName\\s+"([^"]+)"', gradle)
+app_version = pick(r'versionName\s+"([^"]+)"', gradle)
 box64_commit = components.get("box64",{}).get("source_commit","TIDAK TERSEDIA")
 wine_version = components.get("wine",{}).get("version","TIDAK TERSEDIA")
 rootfs_distro = components.get("rootfs",{}).get("distribution","TIDAK TERSEDIA")
-box64_version = pick(r"Box64 arm64 v[0-9.]+[^\\n]*", alltext)
-wine_seen = pick(r"wine-[0-9][^\\s]*", alltext)
-libc = pick(r"rootfs_libc6_package=([^\\s]+)", alltext)
-glibc = pick(r"box64_max_required_glibc=([^\\s]+)", alltext)
+box64_version = pick(r"Box64 arm64 v[0-9.]+[^\n]*", alltext)
+wine_seen = pick(r"wine-[0-9][^\s]*", alltext)
+libc = pick(r"rootfs_libc6_package=([^\s]+)", alltext)
+glibc = pick(r"box64_max_required_glibc=([^\s]+)", alltext)
 if box64_version != "TIDAK TERSEDIA": box64_commit += " / " + box64_version
 if wine_seen != "TIDAK TERSEDIA": wine_version += " / CI: " + wine_seen
 if not libc: libc = "TIDAK TERSEDIA"
@@ -111,7 +111,7 @@ def audit_size(folder, name):
     candidates = list(folder.rglob(name)) if folder.exists() else []
     for p in candidates:
         t = read_text(p)
-        m = re.search(r"^archive_bytes=(\\d+)", t, re.M)
+        m = re.search(r"^archive_bytes=(\d+)", t, re.M)
         if m: return int(m.group(1)), t
     return None, ""
 apk_release, release_audit = audit_size(root, "app-release.apk.txt")
@@ -123,10 +123,10 @@ if apk_release is not None and prev_release is not None:
     delta = apk_release - prev_release
     delta_text = f"{delta:+,} byte vs run {prev_run} (current {apk_release:,}; previous {prev_release:,})"
 else: delta_text = "TIDAK TERSEDIA (APK audit/baseline sebelumnya tidak ditemukan)"
-apk_hash = pick(r"SHA256=([^\\s]+)", release_audit)
+apk_hash = pick(r"SHA256=([^\s]+)", release_audit)
 if apk_hash == "TIDAK TERSEDIA":
-    apk_hash = pick(r"([0-9a-f]{64})\\s+android/app/build/outputs/apk/release/[^\\s]+", release_audit)
-apk_embedded = pick(r"EMBEDDED_RUNTIME_PARTS=([^\\s]+)", release_audit + "\\n" + debug_audit)
+    apk_hash = pick(r"([0-9a-f]{64})\s+android/app/build/outputs/apk/release/[^\s]+", release_audit)
+apk_embedded = pick(r"EMBEDDED_RUNTIME_PARTS=([^\s]+)", release_audit + "\n" + debug_audit)
 if not apk_workflow: apk_status = "N/A (tidak berlaku)"
 else: apk_status = f"release={apk_release if apk_release is not None else 'TIDAK TERSEDIA'} byte; debug={apk_debug if apk_debug is not None else 'TIDAK TERSEDIA'} byte; delta={delta_text}"
 rungs = [("a","box64 --version"),("b","box64 wineserver --version"),("c","box64 wine --version"),("d","box64 wineboot"),("e","box64 wine cmd /c ver")]
@@ -135,15 +135,15 @@ if not runtime:
     rung_rows=["| N/A | N/A (tidak berlaku untuk workflow ini) | N/A | N/A | N/A | N/A |"]
 else:
     for rung,cmd in rungs:
-        hit = next(((n,t) for n,t in texts.items() if re.search(rf"(^|/){rung}-[^/]*\\.log$", n)), None)
+        hit = next(((n,t) for n,t in texts.items() if re.search(rf"(^|/){rung}-[^/]*\.log$", n)), None)
         if not hit:
             rung_rows.append(f"| {rung} | {cmd} | TIDAK TERSEDIA | TIDAK TERSEDIA | NOT RUN | Log rung tidak tersedia |")
             continue
         name, txt = hit
-        ec = pick(r"^exit_code=([^\\s]+)", txt)
-        dur = pick(r"^duration_seconds=([^\\s]+)", txt)
+        ec = pick(r"^exit_code=([^\s]+)", txt)
+        dur = pick(r"^duration_seconds=([^\s]+)", txt)
         state = "PASS" if ec=="0" else "TIMEOUT" if ec in ("124","137") else "FAIL" if ec!="TIDAK TERSEDIA" else "NOT RUN"
-        excerpt = [redact(x[:160]) for x in txt.splitlines() if re.search(r"\\[RUN\\]|\\[FAIL\\]|SIGSEGV|eglChooseConfig|wine-[0-9]|Box64 arm|\\[TIMEOUT\\]",x,re.I)][:3]
+        excerpt = [redact(x[:160]) for x in txt.splitlines() if re.search(r"\[RUN\]|\[FAIL\]|SIGSEGV|eglChooseConfig|wine-[0-9]|Box64 arm|\[TIMEOUT\]",x,re.I)][:3]
         rung_rows.append(f"| {rung} | {cmd} | {ec} | {dur} | {state} | {'; '.join(excerpt) if excerpt else 'TIDAK TERSEDIA'} |")
 error_lines=[]
 for n,txt in texts.items():
@@ -188,13 +188,13 @@ add(f"- glibc maksimum yang diminta Box64: {glibc}")
 add(f"- Versi manifest/runtime pack: {rp.get('version','TIDAK TERSEDIA')}")
 add(f"- Status manifest runtime_pack: {rp.get('status','TIDAK TERSEDIA')}")
 add(""); add("## 5. Ukuran dan artefak")
-add(f"- Rootfs sebelum/sesudah trim: {pick(r'rootfs-size-before-trim[^\\n]*',alltext)} / {pick(r'rootfs-size-after-trim[^\\n]*',alltext)}")
-add(f"- Runtime archive bytes: {pick(r'ARCHIVE_BYTES=([0-9]+)',alltext)}; SHA-256: {pick(r'([0-9a-f]{{64}})\\s+ghost-town-wine-runtime-arm64\\.tar\\.gz',alltext)}; expanded bytes: {pick(r'expanded_size_bytes=([0-9]+)',alltext)}")
+add(f"- Rootfs sebelum/sesudah trim: {pick(r'rootfs-size-before-trim[^\n]*',alltext)} / {pick(r'rootfs-size-after-trim[^\n]*',alltext)}")
+add(f"- Runtime archive bytes: {pick(r'ARCHIVE_BYTES=([0-9]+)',alltext)}; SHA-256: {pick(r'([0-9a-f]{{64}})\s+ghost-town-wine-runtime-arm64\.tar\.gz',alltext)}; expanded bytes: {pick(r'expanded_size_bytes=([0-9]+)',alltext)}")
 add(f"- APK: {apk_status}; SHA-256 release: {apk_hash}; EMBEDDED_RUNTIME_PARTS: {apk_embedded}")
 add("\\n".join(artifacts_lines))
 add(""); add("## 6. Performa build")
 add("- Durasi per job berasal dari GitHub Actions jobs API pada bagian 1.")
-add(f"- Cache Box64/rootfs/Gradle: {pick(r'(?i)(?:cache[^\\n]*(?:hit|miss)|cache hit[^\\n]*)',alltext)}")
+add(f"- Cache Box64/rootfs/Gradle: {pick(r'(?i)(?:cache[^\n]*(?:hit|miss)|cache hit[^\n]*)',alltext)}")
 add(f"- Perbandingan APK: {delta_text}")
 add(""); add("## 7. Perubahan sejak run sebelumnya")
 add("- Commit: "+sha+" — "+commit_message)
