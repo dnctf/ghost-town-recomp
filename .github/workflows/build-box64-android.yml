@@ -1,19 +1,12 @@
 name: Build Box64 Linux ARM64 (glibc)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'runtime/box64/**'
-      - 'runtime/manifest.json'
-      - 'docs/BOX64_ANDROID_RUNTIME.md'
-      - '.github/workflows/build-box64-android.yml'
   workflow_dispatch:
     inputs:
       box64_ref:
         description: Upstream Box64 branch, tag, or commit
         required: true
-        default: main
+        default: 7fab05334445948c918281b54f2a604ff63337f7
         type: string
 
 permissions:
@@ -27,6 +20,7 @@ jobs:
   build-box64:
     name: Build Box64 Linux ARM64 for glibc userspace
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
     steps:
       - name: Install build dependencies
         run: |

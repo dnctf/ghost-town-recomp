@@ -11,7 +11,7 @@ class RuntimeManifestTests(unittest.TestCase):
     def setUpClass(cls):
         cls.manifest = json.loads((ROOT / "runtime/manifest.json").read_text())
         cls.gradle = (ROOT / "android/app/build.gradle").read_text()
-        cls.package_list = (ROOT / "runtime/rootfs/packages-amd64.txt").read_text().lower()
+        cls.package_list = "\n".join(line.split("#", 1)[0].strip().lower() for line in (ROOT / "runtime/rootfs/packages-amd64.txt").read_text().splitlines())
 
     def test_app_and_runtime_manifest_versions_match(self):
         match = re.search(r'versionName\s+"([^"]+)"', self.gradle)
