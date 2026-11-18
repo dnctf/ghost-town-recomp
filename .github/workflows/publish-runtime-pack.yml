@@ -1,0 +1,85 @@
+name: Publish Validated Wine Runtime Pack
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-runtime-pack.yml'
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Successful runtime build run ID
+        required: true
+        default: '44279571506'
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    name: Verify and publish runtime pre-release asset
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_RUN_ID: ${{ inputs.source_run_id || '44279571506' }}
+      RUNTIME_TAG: runtime-v0.5.0-alpha.2
+      BUILD_COMMIT: d15cc4e04bd8b311af1b4c4d70027ca0f84ec598
+      EXPECTED_SIZE: '354498740'
+      EXPECTED_SHA256: 9d4e17f055736c0113db1dcb355c619332a1479e84e2ca43f4fde64cc0f5c6a3
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download validated runtime bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ghost-town-wine-runtime-0.5.0-alpha.2-arm64-debian-bookworm
+          run-id: ${{ inputs.source_run_id || '44279571506' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: runtime-artifact
+      - name: Verify checksum, exact size and archive contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd runtime-artifact
+          archive=ghost-town-wine-runtime-arm64.tar.gz
+          checksum=ghost-town-wine-runtime-arm64.tar.gz.sha256
+          test -s "$archive"
+          test -s "$checksum"
+          sha256sum -c "$checksum"
+          actual_size="$(stat -c '%s' "$archive")"
+          actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
+          test "$actual_size" = "$EXPECTED_SIZE"
+          test "$actual_sha" = "$EXPECTED_SHA256"
+          tar -tzf "$archive" > archive-entries.txt
+          if grep -Eiq '(^|/)(Xvfb|xvfb-run)$|(^|/)\.X11-unix/[^/]+$' archive-entries.txt; then
+            echo "[FAIL] Xvfb executable or X11 socket found in runtime archive"
+            grep -Ei '(^|/)(Xvfb|xvfb-run)$|(^|/)\.X11-unix/[^/]+$' archive-entries.txt
+            exit 1
+          fi
+          {
+            echo "source_run_id=$SOURCE_RUN_ID"
+            echo "build_commit=$BUILD_COMMIT"
+            echo "archive_size_bytes=$actual_size"
+            echo "archive_sha256=$actual_sha"
+            echo "archive_checksum=PASS"
+            echo "archive_content_guard=PASS"
+          } | tee runtime-publish-verification.txt
+      - name: Create or update runtime pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$RUNTIME_TAG" >/dev/null 2>&1; then
+            gh release create "$RUNTIME_TAG" \
+              --target "$BUILD_COMMIT" \
+              --title "Ghost Town Recomp Wine Runtime 0.5.0-alpha.2 (ARM64)" \
+              --prerelease \
+              --notes "Validated app-private Wine runtime pack for Debian Bookworm ARM64 and Box64 v0.4.5. Gate R (Wine smoke rungs A-E) passed in build run $SOURCE_RUN_ID. This release does not claim game playability or physical-device validation."
+          fi
+          gh release upload "$RUNTIME_TAG" \
+            runtime-artifact/ghost-town-wine-runtime-arm64.tar.gz \
+            runtime-artifact/ghost-town-wine-runtime-arm64.tar.gz.sha256 \
+            --clobber
+          gh release view "$RUNTIME_TAG" --json url,isPrerelease,assets
