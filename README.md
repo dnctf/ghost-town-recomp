@@ -1,133 +1,137 @@
-# 🎮 Ghost Town Recomp (Android)
+# Ghost Town Recomp (Android)
 
-[![Build Ghost Town Recomp Android NDK & APK](https://github.com/dnctf/ghost-town-recomp/actions/workflows/build-android.yml/badge.svg)](https://github.com/dnctf/ghost-town-recomp/actions)
-[![Latest Release](https://img.shields.io/github/v/release/dnctf/ghost-town-recomp?include_prereleases&color=orange&label=Release)](https://github.com/dnctf/ghost-town-recomp/releases)
-[![Platform](https://img.shields.io/badge/Platform-Android%2010%2B%20%7C%20HarmonyOS%204-brightgreen)](https://github.com/dnctf/ghost-town-recomp)
-[![Architecture](https://img.shields.io/badge/Arch-arm64--v8a%20(Vulkan)-blue)](https://github.com/dnctf/ghost-town-recomp)
-[![License](https://img.shields.io/badge/License-GPLv3-yellow.svg)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/dnctf/ghost-town-recomp/pulls)
+> **STATUS: Alpha — belum dapat memainkan game.**
 
-> **An experimental Android launcher and native runtime research project for selected PC co-op games.**
+Ghost Town Recomp adalah proyek launcher Android dan riset runtime untuk menjalankan game PC Windows secara eksperimental pada perangkat ARM64. Sasaran pengembangan saat ini adalah Overcooked! 2 pada Huawei MatePad Air 2023. Status di bawah hanya mencerminkan hasil CI yang benar-benar tercatat; belum ada klaim bahwa game dapat diluncurkan atau dimainkan.
 
-**Ghost Town Recomp** is an open-source Android launcher and experimental Unity-oriented native runtime/recompilation prototype. The current repository includes file inspection, metadata helpers, Vulkan integration points, and title-specific scaffolding; it does not yet establish that the listed PC games are playable.
+## Status gerbang
 
-> [!NOTE]
-> **100% Legal & Clean-Room (Bring Your Own Game / BYOG):**
-> This repository contains **NO copyrighted game assets, proprietary code, or binaries**. Users must supply their own legally purchased PC game files (Steam, Epic Games, GOG, etc.).
+| Gerbang | Status | Bukti CI | Emulator | MatePad Air 2023 |
+|---|---|---|---|---|
+| **R — Runtime CI** | **Gagal / belum hijau** | Run [#44235028738](https://github.com/dnctf/ghost-town-recomp/actions/runs/44235028738): Box64 build berhasil, smoke runner berhenti sebelum rung a | Belum diuji | Belum diuji |
+| **P — Runtime pack & installer** | **Belum diuji; manifest pending** | Belum ada archive runtime terverifikasi atau asset release | Belum diuji terhadap archive nyata | Belum diuji |
+| **D — Display X11/VirGL** | **Belum diuji** | Belum ada self-test window/GLX/frame yang lolos | Belum diuji | Belum diuji |
+| **G — Game** | **Belum diuji** | Belum ada D3D11/game/audio/input/stability evidence | Belum diuji | Belum diuji |
 
----
+Run [UI Preview #44238289772](https://github.com/dnctf/ghost-town-recomp/actions/runs/44238289772) berhasil membangun APK preview, menjalankan lint dan empat unit test Play policy. Keberhasilan itu bukan bukti runtime atau game dapat berjalan.
 
-## Runtime Support Matrix
+## Yang sudah berfungsi / terbukti
 
-| Game / Engine | Runtime Path | Status |
-| :--- | :--- | :--- |
-| Overcooked! | Data verifier + Mono/CIL inspection scaffold | 🧪 Data detection only; no execution |
-| Overcooked! 2 | IL2CPP metadata inspection scaffold | 🧪 Metadata detection only; no execution |
-| Moving Out | Title-specific inspection scaffold | 🧪 No verified execution |
-| Moving Out 2 | Title-specific inspection scaffold | 🧪 No verified execution |
-| Wine / Box64 (.exe) | Required candidate path for Windows PC builds | 📄 Research only; not integrated or tested |
-| Source Engine (HL2 / mods) | Separate SDK-based fork/port | 📄 Feasibility research; separate project |
+- **UI Preview** berbasis Jetpack Compose dapat dibangun di CI sebagai APK debug ARM64. APK berukuran 27.157.234 byte (25,90 MiB), package ID memakai suffix `.uipreview`, dan audit APK melaporkan `EMBEDDED_RUNTIME_PARTS=0`.
+- Dashboard demo, halaman Runtime, Library (pemilih folder SAF), dan Settings telah dikompilasi serta melewati lint di CI. Empat unit test Play launch policy lulus.
+- **Play gate nyata** membaca status instalasi dari `RuntimeBundleInstaller.isInstalled()` dan marker display `filesDir/runtime/display/GHOST_TOWN_DISPLAY_READY` dengan isi persis `GHOST_TOWN_DISPLAY_READY=1`. Preview tidak membuat marker; Play tetap diblokir sampai self-test display sungguhan menulis marker tersebut.
+- Pipeline runtime CI telah berhasil membangun Box64 ARM64 di container Debian Bookworm. Pemeriksaan simbol mencatat kebutuhan maksimum Box64 `GLIBC_2.35`, sementara rootfs Bookworm menggunakan glibc `2.36`; pemeriksaan kompatibilitas ini lulus pada run #46.
+- Bootstrap rootfs, download/extract paket amd64, validasi Wine ELF/dependency, dan verifikasi glibc lulus pada run #46. Smoke runner gagal sebelum menjalankan rung pertama; karena itu belum ada rung a-e yang dapat dinyatakan lulus.
 
-See [Runtime Audit](RUNTIME_AUDIT.md), [Multi-Runtime Architecture](docs/MULTI_RUNTIME_ARCHITECTURE.md), [Wine/Box64 Evaluation](docs/WINE_BOX64_EVALUATION.md), and [Source Engine Feasibility](docs/SOURCE_ENGINE_FEASIBILITY.md) for evidence and limitations.
+## Yang belum berfungsi / belum terbukti
 
----
+- Runtime pack belum dibangun, belum memiliki URL/ukuran/SHA-256 final, dan belum dipublikasikan. `runtime/manifest.json` tetap `runtime_pack.status = pending`.
+- Pengunduh/installer belum diuji terhadap archive runtime nyata end-to-end (resume, retry, checksum, ekstraksi atomik, pemulihan instalasi rusak, dan low-storage).
+- Wine belum lulus smoke ladder a-e. Belum ada X11 window, GLX renderer, VirGL visible frame, D3D11 frame, atau marker display-ready.
+- Peluncuran Overcooked! 2, input sentuh/keyboard/gamepad ke Wine, audio game, pause/resume, crash recovery, FPS, RAM, suhu, dan sesi stabil 15 menit belum diuji.
+- Fitur **Ekspor diagnostik ZIP** belum tersedia.
+- Tidak ada pengujian emulator atau pengujian fisik Huawei MatePad Air 2023 yang diklaim.
 
-## ✨ Features
+## Arsitektur target
 
-- ⚡ **C++20 & Vulkan 1.0 integration point**: Android native rendering and device capability groundwork; this is not yet a complete Unity renderer.
-- 🎮 **Native Controller Support (Plug & Play)**:
-  - **Sony DualShock 4 & DualSense (PS4 / PS5)**: Native button glyphs (✕, ◯, ▢, △), analog triggers, and touchpad support.
-  - **Xbox Wireless & Elite Controllers**: Auto-detected profiles, standard A/B/X/Y mappings, and LT/RT analog thresholds.
-  - **Split-Controller Co-op**: Play with a friend on a single controller (Left Stick & L1/L2 for Player 1, Right Stick & R1/R2 for Player 2).
-- 📱 **On-Screen Touch Controls (Virtual Gamepad)**:
-  - Responsive analog touch joystick on the bottom-left with deadzone smoothing.
-  - Diamond action buttons (A, B, X, Y) + shoulder buttons (L1, L2, R1, R2).
-  - Multi-touch tracking and haptic feedback. Can be toggled on/off anytime.
-- 🛡️ **Android 10 to 15+ Compatibility**:
-  - Full support for Android 10 (API 29), Android 12 (HarmonyOS 4), and modern Android 14/15.
-  - **16 KB page-size aligned** (`-Wl,-z,max-page-size=16384`) for next-gen Android kernels.
-  - Scoped storage & SAF file importer with zip extraction safeguards.
-- 🌡️ **Smart Thermal Governor**: Automatically adjusts resolution scale (`0.75x` – `1.0x`) during long gaming sessions to keep your device cool and battery healthy.
-
----
-
-## 🚧 Current Status (0.3.0)
-
-### 1. Install the experimental launcher
-Install the APK from the [Releases](https://github.com/dnctf/ghost-town-recomp/releases) page on an Android 10+ device. This release is a launcher and runtime-readiness preview, not a playable Unity runtime.
-
-### 2. Import game data for inspection
-Copy the `_Data` folder from your legitimate PC game installation to your device:
+Runtime dipisah dari APK dan diunduh setelah runtime pack tersedia:
 
 ```text
-/sdcard/Android/data/com.overcookedrecomp.app/files/
-  ├── Overcooked_Data/     # for Overcooked 1
-  ├── Overcooked2_Data/    # for Overcooked 2
-  ├── MovingOut_Data/      # for Moving Out
-  └── MovingOut2_Data/     # for Moving Out 2
+Android App
+   |
+   +-- UI / Library (SAF) / Runtime manager
+   |
+   +-- download + verify runtime pack (HTTPS + SHA-256)
+          |
+          v
+       App-private rootfs
+          |
+        PRoot
+          |
+        Box64 (ARM64 host -> x86_64 guest)
+          |
+        Wine (Windows x86_64)
+          |
+        X11 / guest Mesa / VirGL transport
+          |
+        Android display SurfaceView
 ```
 
-> 💡 **Tip:** You can also simply zip the folder on your PC, send it to your phone's **Download** folder, and tap **"⚡ Deteksi Otomatis dari Folder Download"** or **"📁 Impor .ZIP PC"** inside the app!
+APK hanya membawa komponen Android/native yang memang diperlukan (termasuk PRoot ARM64). **Rootfs, Box64 guest payload, Wine, dan file game tidak dibundel ke APK UI Preview.** Arsitektur diagram adalah target; jalur tampilan belum lolos Gerbang D.
 
-### 3. Inspect execution requirements
-Open **Ghost Town Recomp** and inspect the imported game data. The app reports detected data separately from execution readiness. Press **EXECUTION STATUS** on a game card to see the missing runtime components. The orange clear-only renderer has been removed. Mono hosting, IL2CPP recompilation, Unity rendering, and Wine/Box64 integration are not yet implemented; therefore no PC game is claimed playable.
+## Cara mencoba build yang tersedia sekarang
 
----
+1. Buka [UI Preview workflow](https://github.com/dnctf/ghost-town-recomp/actions/workflows/ui-preview.yml).
+2. Pilih run sukses [#44238289772](https://github.com/dnctf/ghost-town-recomp/actions/runs/44238289772), lalu unduh artifact `ghost-town-ui-preview-0.5.0-alpha.2-60800bfda51bf8d858f36ddf602aa809d0ba6795`.
+3. Ekstrak ZIP dan instal APK:
+   ```bash
+   adb install -r app-debug.apk
+   adb shell monkey -p com.overcookedrecomp.app.uipreview 1
+   ```
+4. Yang dapat diuji sekarang: navigasi dashboard demo, detail kartu, tab Runtime/Library/Settings, pemilih folder SAF, dan perilaku gate Play yang tetap blocked. Kartu game masih data demo; ini bukan peluncur game.
 
-## 🤝 We Love Contributors!
+Petunjuk rinci ada di [docs/ui-preview.md](docs/ui-preview.md). APK ini debug-signed dan bukan distribusi Play Store.
 
-Ghost Town Recomp is an open-source project and we welcome contributions of all skill levels! Whether you want to add a feature, optimize performance, or fix a bug, we'd love to have you on board.
+## Build dan alur CI
 
-### 🔥 Great Areas to Help With:
-- 🎮 **New Controller Profiles**: Add support for Nintendo Switch Pro Controller, 8BitDo, Joy-Cons, Razer Kishi, etc.
-- 🎨 **UI / UX Polish**: Modernize the setup launcher, add themes, customizable button layouts, or game art scrapers.
-- ⚡ **Graphics & Shaders**: Unity ShaderLab-to-SPIRV translations, Mali/PowerVR/Xclipse GPU compatibility.
-- 🌐 **Translations & Docs**: Help translate the app and documentation into more languages.
-- 🧪 **Device Testing**: Test on different chips (Snapdragon 8 Gen 1/2/3, Dimensity 9000+, Tensor G3, etc.) and submit test reports.
+### Build Android lokal
 
-### 🛠️ How to Contribute:
-1. **Fork** the repository.
-2. Create your feature branch (`git checkout -b feature/amazing-feature`).
-3. Commit your changes (`git commit -m "feat: add support for Nintendo Switch Pro Controller"`).
-4. Push to your branch (`git push origin feature/amazing-feature`).
-5. Open a **Pull Request** and describe what you built!
+Prasyarat: JDK 17, Android SDK/NDK yang sesuai konfigurasi Gradle, CMake 3.22.1, dan Gradle 8.2.2-compatible.
 
----
-
-## 🏗️ Building from Source
-
-### Prerequisites
-- **Android Studio** (Hedgehog or newer) / JDK 17
-- **Android NDK**: `r26d` (26.3.11579264)
-- **CMake**: `3.22.1+`
-- **Target ABI**: `arm64-v8a`
-
-### Build Command
 ```bash
-git clone --recursive https://github.com/dnctf/ghost-town-recomp.git
-cd ghost-town-recomp/android
+cd android
 gradle assembleDebug
 gradle lint
 ```
-The output APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`. This repository currently does not include `gradlew` or the Gradle wrapper JAR/properties; use installed Gradle 8.5+ as CI does, or add a verified wrapper before using `./gradlew`.
 
----
+APK debug berada di `android/app/build/outputs/apk/debug/app-debug.apk`. Untuk workflow CI:
 
-## ⚖️ Legal Disclaimer
+- [Android APK build & size audit](.github/workflows/build-android.yml)
+- [UI Preview APK](.github/workflows/ui-preview.yml)
+- [ARM64 Wine runtime bundle](.github/workflows/build-wine-runtime-bundle.yml)
 
-*Ghost Town Recomp* is an independent, non-commercial open-source project developed for interoperability and preservation purposes. It is **not** endorsed by, affiliated with, or associated with Ghost Town Games, SMG Studio, Team17 Digital, or Unity Technologies. All game trademarks, titles, and copyrighted materials belong to their respective owners. Users must own legitimate copies of the PC games to use this software.
+Runtime workflow membangun Box64 pada Debian Bookworm ARM64, menyiapkan Debian Bookworm ARM64 + amd64 rootfs, memeriksa ELF/glibc, menjalankan smoke ladder sebelum trim, lalu mengemas archive jika semua gate berhasil. Run terbaru yang diperiksa tercatat di [runtime-debug](docs/runtime-debug.md).
 
+### Versi dan manifest
 
-## Contributor and tester tooling
+Versi aplikasi/runtime saat ini masih `0.5.0-alpha.2` di konfigurasi Gradle dan manifest. **Sumber versi tunggal `VERSION` belum tersedia atau belum diintegrasikan**; penyatuan versi aplikasi, workflow, downloader, dan manifest adalah pekerjaan Gerbang P1. Jangan mengubah manifest menjadi aktif sebelum archive nyata selesai diverifikasi.
 
-- [Contributor guide](CONTRIBUTING.md)
-- [Game installation and Android tester guide](docs/CONTRIBUTOR_TESTING.md)
-- Run the host-side installation probe: `python3 tools/game_installation_probe.py /path/to/Game --json report.json`
-- Run probe tests: `python3 -m unittest discover -s tools/tests -v`\n- Run Android launcher smoke test: `tools/android_device_smoke_test.sh /path/to/app-debug.apk`
+## Target perangkat dan risiko
 
-A complete Windows folder layout is not proof of Android compatibility. This project does not bundle Wine/Box64 or proprietary game files.
+Target pengujian: **Huawei MatePad Air 2023**, Snapdragon 888, Adreno 660, ARM64, HarmonyOS 4.2.
 
+Risiko yang masih terbuka:
 
-## v0.4.0 runtime transition
+- Android/HarmonyOS W^X dan kebijakan eksekusi binary dari app sandbox.
+- seccomp, PRoot/ptrace, akses `/proc`, `/dev/pts`, dan namespace/mount yang diizinkan.
+- Tidak mengandalkan SysV shared memory; jalur grafis harus sesuai kemampuan host Android.
+- Kecocokan Mesa `virtio_gpu_dri.so` dengan transport socket vtest/virpipe belum terbukti; rencana Vulkan/Turnip + DXVK masih ditunda.
+- RAM, tekanan memori, panas, thermal throttling, dan konsumsi daya saat sesi panjang.
 
-The `0.4.0-alpha.1` line starts the self-contained Android runtime migration. It is explicitly a **pre-release foundation**, not a playable Overcooked 2 build. The app now has a managed HTTPS download path for the project-owned runtime release with SHA-256 verification and transactional extraction. The existing PRoot/Box64/Wine/DXVK payload is not sufficient by itself: a tested Android graphics-driver loading path, a glibc-visible Vulkan/Wine presentation backend, audio/input bridges, prefix creation, and target-device gameplay evidence remain required. See [`docs/V0.4.0_EXECUTION_GATES.md`](docs/V0.4.0_EXECUTION_GATES.md) and [`docs/PROVENANCE.md`](docs/PROVENANCE.md).
+Dokumen teknis:
+- [Runtime debug dan smoke ladder](docs/runtime-debug.md)
+- [Risk register](docs/risk-register.md)
+- [Graphics transport plan](docs/graphics-plan.md)
+- [Device bring-up — draft, belum untuk dijalankan](docs/device-bringup.md)
+- [UI Preview guide](docs/ui-preview.md)
+
+## Roadmap berbasis gerbang
+
+1. **R — Runtime CI:** buktikan rung a-e lengkap dengan log dan timeout; verifikasi usr-merge, loader, glibc, library path, dan mount chroot; baru trim, ukur, hash, dan publikasikan runtime archive.
+2. **P — Runtime pack:** isi manifest dari archive terverifikasi, uji downloader/installer, tambahkan Ekspor diagnostik, bangun APK uji dan panduan device bring-up. Setelah P4, berhenti untuk pengujian MatePad oleh pengguna.
+3. **D — Display:** setelah bukti perangkat Gerbang P diterima, buktikan xmessage, glxinfo -B, dan glxgears terlihat di SurfaceView. Marker hanya dibuat oleh self-test yang sukses. Setelah itu berhenti untuk uji display di MatePad.
+4. **G — Game:** setelah display terbukti di perangkat, lanjut D3D11, input, audio, lifecycle, dan stabilitas game dengan jeda pengujian perangkat di setiap sub-gerbang.
+
+## Cara melaporkan masalah
+
+Fitur **Ekspor diagnostik ZIP direncanakan pada P3 tetapi belum tersedia**. Jangan mengirim file game atau data pribadi. Untuk kondisi build saat ini, sertakan:
+- versi aplikasi dan model/versi OS perangkat;
+- langkah reproduksi dan waktu kejadian;
+- log CI yang relevan atau `adb logcat` yang sudah disaring dari informasi pribadi;
+- screenshot UI bila masalahnya visual.
+
+Pengguna menyediakan sendiri salinan Overcooked! 2 yang sah. Jangan mengunggah executable atau aset game ke issue/artifact proyek.
+
+## Legal
+
+Repositori ini **tidak menyertakan file Overcooked! 2**, executable game, maupun aset proprietary. Pengguna wajib menyediakan salinan game yang diperoleh secara sah. Proyek ini tidak berafiliasi, didukung, atau disponsori oleh **Team17, Ghost Town Games, Microsoft, atau Sony**. Aset UI Preview merupakan karya orisinal/prosedural untuk proyek ini; merek dan nama game tetap milik pemegang hak masing-masing.

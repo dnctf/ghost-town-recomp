@@ -206,3 +206,40 @@ The next diagnostics collection writes complete inventories to files before trun
   ```
 - Root cause: the minimal Debian Bookworm container did not include the Python 3 interpreter required by the pinned Box64 CMake configuration. The shell selection and apt package installation both succeeded; compilation did not start.
 - Fix: add `python3` to the Bookworm build-container tool installation. No Box64 source or runtime files changed.
+
+
+## Run #46: smoke runner berhenti saat inventarisasi mount
+
+- Run: [44235028738](https://github.com/dnctf/ghost-town-recomp/actions/runs/44235028738), commit `ba6ebb7f5d7ce24fa1cd8a32839925e0fd6c93a3`, completed **failure**.
+- Job Box64 berhasil. Rootfs job lulus bootstrap, download paket amd64, ekstraksi payload, validasi Wine, verifikasi loader, dan pemeriksaan glibc. Step `Run Wine smoke ladder on untrimmed rootfs` gagal; trim dan assemble dilewati.
+- Artifact:
+  - [box64-arm64-glibc-sd888](https://github.com/dnctf/ghost-town-recomp/actions/runs/44235028738/artifacts/14397371600), 6,623,356 bytes, artifact ZIP SHA-256 `e2ed91e2b25c9ae202d86f06044f3a5f4e7650d15df325d4c69e9ea177efb046`.
+  - [runtime-build-diagnostics](https://github.com/dnctf/ghost-town-recomp/actions/runs/44235028738/artifacts/14397167386), 425,126 bytes, artifact ZIP SHA-256 `493d2eac5c031e72c6c77d08e3bf4453f3f19ea8b043b62fdb3fe40c21b6f7ea`.
+  - [runtime-wine-smoke-diagnostics](https://github.com/dnctf/ghost-town-recomp/actions/runs/44235028738/artifacts/14396738987), 189 bytes; no rung log was produced.
+- Box64 compatibility log:
+  ```
+  rootfs_libc6_package=2.36-9+deb12u14
+  rootfs_glibc=2.36
+  box64_max_required_glibc=2.35
+  ```
+  The GLIBC ceiling check passed.
+- Exact smoke log excerpt:
+  ```
+  ### active chroot mounts
+  [ERROR] stage=06-smoke-wine-untrimmed-rootfs line=3 exit_code=1 command=bash runtime/scripts/ci-wine-smoke.sh "$ROOTFS" runtime-smoke
+  ```
+  The smoke script mounts `/dev`, `/dev/pts`, `/proc`, and `/sys`, then executes `findmnt -R "$ROOTFS"` in a pipeline under `set -euo pipefail`. The log stops immediately after the heading, before any mount inventory or rung output. This identifies the mount-inventory command/pipeline as the failing point; it does **not** show a Wine or Box64 rung failure.
+- The artifact's `apt-get-loader-paths.txt` reports `/lib` as a real directory, not a symlink to `usr/lib`. Thus the required usr-merged layout was still absent after amd64 extraction. The run did not record a pre-extraction `/lib` assertion, so it cannot establish whether amd64 extraction changed the layout.
+- Rung table for this run:
+
+| Rung | Status | Duration | Log evidence |
+|---|---|---:|---|
+| a — `box64 --version` | **NOT RUN** | — | Smoke runner stopped before `run_rung a-box64-version` |
+| b — x86_64 `wineserver --version` | **NOT RUN** | — | No `b-x86_64-utility.log` |
+| c — `wine --version` | **NOT RUN** | — | No `c-wine-version.log` |
+| d — `wineboot` | **NOT RUN** | — | No `d-wineboot.log` |
+| e — `wine cmd /c ver` | **NOT RUN** | — | No `e-wine-cmd-ver.log` |
+
+- Root cause category: smoke setup/diagnostic failure before rung a. It is distinct from the earlier trim and loader failures. No standalone Wine experiment is justified because rung c/d has not run.
+- Corrective commit: [49c4833](https://github.com/dnctf/ghost-town-recomp/commit/49c48338298d170d7247e889128da8d3a0b2455b) adds explicit `usrmerge` installation and pre-/post-amd64-extraction assertions that `/lib -> usr/lib`; removes the ad-hoc loader symlink repair; asserts all four chroot mountpoints before treating the mount inventory as diagnostic; and adds both `/lib/x86_64-linux-gnu` and `/usr/lib/x86_64-linux-gnu` to `BOX64_LD_LIBRARY_PATH`.
+- Validation of that correction is pending in [runtime run 44242702116](https://github.com/dnctf/ghost-town-recomp/actions/runs/44242702116). Do not count it as a fix until the workflow completes and logs prove the assertions and smoke ladder.
