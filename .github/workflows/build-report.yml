@@ -49,7 +49,7 @@ jobs:
           echo "REPORT_PREVIOUS_APK_DIR=previous-apk" >> "$GITHUB_ENV"
           echo "REPORT_RUNNER_MACHINE=$(uname -m)" >> "$GITHUB_ENV"
           echo "REPORT_RUNNER_NPROC=$(nproc)" >> "$GITHUB_ENV"
-          echo "REPORT_RUNNER_RAM=$(awk '/MemTotal/ {printf \"%d MiB\", $2/1024}' /proc/meminfo)" >> "$GITHUB_ENV"
+          echo "REPORT_RUNNER_RAM=$(awk '/MemTotal/ {printf "%d MiB", $2/1024}' /proc/meminfo)" >> "$GITHUB_ENV"
           echo "REPORT_GENERATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
           gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq '.commit.message' > reports/commit-message.txt
           if [ -s reports/commit-message.txt ]; then
@@ -57,7 +57,7 @@ jobs:
             cat reports/commit-message.txt >> "$GITHUB_ENV"
             echo "REPORT_COMMIT_EOF" >> "$GITHUB_ENV"
           fi
-          gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq '[.files[].filename] | join(\"; \")' > reports/changed-files.txt
+          gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq '[.files[].filename] | join("; ")' > reports/changed-files.txt
           if [ -s reports/changed-files.txt ]; then
             echo "REPORT_CHANGED_FILES=$(cat reports/changed-files.txt)" >> "$GITHUB_ENV"
           fi
