@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'runtime/**'
-      - '!runtime/scripts/ci-wine-smoke.sh'
+      - '.github/workflows/build-wine-runtime-bundle.yml'
       - 'runtime/rootfs/packages-amd64.txt'
       - 'tools/audit_runtime_tree.py'
       - 'tools/validate_runtime_archive.py'
@@ -132,7 +132,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y debootstrap git cmake ninja-build build-essential \
-            file binutils curl xz-utils tar python3 pax-utils
+            file binutils curl xz-utils tar python3 pax-utils xvfb
       - name: Restore Debian package archive cache
         uses: actions/cache@v4
         with:
@@ -222,6 +222,25 @@ jobs:
             sudo ls -ld "$ROOTFS/lib" "$ROOTFS/lib/ld-linux-aarch64.so.1"
           } | tee rootfs-usrmerge-after-amd64.txt
 
+      - name: Validate amd64 libbsd symbols and Fontconfig configuration
+        run: |
+          set -euo pipefail
+          LIBBSD="$ROOTFS/usr/lib/x86_64-linux-gnu/libbsd.so.0"
+          LIBEDIT="$ROOTFS/usr/lib/x86_64-linux-gnu/libedit.so.2"
+          FONTS_CONF="$ROOTFS/etc/fonts/fonts.conf"
+          test -s "$LIBBSD"
+          test -s "$LIBEDIT"
+          test -s "$FONTS_CONF"
+          objdump -T "$LIBBSD" | tee libbsd-symbols.txt
+          for symbol in vis strvis strunvis; do
+            awk -v symbol="$symbol" '$NF == symbol { found=1 } END { exit !found }' libbsd-symbols.txt || { echo "[FAIL] missing libbsd symbol: $symbol"; exit 1; }
+            echo "[PASS] libbsd exports $symbol"
+          done
+          readelf -d "$LIBEDIT" | tee libedit-dynamic.txt
+          grep -q 'libbsd.so.0' libedit-dynamic.txt
+          lddtree -R "$ROOTFS" /usr/lib/x86_64-linux-gnu/libedit.so.2 | tee libedit-lddtree.txt
+          if grep -Eq '=> None|could not locate library|not found' libedit-lddtree.txt; then echo "[FAIL] unresolved libedit dependency"; exit 1; fi
+          echo "[PASS] Fontconfig config: $FONTS_CONF"
       - name: Validate Wine payloads (fatal) and inventory graphics (warning only)
         run: |
           source runtime/scripts/ci-diagnostics.sh 04-validate-runtime-payloads
