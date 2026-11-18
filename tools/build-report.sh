@@ -9,7 +9,7 @@ def read(p):
  try:return pathlib.Path(p).read_text(errors="replace")
  except:return ""
 def pick(pat,txt):
- m=re.search(pat,txt,re.I|re.M);return m.group(1).strip() if m else "TIDAK TERSEDIA"
+ m=re.search(pat,txt,re.I|re.M);return (m.group(1) if m.lastindex else m.group(0)).strip() if m else "TIDAK TERSEDIA"
 def quote(txt):return "\n".join("> "+line if line else ">" for line in txt.splitlines())
 workflow=env("REPORT_WORKFLOW")
 slug=re.sub(r"[^a-z0-9]+","-",workflow.lower()).strip("-") or "workflow"
