@@ -32,16 +32,22 @@ concurrency:
 
 jobs:
   build-box64:
-    name: Build and cache Box64 ARM64 glibc binary
+    name: Build Box64 against Debian Bookworm ARM64 glibc
     runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:bookworm
     timeout-minutes: 60
     env:
       BOX64_REF: ${{ inputs.box64_ref || '7fab05334445948c918281b54f2a604ff63337f7' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Install Box64 host build tools
-        run: sudo apt-get update && sudo apt-get install -y git cmake ninja-build build-essential libcapstone-dev ccache file binutils
+      - name: Install Box64 Bookworm build tools
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "aarch64"
+          apt-get update
+          apt-get install -y git cmake ninja-build build-essential libcapstone-dev ccache file binutils
       - name: Restore Box64 compiler cache
         uses: actions/cache@v4
         with:
@@ -66,7 +72,12 @@ jobs:
           install -D -m 0755 "$(find box64-build -type f -name box64 -perm -111 -print -quit)" box64-install/usr/local/bin/box64
           file box64-install/usr/local/bin/box64
           readelf -h box64-install/usr/local/bin/box64 | grep -q 'Machine:.*AArch64'
+          ldd --version | sed -n '1p' | tee box64-build-glibc.txt
           ldd box64-install/usr/local/bin/box64 | tee box64-ldd.txt
+          objdump -T box64-install/usr/local/bin/box64 | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -3 | tee box64-glibc-symbols.txt
+          BOX64_GLIBC_MAX="$(tail -n 1 box64-glibc-symbols.txt | sed 's/^GLIBC_//')"
+          BUILD_GLIBC="$(ldd --version | sed -n '1p' | awk '{print $NF}')"
+          dpkg --compare-versions "$BOX64_GLIBC_MAX" le "$BUILD_GLIBC"
           ccache --show-stats | tee box64-ccache-stats.txt
       - name: Upload reusable Box64 build artifact
         uses: actions/upload-artifact@v4
@@ -77,6 +88,8 @@ jobs:
             box64-src/LICENSE
             box64-upstream-commit.txt
             box64-ldd.txt
+            box64-build-glibc.txt
+            box64-glibc-symbols.txt
             box64-ccache-stats.txt
           if-no-files-found: error
           retention-days: 7
@@ -84,6 +97,7 @@ jobs:
   build-rootfs:
     name: Build ARM64 glibc rootfs and Windows runtime components
     runs-on: ubuntu-24.04-arm
+    needs: build-box64
     timeout-minutes: 120
     env:
       DEBIAN_SUITE: ${{ inputs.debian_suite || 'bookworm' }}
@@ -92,10 +106,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Download Bookworm-compatible Box64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: box64-arm64-glibc-sd888
+          path: box64-artifact
       - name: Verify native ARM64 runner and record CPU
         run: |
           set -euo pipefail
-          { echo "uname_m=$(uname -m)"; echo "nproc=$(nproc)"; echo "runner_arch=${RUNNER_ARCH:-unknown}"; echo "runner_os=${RUNNER_OS:-unknown}"; echo "### lscpu"; lscpu | grep -E "^(Architecture|CPU|Model name|Vendor ID|Byte Order)" || true; echo "### cpuinfo"; grep -m 6 -E "^(processor|model name|CPU implementer|CPU part|Features)" /proc/cpuinfo; } | tee runner-arm64-environment.log
+          { echo "uname_m=$(uname -m)"; echo "nproc=$(nproc)"; echo "runner_arch=${RUNNER_ARCH:-unknown}"; echo "runner_os=${RUNNER_OS:-unknown}"; echo "### host glibc"; ldd --version | sed -n '1p'; echo "### lscpu"; lscpu | grep -E "^(Architecture|CPU|Model name|Vendor ID|Byte Order)" || true; echo "### cpuinfo"; grep -m 6 -E "^(processor|model name|CPU implementer|CPU part|Features)" /proc/cpuinfo; } | tee runner-arm64-environment.log
           test "$(uname -m)" = "aarch64"
           test "${RUNNER_ARCH}" = "ARM64"
       - name: Install host build tools
@@ -202,7 +221,7 @@ jobs:
               sudo ls -ld "$ROOTFS$loader" 2>&1 || true
             done
           } | tee apt-get-loader-paths.txt
-          sudo find "$ROOTFS" -type l -printf '%p -> %l\\n' > rootfs-symlinks-before-loader-fix.txt
+          sudo find "$ROOTFS" -type l -printf '%p -> %l\n' > rootfs-symlinks-before-loader-fix.txt
           sudo mkdir -p "$ROOTFS/lib"
           if [ ! -e "$ROOTFS/lib/aarch64-linux-gnu" ]; then
             sudo ln -s /usr/lib/aarch64-linux-gnu "$ROOTFS/lib/aarch64-linux-gnu"
@@ -213,20 +232,42 @@ jobs:
           sudo test -e "$ROOTFS/lib/ld-linux-aarch64.so.1"
           sudo test -e "$ROOTFS/lib/aarch64-linux-gnu/libc.so.6"
           sudo ls -ld "$ROOTFS/lib/ld-linux-aarch64.so.1" "$ROOTFS/lib/aarch64-linux-gnu"
+      - name: Install Box64 and verify Bookworm glibc compatibility
+        run: |
+          source runtime/scripts/ci-diagnostics.sh 05-verify-box64-glibc
+          sudo install -D -m 0755 box64-artifact/box64-install/usr/local/bin/box64 "$ROOTFS/usr/local/bin/box64"
+          HOST_GLIBC="$(ldd --version | sed -n '1p')"
+          ROOTFS_LIBC_PACKAGE="$(sudo dpkg-query --admindir="$ROOTFS/var/lib/dpkg" -W -f='${Version}' libc6:arm64)"
+          ROOTFS_GLIBC="${ROOTFS_LIBC_PACKAGE%%-*}"
+          objdump -T box64-artifact/box64-install/usr/local/bin/box64 | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -3 | tee box64-glibc-symbols-rootfs-check.txt
+          BOX64_GLIBC_MAX="$(tail -n 1 box64-glibc-symbols-rootfs-check.txt | sed 's/^GLIBC_//')"
+          {
+            echo "runner_glibc=$HOST_GLIBC"
+            echo "box64_build_glibc=$(cat box64-artifact/box64-build-glibc.txt)"
+            echo "rootfs_libc6_package=$ROOTFS_LIBC_PACKAGE"
+            echo "rootfs_glibc=$ROOTFS_GLIBC"
+            echo "box64_max_required_glibc=$BOX64_GLIBC_MAX"
+          } | tee glibc-compatibility.log
+          dpkg --compare-versions "$BOX64_GLIBC_MAX" le "$ROOTFS_GLIBC"
+      - name: Run Wine smoke ladder on untrimmed rootfs
+        run: |
+          source runtime/scripts/ci-diagnostics.sh 06-smoke-wine-untrimmed-rootfs
+          mkdir -p runtime-smoke
+          bash runtime/scripts/ci-wine-smoke.sh "$ROOTFS" runtime-smoke
+      - name: Upload untrimmed Wine smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-wine-smoke-diagnostics
+          path: runtime-smoke/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Trim and package rootfs component
         run: |
-          source runtime/scripts/ci-diagnostics.sh 05-trim-package-rootfs
+          source runtime/scripts/ci-diagnostics.sh 07-trim-package-rootfs
           sudo du -sb "$ROOTFS" > rootfs-size-before-trim.txt
-          sudo readelf -l "$ROOTFS/usr/bin/apt-get" | grep -F 'Requesting program interpreter' | tee apt-get-interpreter.txt
-          {
-            for loader in /lib/ld-linux-aarch64.so.1 /usr/lib/ld-linux-aarch64.so.1 /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1; do
-              echo "### $loader"
-              sudo ls -l "$ROOTFS$loader" 2>&1 || true
-              sudo test -e "$ROOTFS$loader" && echo "exists" || echo "missing"
-            done
-          } | tee apt-get-loader-paths.txt
-          sudo chroot "$ROOTFS" /usr/bin/apt-get -o Dpkg::Use-Pty=0 clean
-          sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/info/"*
+          sudo rm -rf "$ROOTFS"/var/cache/apt/archives/*.deb "$ROOTFS"/var/cache/apt/archives/partial "$ROOTFS"/var/lib/apt/lists/*
+          sudo rm -rf "$ROOTFS/usr/share/man" "$ROOTFS/usr/share/info"
           sudo rm -rf "$ROOTFS/var/cache/"*
           sudo find "$ROOTFS/usr/share/locale" -mindepth 1 -maxdepth 1 ! -name en ! -name en_US ! -name en_GB -exec rm -rf {} +
           sudo rm -rf "$ROOTFS/usr/include"
@@ -265,7 +306,9 @@ jobs:
           cat rootfs-package-manifest-amd64.txt >> rootfs-package-manifest.txt
           mkdir -p rootfs-artifact/provenance/licenses
           cp runtime/licenses/WINE-LICENSE runtime/licenses/WINE-COPYING.LIB runtime/licenses/WINE-NOTICES.md rootfs-artifact/provenance/licenses/
-          cp wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt rootfs-package-manifest.txt rootfs-size-before-trim.txt rootfs-size-after-trim.txt rootfs-artifact/provenance/
+          cp wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt rootfs-package-manifest.txt rootfs-size-before-trim.txt rootfs-size-after-trim.txt glibc-compatibility.log box64-glibc-symbols-rootfs-check.txt rootfs-artifact/provenance/
+          cp box64-artifact/box64-build-glibc.txt box64-artifact/box64-glibc-symbols.txt box64-artifact/box64-ldd.txt rootfs-artifact/provenance/
+          cp runtime-smoke/* rootfs-artifact/provenance/
           EXPECTED_DRIVER="$(python3 -c 'import json,os; print(os.path.basename(json.load(open("runtime/manifest.json"))["components"]["virgl"]["driver"]))')"
           printf 'expected_guest_driver=%s\narchitecture=x86_64\nsource=Debian Bookworm libgl1-mesa-dri\ntransport=virtio-gpu DRM; Android vtest/virpipe compatibility unproven\n' "$EXPECTED_DRIVER" > rootfs-artifact/provenance/MESA-VIRGL-BUILD-INFO.txt
           sha256sum downloads/wine.tar.xz > rootfs-artifact/provenance/UPSTREAM-ARCHIVE-SHA256SUMS
@@ -289,7 +332,7 @@ jobs:
         run: |
           set +e
           mkdir -p logs runtime-failure-logs
-          for f in apt-get-download.log box64-ccache-stats.txt box64-ldd.txt wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt; do
+          for f in apt-get-download.log apt-get-elf-header.txt apt-get-elf-program-headers.txt apt-get-loader-paths.txt rootfs-symlinks-before-loader-fix.txt box64-ccache-stats.txt box64-ldd.txt box64-build-glibc.txt box64-glibc-symbols.txt box64-glibc-symbols-rootfs-check.txt glibc-compatibility.log wine-lddtree.txt mesa-dri-inventory.txt mesa-dri-lddtree.txt; do
             [ -f "$f" ] && cp "$f" runtime-failure-logs/
           done
           sudo dpkg --audit > runtime-failure-logs/dpkg-audit.txt 2>&1
@@ -403,9 +446,6 @@ jobs:
           sudo du -sb "$OUT/rootfs" > runtime-tree-size-after-strip.txt
           cp runtime-strip-failures.txt runtime-tree-size-before-strip.txt runtime-tree-size-after-strip.txt "$OUT/provenance/"
           file "$OUT/rootfs/usr/local/bin/box64" "$OUT/rootfs/opt/wine/bin/wine"
-          mkdir -p runtime-smoke
-          bash runtime/scripts/ci-wine-smoke.sh "$OUT/rootfs" runtime-smoke
-          cp runtime-smoke/*.log "$OUT/provenance/"
           (cd "$OUT" && sha256sum rootfs/usr/local/bin/box64 rootfs/opt/wine/bin/wine > provenance/RUNTIME-SHA256SUMS)
           tar --numeric-owner --xattrs --acls -czf ghost-town-wine-runtime-arm64.tar.gz -C "$OUT" .
           sha256sum ghost-town-wine-runtime-arm64.tar.gz > ghost-town-wine-runtime-arm64.tar.gz.sha256
@@ -414,14 +454,6 @@ jobs:
           python3 tools/audit_runtime_tree.py "$OUT" | tee runtime-tree-size-audit.txt
           printf '\nARCHIVE_BYTES=' >> runtime-tree-size-audit.txt
           stat -c '%s' ghost-town-wine-runtime-arm64.tar.gz >> runtime-tree-size-audit.txt
-      - name: Upload Wine smoke diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: runtime-wine-smoke-diagnostics
-          path: runtime-smoke/
-          if-no-files-found: warn
-          retention-days: 7
       - name: Upload complete runtime bundle
         uses: actions/upload-artifact@v4
         with:
