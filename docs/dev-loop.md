@@ -24,3 +24,13 @@ tools/device-loop.sh (belum diimplementasikan) menyediakan list, push-component,
 ADB tidak otomatis memberi akses ke private app data. Jangan mengasumsikan run-as tersedia pada release build. Gunakan debug-only IPC terbatas atau diagnostic export aplikasi untuk operasi app-private. Jangan mengandalkan Termux membaca direktori private aplikasi lain.
 
 Setiap percobaan menghasilkan device-test-<UTC>.json: model/OS, versi komponen, SHA-256, command, exit code, elapsed time, self-test, suhu/RAM bila tersedia, dan daftar log yang disanitasi.
+
+## Rancangan lapisan runtime berversi (belum diterapkan)
+
+Setelah arsitektur disetujui, manifest memuat komponen independen: base rootfs, Box64, Wine, driver GPU, DXVK (opsional), dan prefix Wine siap pakai. Setiap komponen wajib mempunyai id, version, target ABI/OS, URL HTTPS, SHA-256, byte size, license/provenance, serta compatibility constraints. Manifest tidak boleh aktif sebelum URL, ukuran dan hash berasal dari archive yang benar-benar dibangun dan diverifikasi.
+
+APK/CI aplikasi hanya membangun launcher dan native Android app. Saat first-run, Runtime Manager mengunduh komponen pinned, memverifikasi SHA-256, mengekstrak ke staging, memvalidasi layout/dependency, lalu atomic activation. Versi prefix diikat ke Wine build, architecture dan runtime ABI; prefix archive dibangun sekali di CI atau dibuat pada perangkat, disimpan dengan hash dan diekstrak saat first-run. Prefix tidak boleh berisi data pengguna, credential, atau file game.
+
+Regenerasi prefix: buat prefix baru pada runtime/Wine build yang persis dipin; jalankan wineboot dalam job eksperimen terpisah; pasang konfigurasi redistributable yang diperlukan; validasi registry/prefix layout dan startup minimal; arsipkan prefix tanpa game/user data; catat versi, ukuran, SHA-256 dan provenance. Jika Wine berubah, bangun prefix baru—jangan menganggap prefix lama kompatibel.
+
+Wineboot tetap smoke test diagnostik terpisah, bukan syarat first-run/runtime bila prefix siap pakai telah lolos validasi. Rung wineboot tetap dicatat pada CI untuk diagnosis. Tidak ada perubahan ke gerbang display: hanya self-test display nyata yang boleh menghasilkan GHOST_TOWN_DISPLAY_READY=1.
