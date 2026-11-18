@@ -30,6 +30,7 @@ on:
         options: ['180', '600']
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
