@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.BatteryManager
 import android.os.Bundle
 import android.os.PowerManager
-import android.view.KeyEvent as AndroidKeyEvent
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -52,7 +51,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.nativeKeyEvent
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalDensity
@@ -95,6 +95,7 @@ private fun ConsoleDashboard() {
     val context = LocalContext.current
     var activeTab by remember { mutableStateOf(DashboardTab.GAMES) }
     var selectedIndex by remember { mutableIntStateOf(0) }
+    var tabsFocused by remember { mutableStateOf(false) }
     var detailsOpen by remember { mutableStateOf(false) }
     var contextMenuOpen by remember { mutableStateOf(false) }
     var reduceMotion by remember { mutableStateOf(false) }
@@ -174,33 +175,33 @@ private fun ConsoleDashboard() {
         Modifier.fillMaxSize().background(C.Storm)
             .focusRequester(rootFocusRequester).focusable().onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (event.nativeKeyEvent.keyCode) {
-                    AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
-                        if (activeTab == DashboardTab.GAMES && !detailsOpen) selectedIndex = (selectedIndex - 1).coerceAtLeast(0)
-                        else activeTab = DashboardTab.entries[(activeTab.ordinal - 1).coerceAtLeast(0)]
+                when (event.key) {
+                    Key.DirectionLeft -> {
+                        if (tabsFocused || activeTab != DashboardTab.GAMES) {
+                            activeTab = DashboardTab.entries[(activeTab.ordinal - 1).coerceAtLeast(0)]
+                        } else if (!detailsOpen) selectedIndex = (selectedIndex - 1).coerceAtLeast(0)
                         true
                     }
-                    AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
-                        if (activeTab == DashboardTab.GAMES && !detailsOpen) selectedIndex = (selectedIndex + 1).coerceAtMost(demoGames.lastIndex)
-                        else activeTab = DashboardTab.entries[(activeTab.ordinal + 1).coerceAtMost(DashboardTab.entries.lastIndex)]
+                    Key.DirectionRight -> {
+                        if (tabsFocused || activeTab != DashboardTab.GAMES) {
+                            activeTab = DashboardTab.entries[(activeTab.ordinal + 1).coerceAtMost(DashboardTab.entries.lastIndex)]
+                        } else if (!detailsOpen) selectedIndex = (selectedIndex + 1).coerceAtMost(demoGames.lastIndex)
                         true
                     }
-                    AndroidKeyEvent.KEYCODE_BUTTON_A, AndroidKeyEvent.KEYCODE_DPAD_CENTER, AndroidKeyEvent.KEYCODE_ENTER -> {
-                        if (activeTab == DashboardTab.GAMES && !detailsOpen) detailsOpen = true
+                    Key.DirectionUp -> { tabsFocused = true; true }
+                    Key.DirectionDown -> { tabsFocused = false; true }
+                    Key.ButtonA, Key.Enter -> {
+                        if (!tabsFocused && activeTab == DashboardTab.GAMES && !detailsOpen) detailsOpen = true
+                        else tabsFocused = false
                         true
                     }
-                    AndroidKeyEvent.KEYCODE_BUTTON_B, AndroidKeyEvent.KEYCODE_ESCAPE -> {
-                        if (detailsOpen) detailsOpen = false else activeTab = DashboardTab.GAMES
+                    Key.ButtonB, Key.Escape -> {
+                        if (detailsOpen) detailsOpen = false else if (activeTab != DashboardTab.GAMES) activeTab = DashboardTab.GAMES
+                        tabsFocused = false
                         true
                     }
-                    AndroidKeyEvent.KEYCODE_BUTTON_Y -> {
-                        activeTab = DashboardTab.LIBRARY
-                        true
-                    }
-                    AndroidKeyEvent.KEYCODE_BUTTON_START, AndroidKeyEvent.KEYCODE_MENU -> {
-                        contextMenuOpen = true
-                        true
-                    }
+                    Key.ButtonY -> { activeTab = DashboardTab.LIBRARY; tabsFocused = true; true }
+                    Key.Menu -> { contextMenuOpen = true; true }
                     else -> false
                 }
             }

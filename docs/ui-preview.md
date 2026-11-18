@@ -66,3 +66,15 @@ adb pull /sdcard/ghost-town-ui-preview.png .
 ```
 
 Still to verify on Huawei MatePad Air 2023: actual display scaling, focus traversal with the physical controller, SAF behavior on HarmonyOS, contrast under the device's display settings, rotation/resize behavior, and thermal/battery indicator behavior. CI success is not a substitute for this physical-device validation.
+
+
+### CI compile correction
+
+The first preview attempt, [Run 44236665584](https://github.com/dnctf/ghost-town-recomp/actions/runs/44236665584), stopped at Kotlin compilation with:
+
+```
+DashboardActivity.kt:55:38 Unresolved reference: nativeKeyEvent
+Task :app:compileDebugKotlin FAILED
+```
+
+The input handler now maps Compose `Key` values directly (D-pad, A/B/Y, Enter/Escape, Menu), avoiding the unavailable Android-specific `nativeKeyEvent` extension and supporting explicit up/down focus-zone movement.
