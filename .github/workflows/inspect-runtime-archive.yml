@@ -1,0 +1,66 @@
+name: Inspect Built Runtime Archive Metadata
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/inspect-runtime-archive.yml'
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: GitHub Actions run ID containing the validated runtime bundle
+        required: true
+        default: '44279571506'
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  inspect:
+    name: Extract exact runtime archive size and SHA-256
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download validated runtime bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ghost-town-wine-runtime-0.5.0-alpha.2-arm64-debian-bookworm
+          run-id: ${{ inputs.source_run_id || '44279571506' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: runtime-artifact
+      - name: Verify and print exact archive metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd runtime-artifact
+          archive=ghost-town-wine-runtime-arm64.tar.gz
+          checksum=ghost-town-wine-runtime-arm64.tar.gz.sha256
+          audit=runtime-tree-size-audit.txt
+          test -s "$archive"
+          test -s "$checksum"
+          test -s "$audit"
+          sha256sum -c "$checksum"
+          actual_bytes="$(stat -c '%s' "$archive")"
+          actual_sha256="$(sha256sum "$archive" | awk '{print $1}')"
+          audit_bytes="$(sed -n 's/^ARCHIVE_BYTES=//p' "$audit" | tail -n 1)"
+          test -n "$audit_bytes"
+          test "$actual_bytes" = "$audit_bytes"
+          {
+            printf 'source_run_id=%s\n' "${{ inputs.source_run_id || '44279571506' }}"
+            printf 'archive_file=%s\n' "$archive"
+            printf 'archive_size_bytes=%s\n' "$actual_bytes"
+            printf 'archive_sha256=%s\n' "$actual_sha256"
+            printf 'archive_checksum_validation=PASS\n'
+            printf 'archive_size_audit_validation=PASS\n'
+          } | tee runtime-archive-metadata.txt
+      - name: Upload exact runtime archive metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-archive-metadata
+          path: runtime-artifact/runtime-archive-metadata.txt
+          if-no-files-found: error
+          retention-days: 30
