@@ -6,9 +6,9 @@
 2. Select the successful run for the commit you want to test.
 3. In **Artifacts**, download `ghost-town-ui-preview-0.5.0-alpha.2-<full-sha>`.
 4. Extract the ZIP and install the included debug-signed APK:
-   - USB/ADB: `adb install -r app-debug.apk`
+   - USB/ADB: `adb install -r app-debug.apk` (package suffix `.uipreview`, so it installs beside the normal app). Remove the previous UI Preview first if Android reports a debug-signature mismatch.
    - Device: copy the APK to the tablet, allow installation from that file manager, then sideload it.
-5. Launch **Ghost Town Recomp**. The dashboard is the app's launcher Activity; the legacy native setup Activity remains internal and is not the UI Preview entry point.
+5. Launch **Ghost Town Recomp UI Preview**. The dashboard is the app's launcher Activity; the legacy native setup Activity remains internal and is not the UI Preview entry point.
 
 The APK is signed with the standard Android debug signing configuration and is intended for sideload testing, not Play Store distribution. It is ARM64-only, matching the current application ABI.
 
@@ -60,7 +60,7 @@ whose exact content must be `GHOST_TOWN_DISPLAY_READY=1`. This preview does not 
 The CI job builds the ARM64 APK and runs JVM unit tests/lint, but it does not launch an ARM64 emulator or capture an emulator screenshot. No screenshot is represented as a device capture. Capture one on the target tablet with:
 
 ```bash
-adb shell am start -n com.overcookedrecomp.app/.ui.DashboardActivity
+adb shell am start -n com.overcookedrecomp.app.uipreview/.ui.DashboardActivity
 adb shell screencap -p /sdcard/ghost-town-ui-preview.png
 adb pull /sdcard/ghost-town-ui-preview.png .
 ```

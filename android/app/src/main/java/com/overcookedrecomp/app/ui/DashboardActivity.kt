@@ -35,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -104,8 +106,11 @@ private fun ConsoleDashboard() {
     var battery by remember { mutableIntStateOf(-1) }
     var thermal by remember { mutableStateOf("TERMAL: —") }
     var gate by remember { mutableStateOf(RuntimeLaunchGate.read(context)) }
-    var notices by remember { mutableStateOf(listOf(Notice(1, "MODE DEMO", "Konten contoh · tidak ada aset game"))) }
-    var nextNoticeId by remember { mutableIntStateOf(2) }
+    var notices by remember { mutableStateOf(listOf(
+        Notice(1, "MODE DEMO", "Konten contoh · tidak ada aset game"),
+        Notice(2, "RUNTIME PENDING", "Pemasangan belum tersedia")
+    )) }
+    var nextNoticeId by remember { mutableIntStateOf(3) }
     var swipeOffset by remember { mutableFloatStateOf(0f) }
     val selected = demoGames[selectedIndex.coerceIn(0, demoGames.lastIndex)]
     val playState = PlayLaunchPolicy.resolve(gate.runtimeInstalled, gate.displaySelfTestPassed)
@@ -140,10 +145,15 @@ private fun ConsoleDashboard() {
             delay(3000)
         }
     }
-    LaunchedEffect(Unit) {
-        delay(6500)
-        notices = emptyList()
+    LaunchedEffect(notices.lastOrNull()?.id) {
+        val latestId = notices.lastOrNull()?.id
+        if (latestId != null) {
+            delay(5500)
+            notices = notices.filterNot { it.id == latestId }
+        }
     }
+    val rootFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { rootFocusRequester.requestFocus() } }
     BackHandler(enabled = detailsOpen || contextMenuOpen || activeTab != DashboardTab.GAMES) {
         when {
             contextMenuOpen -> contextMenuOpen = false
@@ -162,7 +172,7 @@ private fun ConsoleDashboard() {
 
     Box(
         Modifier.fillMaxSize().background(C.Storm)
-            .focusable().onPreviewKeyEvent { event ->
+            .focusRequester(rootFocusRequester).focusable().onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.nativeKeyEvent.keyCode) {
                     AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
