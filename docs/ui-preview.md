@@ -8,7 +8,7 @@
 4. Extract the ZIP and install the included debug-signed APK:
    - USB/ADB: `adb install -r app-debug.apk` (package suffix `.uipreview`, so it installs beside the normal app). Remove the previous UI Preview first if Android reports a debug-signature mismatch.
    - Device: copy the APK to the tablet, allow installation from that file manager, then sideload it.
-5. Launch **Ghost Town Recomp UI Preview**. The dashboard is the app's launcher Activity; the legacy native setup Activity remains internal and is not the UI Preview entry point.
+5. Launch **Ghost Town Recomp** (the installed debug build is the UI Preview). The dashboard is the app's launcher Activity; the legacy native setup Activity remains internal and is not the UI Preview entry point.
 
 The APK is signed with the standard Android debug signing configuration and is intended for sideload testing, not Play Store distribution. It is ARM64-only, matching the current application ABI.
 
@@ -23,7 +23,7 @@ The APK is signed with the standard Android debug signing configuration and is i
 ## Controls and accessibility
 
 - Touch: tap tabs/cards/actions; long-press a game card for its context menu; swipe/scroll the game row horizontally.
-- Keyboard/gamepad: D-pad left/right changes focus/selection; A/Enter opens game details; B/Escape returns; Y opens Library; Menu/Start opens the context menu.
+- Keyboard/gamepad: D-pad left/right changes focus/selection; A/Enter opens game details; B/Escape returns; Y opens the DEMO game search; Menu opens the context menu.
 - Touch controls use at least 48dp action height where applicable. The Android system font family and font scaling are retained. Focus selection uses the teal accent and a visible outline.
 - **Reduce motion** stops the animated storm backdrop. No real-time image blur is used: cards are original abstract gradients, so the backdrop uses its procedural fallback.
 
@@ -82,4 +82,4 @@ The input handler now maps Compose `Key` values directly (D-pad, A/B/Y, Enter/Es
 
 ### Size note from preview build
 
-The first complete UI Preview build measured 28,964,663 bytes (about 27.62 MiB), compared with the pre-UI debug APK baseline of 13,135,290 bytes. The measured increase is 15,829,373 bytes (+120.51%). The APK remains free of embedded runtime parts (`EMBEDDED_RUNTIME_PARTS=0`); the size increase is primarily the added Compose UI stack. Compose tooling-only dependencies were removed from the preview build to avoid shipping preview tooling.
+The validated UI Preview APK measured 27,157,234 bytes (about 25.90 MiB), compared with the pre-UI debug APK baseline of 13,135,290 bytes. The measured increase is 14,021,944 bytes (+106.75%). The APK remains free of embedded runtime parts (`EMBEDDED_RUNTIME_PARTS=0`); the increase is primarily the added Compose UI stack. Compose tooling-only dependencies are excluded from the preview build.
