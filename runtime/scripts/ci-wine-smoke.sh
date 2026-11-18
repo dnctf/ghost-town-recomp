@@ -10,7 +10,7 @@ cleanup_mounts() {
   if [ -n "${WINESERVER_ENTRY:-}" ] && [ -x "$ROOTFS/usr/local/bin/box64" ]; then
     timeout --signal=TERM --kill-after=3s 8s sudo chroot "$ROOTFS" /usr/bin/env \
       BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
-      BOX64_LD_PRELOAD=libmd.so.0:libbsd.so.0 BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
+      BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
       HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke \
       WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix \
       /usr/local/bin/box64 "$WINESERVER_ENTRY" -k >> "$LOG_DIR/cleanup-wineserver.log" 2>&1
@@ -75,13 +75,13 @@ run_rung() {
   start="$(date +%s)"
   {
     echo "[RUN] rung=$rung timeout_seconds=$limit"
-    echo "environment: DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe FONTCONFIG_FILE=/etc/fonts/fonts.conf BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib BOX64_LD_PRELOAD=libmd.so.0:libbsd.so.0 BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0"
+    echo "environment: DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe FONTCONFIG_FILE=/etc/fonts/fonts.conf BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0"
     printf 'command='; printf '%q ' "$@"; echo
   } | tee "$log"
   set +e
   timeout --signal=TERM --kill-after=10s "$limit"s sudo chroot "$ROOTFS" /usr/bin/env \
     BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
-    BOX64_LD_PRELOAD=libmd.so.0:libbsd.so.0 BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
+    BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
     BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all \
     DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
     FONTCONFIG_FILE=/etc/fonts/fonts.conf WAYLAND_DISPLAY= \
@@ -125,7 +125,7 @@ run_wineboot_d() {
   sudo mkdir -p "$ROOTFS/tmp/ghost-town-wine-smoke-home"
   local -a guest_env=(
     BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib
-    BOX64_LD_PRELOAD=libmd.so.0:libbsd.so.0 BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0
+    BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0
     BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all,+timestamp,+process
     DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe
     FONTCONFIG_FILE=/etc/fonts/fonts.conf WAYLAND_DISPLAY=
@@ -136,7 +136,7 @@ run_wineboot_d() {
   {
     echo "[RUN] rung=d-wineboot timeout_seconds=$limit"
     echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "environment: DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe FONTCONFIG_FILE=/etc/fonts/fonts.conf BOX64_LD_LIBRARY_PATH=${guest_env[0]#BOX64_LD_LIBRARY_PATH=} BOX64_LD_PRELOAD=libmd.so.0:libbsd.so.0 BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0 WINEDLLOVERRIDES=mscoree,mshtml= WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix"
+    echo "environment: DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe FONTCONFIG_FILE=/etc/fonts/fonts.conf BOX64_LD_LIBRARY_PATH=${guest_env[0]#BOX64_LD_LIBRARY_PATH=} BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0 WINEDLLOVERRIDES=mscoree,mshtml= WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix"
     echo "command=sudo chroot ROOTFS /usr/bin/env ... box64 wineboot --init; box64 wineserver -w"
   } | tee "$log"
   sudo chroot "$ROOTFS" /usr/bin/env "${guest_env[@]}" /bin/sh -c '
@@ -150,7 +150,7 @@ run_wineboot_d() {
   ' | tee -a "$log"
   echo "WINEBOOT_LIMIT_SECONDS=90 WINESERVER_WAIT_LIMIT_SECONDS=45" | tee -a "$log"
   start="$(date +%s)"
-  tail -n +1 -F "$log" &
+  tail -n 80 -F "$log" &
   LOG_TAIL_PID=$!
   set +e
   timeout --signal=TERM --kill-after=10s "${limit}s" sudo chroot "$ROOTFS" /usr/bin/env "${guest_env[@]}" /bin/sh -c '
