@@ -201,7 +201,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     .show();
         }
 
-        // Provision the runtime from APK assets on first launch; never overwrite an existing install.
+        // Provision the manifest-pinned runtime pack on first launch; never overwrite a valid install.
         ensureBundledRuntimeInstalled();
 
         // Refresh status game yang terpasang
@@ -384,7 +384,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         winePrefixParams.topMargin = dp(8);
         container.addView(winePrefixBtn, winePrefixParams);
 
-        Button runtimeRepairBtn = createDashboardButton("INSTALL / REPAIR BUILT-IN RUNTIME", "#24513D");
+        Button runtimeRepairBtn = createDashboardButton("DOWNLOAD / REPAIR RUNTIME PACK", "#24513D");
         runtimeRepairBtn.setOnClickListener(v -> installBundledRuntime(true));
         LinearLayout.LayoutParams runtimeRepairParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
@@ -552,27 +552,27 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         installBundledRuntime(false);
     }
 
-    /** Installs or repairs the one runtime shipped inside this APK; no network or file picker. */
+    /** Downloads or repairs the version-matched runtime pack using the repository manifest. */
     private void installBundledRuntime(boolean userRequested) {
         if (importProgressText != null) {
-            importProgressText.setText("Memasang runtime bawaan APK...");
+            importProgressText.setText("Mengunduh dan memasang runtime pack...");
             importProgressText.setVisibility(View.VISIBLE);
         }
         if (importProgressBar != null) importProgressBar.setVisibility(View.VISIBLE);
         new Thread(() -> {
             try {
-                DiagnosticLog.info(this, "RUNTIME", "Provisioning bundled Wine/Box64 runtime from APK assets.");
-                RuntimeBundleInstaller.installBundledParts(this, "runtime/parts/SHA256SUMS",
+                DiagnosticLog.info(this, "RUNTIME", "Downloading manifest-pinned Wine/Box64 runtime pack.");
+                RuntimeBundleDownloader.downloadAndInstall(this,
                         message -> runOnUiThread(() -> {
                             if (importProgressText != null) importProgressText.setText(message);
                         }));
-                DiagnosticLog.info(this, "RUNTIME", "Bundled runtime installed and checksum-validated.");
+                DiagnosticLog.info(this, "RUNTIME", "Downloaded runtime pack installed and SHA-256 validated.");
                 runOnUiThread(() -> {
-                    showImportProgress(false, "Runtime bawaan berhasil dipasang dan diverifikasi.");
+                    showImportProgress(false, "Runtime pack berhasil diunduh, dipasang, dan diverifikasi.");
                     refreshInstalledGamesStatus();
                     new AlertDialog.Builder(this)
                             .setTitle("RUNTIME SIAP")
-                            .setMessage("Runtime bawaan APK berhasil diekstrak dan checksum diverifikasi. Ini baru validasi instalasi; pengujian Wine, Vulkan, dan peluncuran game masih diperlukan.")
+                            .setMessage("Runtime pack berhasil diunduh dari manifest dan SHA-256 diverifikasi. Ini baru validasi instalasi; pengujian Wine, Vulkan, dan peluncuran game masih diperlukan.")
                             .setPositiveButton("PERIKSA STATUS", (dialog, which) -> showWineRuntimeStatus())
                             .setNegativeButton("TUTUP", null)
                             .show();
@@ -580,7 +580,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             } catch (Throwable error) {
                 DiagnosticLog.error(this, "RUNTIME", "Bundled runtime installation failed", error);
                 runOnUiThread(() -> {
-                    showImportProgress(false, "Runtime gagal dipasang. Periksa detail diagnostik.");
+                    showImportProgress(false, "Runtime gagal diunduh atau dipasang. Periksa detail diagnostik.");
                     new AlertDialog.Builder(this)
                             .setTitle("INSTALASI RUNTIME GAGAL")
                             .setMessage((error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())

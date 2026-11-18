@@ -55,7 +55,7 @@ Source: successful Android workflow run [44220463808](https://github.com/dnctf/g
 | \`lib/\` | 2,489,303 | 856,424 | 0.65% |
 | \`res/\` | 253,943 | 161,460 | 0.07% |
 | \`resources.arsc\` | 252,592 | 252,592 | 0.07% |
-| Other entries | 279,156 | 116,? | <0.1% |
+| Other entries | 279,156 | 116,737 | <0.1% |
 
 ### Largest release APK entries
 
@@ -94,3 +94,22 @@ Runtime run \`44220463747\` restored no Box64 or Debian package cache (cold cach
 | Wine Mono/Gecko, i386, docs/locale/static/debug stripping | Not removed | Defer until runtime dependency audit and Wine prefix/game tests prove safe |
 
 **Measurement caveat:** the baseline release metadata (361.03 MiB) and the latest APK build (362.8 MiB) are not a strict before/after optimization comparison: the latter is an independently rebuilt APK and still embeds the same runtime. The valid result so far is the entry-level attribution, not a size reduction.
+
+
+## A1 runtime separation — implementation staged, CI measurement pending
+
+The source changes now separate the Android base APK from the Linux guest runtime:
+
+- Base APK: Android UI/native host libraries plus static Android/Bionic PRoot and its loader in \`lib/arm64-v8a/\`; runtime chunks are no longer copied into \`assets/runtime/parts/\`.
+- Runtime pack: Debian rootfs, Wine 11.19 amd64, Box64 ARM64 and Mesa VirGL; PRoot is not duplicated in the pack.
+- DXVK is not included. The app uses WineD3D until guest Vulkan and visible D3D11 output are proven.
+- Runtime URL, archive size, expanded size and SHA-256 are read from \`runtime/manifest.json\`. Its status remains \`pending\` until the validated archive can be published without violating the release gate.
+- The downloader includes Range resume, retries, SHA-256, storage preflight, progress reporting and staged installation. PRoot is launched from Android \`nativeLibraryDir\`, not writable \`filesDir\`.
+
+The implementation is committed only after the CI run confirms that:
+1. APK contains both static PRoot native payloads and no embedded runtime parts.
+2. APK size is below the 80 MiB target.
+3. Runtime archive passes its structural/checksum validation and Wine-under-Box64 smoke test.
+4. Runtime/app manifest versions match.
+
+Until those run artifacts exist, no post-optimization APK size, runtime pack size, or first-run download/extraction duration is claimed. HarmonyOS 4.2 execution is not physically tested.

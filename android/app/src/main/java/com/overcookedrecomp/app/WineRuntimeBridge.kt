@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Optional Wine/Box64 adapter.
  *
- * The APK provisions its bundled Linux runtime under filesDir/runtime/wine.
+ * The APK downloads its Linux runtime under filesDir/runtime/wine; Android PRoot executes from nativeLibraryDir.
  * This adapter currently performs only a fixed, headless Wine version probe;
  * it does not create a graphics session or launch a game. It never invokes a
  * shell and never accepts arbitrary command strings.
@@ -45,6 +45,7 @@ object WineRuntimeBridge {
 
     private fun layout(context: Context): Layout {
         val root = File(context.filesDir, "runtime/wine")
+        val nativeLibDir = File(context.applicationInfo.nativeLibraryDir)
         val rootfs = File(root, "rootfs")
         val box64Candidates = listOf(
             "usr/local/bin/box64",
@@ -54,8 +55,8 @@ object WineRuntimeBridge {
             ?: box64Candidates.first()
         return Layout(
             root = root,
-            proot = File(root, "bin/proot"),
-            prootLoader = File(root, "libexec/proot/loader"),
+            proot = File(nativeLibDir, "libproot.so"),
+            prootLoader = File(nativeLibDir, "libproot-loader.so"),
             rootfs = rootfs,
             box64 = "/$box64",
             wine = "/opt/wine/bin/wine",
@@ -70,22 +71,17 @@ object WineRuntimeBridge {
             return RuntimeStatus(
                 State.NOT_INSTALLED,
                 "Wine/Box64 runtime belum dipasang.",
-                listOf("Android ARM64 PRoot + loader", "glibc rootfs ARM64", "Box64 ARM64", "Wine x86_64", "DXVK DLL"),
+                listOf("Android ARM64 PRoot native libraries", "glibc rootfs ARM64", "Box64 ARM64", "Wine x86_64"),
                 l.root.absolutePath
             )
         }
 
         val missing = mutableListOf<String>()
-        if (!l.proot.isFile || !l.proot.canExecute()) missing += "bin/proot (executable Android ARM64)"
-        if (!l.prootLoader.isFile) missing += "libexec/proot/loader (PRoot AArch64 companion loader)"
-        if (!File(l.root, "libexec/proot/loader32").isFile) missing += "libexec/proot/loader32 (PRoot ARM32 companion loader)"
+        if (!l.proot.isFile || !l.proot.canExecute()) missing += "nativeLibraryDir/libproot.so (executable Android ARM64 PRoot)"
+        if (!l.prootLoader.isFile || !l.prootLoader.canExecute()) missing += "nativeLibraryDir/libproot-loader.so (PRoot AArch64 companion loader)"
         if (!File(l.rootfs, "etc/os-release").isFile) missing += "rootfs/etc/os-release (glibc Linux userspace)"
         if (!File(l.rootfs, l.box64.removePrefix("/")).isFile) missing += "Box64 ARM64/glibc"
         if (!File(l.rootfs, l.wine.removePrefix("/")).isFile) missing += "Wine x86_64"
-        if (!File(l.dxvk, "x64/dxgi.dll").isFile || !File(l.dxvk, "x64/d3d11.dll").isFile) {
-            missing += "DXVK x64 DLL payload"
-        }
-
         return if (missing.isEmpty()) {
             RuntimeStatus(
                 State.READY_FOR_HEADLESS_PROBE,
@@ -171,7 +167,6 @@ object WineRuntimeBridge {
                     environment()["BOX64_LD_LIBRARY_PATH"] =
                         "/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib"
                     environment()["PROOT_LOADER"] = l.prootLoader.absolutePath
-                    environment()["PROOT_LOADER_32"] = File(l.root, "libexec/proot/loader32").absolutePath
                     environment()["PROOT_NO_SECCOMP"] = "1"
                 }
                 .start()

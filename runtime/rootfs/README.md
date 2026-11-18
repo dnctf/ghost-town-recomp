@@ -1,47 +1,41 @@
-# Complete Android Wine runtime bundle
+# Complete Android Wine runtime pack
 
-This workflow creates a single app-private runtime payload for the experimental Android launcher. The build is split across an x86_64 host for Android NDK/PRoot and a native ARM64 host for the Debian rootfs/Box64 build, then merged in a final packaging job.
+This workflow builds the Linux guest userspace as a separately versioned runtime pack. The base APK contains the Android/Bionic PRoot executable and its companion loader under `jniLibs/arm64-v8a`; the Wine guest payload is downloaded only when the user installs the runtime.
 
 ## Target layout after extraction
 
 The archive contains:
-- `bin/proot`: static Android ARM64/Bionic executable
-- `libexec/proot/loader` and `loader32`: PRoot companion loaders
-- `rootfs/`: Debian ARM64/glibc userspace with amd64 runtime libraries
-- `rootfs/usr/local/bin/box64`: Linux ARM64 Box64 built with the Snapdragon 888 profile
+- `rootfs/`: Debian Bookworm ARM64/glibc userspace plus the amd64 libraries needed by WineD3D and Mesa VirGL
+- `rootfs/usr/local/bin/box64`: pinned ARM64 Box64 build using the Snapdragon 888 profile
 - `rootfs/opt/wine`: pinned Wine 11.19 amd64 payload
-- `rootfs/opt/dxvk`: pinned DXVK 3.1.1 DLL payload
-- `provenance/`: upstream commits, license, dependency report, hashes and build information
+- `rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so`: guest Mesa VirGL driver
+- `provenance/`: upstream commits, license notices, package versions, dependency reports, hashes, size measurements and Wine-under-Box64 smoke log
 
-The tar.gz archive is intended to be extracted into the app's private `filesDir/runtime/wine/` directory. The archive is a large external runtime payload; it is not embedded in the APK.
+PRoot and its Android loader are deliberately not duplicated in this archive. DXVK is deliberately not included until guest Vulkan and a visible D3D11 frame are independently validated. The runtime pack is extracted into app-private `filesDir/runtime/wine/`; Box64 and Wine guest binaries are invoked through PRoot, not executed directly from writable app data.
 
-## Build inputs
+## Build inputs and reproducibility
 
-- Debian suite: Bookworm by default; manually selectable Bookworm or Trixie.
-- Box64: upstream ref configurable at dispatch; exact commit recorded.
-- PRoot: `berilevi/proot-static`; exact commit recorded.
-- Wine: Kron4ek Wine 11.19 amd64, SHA-256 pinned.
-- DXVK: 3.1.1, SHA-256 pinned.
-- Build host: Ubuntu 24.04 ARM64 runner.
+- Debian suite: Bookworm; the exact amd64 package versions are recorded in `provenance/rootfs-package-manifest.txt`
+- Package list: `runtime/rootfs/packages-amd64.txt`; packages are downloaded without running foreign-architecture maintainer scripts, then unpacked with `dpkg-deb -x`
+- Box64: pinned commit `7fab05334445948c918281b54f2a604ff63337f7`, built in a separate cached ARM64 job and reused as an artifact
+- Wine: Kron4ek Wine 11.19 amd64, SHA-256 pinned in the workflow
+- Mesa VirGL: Debian Bookworm amd64 packages, exact package versions recorded in provenance
+- PRoot: pinned commit `6f8ebfd8e24887dfba64c3f2d7d5fe9dc059b60e`, built into the APK's read-only native library directory
 
-## Scope and validation
+The rootfs package step does not execute amd64 maintainer scripts under QEMU. This avoids the previous QEMU/binfmt configuration failure and avoids running foreign post-install hooks. It also means generated package caches such as GSettings schemas are not assumed to exist unless a runtime test proves they are needed.
 
-The workflow assembles the userspace and validates files, ELF architecture, and source archive checksums. It does not execute the Wine x86_64 binary through Box64, run PRoot on Android, install DXVK into a Wine prefix, create a Vulkan device, or validate game rendering. DXVK needs a compatible graphics/display bridge that is not bundled here.
+## Optimization and size audit
 
-Debian packages are fetched from the selected Debian suite at build time; the exact package versions are represented in the rootfs dpkg database. For byte-identical rebuilds, use a dated Debian snapshot and pin both upstream Git refs to immutable commit IDs.
+The workflow removes apt caches/lists, non-English locales (retaining English), man/info pages, non-license documentation, headers, static archives, debug files and Python bytecode. It applies `strip --strip-unneeded` to ELF files where the matching architecture tool succeeds, and records before/after tree sizes plus any strip failures. The final archive is validated for required files and rootfs-confined symlinks.
 
-## Important compatibility boundary
+The runtime remains gzip-compressed for compatibility with the current Android installer. zstd/xz and first-run extraction performance have not yet been benchmarked on the Snapdragon 888, so no device-speed claim is made.
 
-This runtime is a foundation, not a playable Windows emulator. A successful artifact build is not proof of PRoot ptrace compatibility on HarmonyOS or of Wine/Box64 execution on the MatePad Air. Do not enable game launch until the headless probe, a harmless PE test, DXVK/Vulkan initialization, input/audio, and gameplay tests pass on device.
+## First-run manifest and publication gate
 
+The app reads `runtime/manifest.json`; it does not hardcode a runtime asset URL or checksum. The downloader supports HTTPS redirects, Range resume, bounded retries, SHA-256 validation, storage preflight, progress reporting and staged/atomic installation. The manifest's `runtime_pack.status` remains `pending` until a validated runtime asset is published. A pending manifest is an intentional safe state, not a playable build.
 
-## App installation
+Do not create a GitHub Release/tag or mark the pack published until the app/runtime compatibility checks and required display/gameplay gates pass.
 
-Use the dashboard action **INSTALL WINE RUNTIME BUNDLE (.TAR.GZ)** and select the workflow's `ghost-town-wine-runtime-arm64.tar.gz` artifact after downloading it. The installer extracts into app-private storage and validates the required runtime files before activation. Keep at least the archive's expanded size plus temporary staging space free; installation stages a second copy before replacing an existing runtime.
+## Scope and non-claims
 
-The installer does not make the runtime executable on a particular Android kernel/GPU. Run the headless Wine version probe after import and record its log and exit code.
-
-
-## License and attribution payload
-
-The runtime artifact includes upstream notices for PRoot (GPL-2.0-or-later), Box64 (MIT), Wine 11.19 (LGPL-2.1-or-later plus Wine third-party notices), and DXVK 3.1.1 (zlib/libpng). Debian package copyright files are retained under `rootfs/usr/share/doc/*/copyright`. Preserve the `provenance/licenses/` directory when redistributing the runtime.
+The CI smoke test executes Wine's version probe through Box64 on a native ARM64 GitHub runner. It does not prove that PRoot executes under Android/HarmonyOS app sandbox rules, that X11/VirGL displays a visible frame on Adreno 660, or that Overcooked! 2 is playable. No physical HarmonyOS 4.2 test is claimed. Keep `GHOST_TOWN_DISPLAY_READY=1` mandatory until the X11 display session and VirGL presentation self-tests pass.

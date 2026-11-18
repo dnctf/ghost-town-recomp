@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the bundled Debian/Wine runtime tarball before APK packaging.
+"""Validate the separate Debian/Wine runtime pack before publishing its release asset.
 
 Absolute symlinks in rootfs are interpreted as guest-root paths and must be
 rebased by the Android installer. This validator never extracts archive data.
@@ -11,13 +11,12 @@ import sys
 import tarfile
 
 REQUIRED = {
-    "bin/proot",
-    "libexec/proot/loader",
     "rootfs/etc/os-release",
     "rootfs/usr/local/bin/box64",
     "rootfs/opt/wine/bin/wine",
-    "rootfs/opt/dxvk/x64/d3d11.dll",
-    "rootfs/opt/dxvk/x64/dxgi.dll",
+    "rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so",
+    "rootfs/usr/bin/glxinfo",
+    "rootfs/usr/bin/xmessage",
 }
 
 

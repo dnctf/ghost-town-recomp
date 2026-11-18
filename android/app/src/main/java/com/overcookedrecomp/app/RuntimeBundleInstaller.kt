@@ -292,28 +292,31 @@ object RuntimeBundleInstaller {
     fun isInstalled(context: Context): Boolean {
         val root = File(context.filesDir, "runtime/wine")
         if (!File(root, ".runtime-install-complete").isFile) return false
+        val version = File(root, ".runtime-version")
+        if (!version.isFile || version.readText().trim() != BuildConfig.VERSION_NAME) return false
         val required = listOf(
-            "bin/proot", "libexec/proot/loader", "rootfs/etc/os-release",
-            "rootfs/usr/local/bin/box64", "rootfs/opt/wine/bin/wine",
-            "rootfs/opt/dxvk/x64/d3d11.dll", "rootfs/opt/dxvk/x64/dxgi.dll"
+            "rootfs/etc/os-release",
+            "rootfs/usr/local/bin/box64",
+            "rootfs/opt/wine/bin/wine",
+            "rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so",
+            "rootfs/usr/bin/glxinfo",
+            "rootfs/usr/bin/xmessage"
         )
         return required.all { File(root, it).isFile }
     }
 
     private fun validate(root: File) {
         val required = listOf(
-            "bin/proot",
-            "libexec/proot/loader",
             "rootfs/etc/os-release",
             "rootfs/usr/local/bin/box64",
             "rootfs/opt/wine/bin/wine",
-            "rootfs/opt/dxvk/x64/d3d11.dll",
-            "rootfs/opt/dxvk/x64/dxgi.dll"
+            "rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so",
+            "rootfs/usr/bin/glxinfo",
+            "rootfs/usr/bin/xmessage"
         )
         val missing = required.filterNot { File(root, it).isFile }
         if (missing.isNotEmpty()) throw IOException("Runtime tidak lengkap: ${missing.joinToString()}")
         listOf(
-            "bin/proot",
             "rootfs/usr/local/bin/box64",
             "rootfs/opt/wine/bin/wine"
         ).forEach {
@@ -328,13 +331,11 @@ object RuntimeBundleInstaller {
         val checksumFile = File(root, "provenance/RUNTIME-SHA256SUMS")
         if (!checksumFile.isFile) throw IOException("Manifest checksum runtime tidak ditemukan.")
         val required = setOf(
-            "bin/proot",
-            "libexec/proot/loader",
-            "libexec/proot/loader32",
             "rootfs/usr/local/bin/box64",
             "rootfs/opt/wine/bin/wine",
-            "rootfs/opt/dxvk/x64/d3d11.dll",
-            "rootfs/opt/dxvk/x64/dxgi.dll"
+            "rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so",
+            "rootfs/usr/bin/glxinfo",
+            "rootfs/usr/bin/xmessage"
         )
         val verified = mutableSetOf<String>()
         checksumFile.forEachLine { line ->

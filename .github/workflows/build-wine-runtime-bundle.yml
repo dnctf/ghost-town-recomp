@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/build-wine-runtime-bundle.yml'
       - 'runtime/**'
+      - 'runtime/rootfs/packages-amd64.txt'
       - 'tools/audit_runtime_tree.py'
       - 'tools/validate_runtime_archive.py'
   workflow_dispatch:
@@ -19,124 +20,35 @@ on:
       box64_ref:
         description: Box64 upstream ref
         required: true
-        default: main
-        type: string
-      proot_ref:
-        description: Android PRoot upstream ref
-        required: true
-        default: main
+        default: 7fab05334445948c918281b54f2a604ff63337f7
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-proot:
-    name: Build Android ARM64 PRoot (NDK x86_64 host)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    env:
-      PROOT_REF: ${{ inputs.proot_ref || '6f8ebfd8e24887dfba64c3f2d7d5fe9dc059b60e' }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Install Android NDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'ndk;28.2.13676358'
-      - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y git make python3 file binutils
-      - name: Build static Android ARM64 PRoot and loaders
-        run: |
-          set -euo pipefail
-          git clone https://github.com/berilevi/proot-static.git proot-src
-          git -C proot-src checkout --detach "$PROOT_REF"
-          git -C proot-src rev-parse HEAD > proot-upstream-commit.txt
-          cd proot-src
-          NDK="$ANDROID_HOME/ndk/28.2.13676358" \
-          OUT="$RUNNER_TEMP/proot-static-build" \
-          REPO_ARTIFACT_DIR="$GITHUB_WORKSPACE/proot-src/dist/aarch64" \
-            tools/build-static-aarch64.sh
-          cd "$GITHUB_WORKSPACE"
-          SRC="proot-src/dist/aarch64"
-          OUT="proot-artifact"
-          mkdir -p "$OUT/root/bin" "$OUT/root/libexec/proot" "$OUT/provenance"
-          install -m 0755 "$SRC/proot" "$OUT/root/bin/proot"
-          install -m 0755 "$SRC/loader" "$OUT/root/libexec/proot/loader"
-          install -m 0755 "$SRC/loader32" "$OUT/root/libexec/proot/loader32"
-          for f in "$OUT/root/bin/proot" "$OUT/root/libexec/proot/loader"; do
-            readelf -h "$f" | grep -q 'Class:.*ELF64'
-            readelf -h "$f" | grep -q 'Machine:.*AArch64'
-            if readelf -l "$f" | grep -q 'Requesting program interpreter'; then exit 1; fi
-          done
-          readelf -h "$OUT/root/libexec/proot/loader32" | grep -q 'Class:.*ELF32'
-          readelf -h "$OUT/root/libexec/proot/loader32" | grep -q 'Machine:.*ARM'
-          if readelf -l "$OUT/root/libexec/proot/loader32" | grep -q 'Requesting program interpreter'; then exit 1; fi
-          cp proot-src/COPYING "$OUT/provenance/PROOT-COPYING"
-          cp proot-upstream-commit.txt "$OUT/provenance/"
-          printf 'source=https://github.com/berilevi/proot-static\nabi=arm64-v8a\nloader32=arm-eabi\nlinkage=static\nndk=28.2.13676358\n' > "$OUT/provenance/PROOT-BUILD-INFO.txt"
-          (cd "$OUT" && sha256sum root/bin/proot root/libexec/proot/loader root/libexec/proot/loader32 > provenance/PROOT-SHA256SUMS)
-      - name: Upload PRoot component
-        uses: actions/upload-artifact@v4
-        with:
-          name: runtime-proot-android-arm64
-          path: proot-artifact/
-          if-no-files-found: error
-          retention-days: 3
-
-  build-rootfs:
-    name: Build ARM64 glibc rootfs and Windows runtime components
+  build-box64:
+    name: Build and cache Box64 ARM64 glibc binary
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 120
+    timeout-minutes: 60
     env:
-      DEBIAN_SUITE: ${{ inputs.debian_suite || 'bookworm' }}
-      BOX64_REF: ${{ inputs.box64_ref || '7fab05334445948c918281b54f2a604ff63337f7' }}
-      WINE_SHA256: 40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e
-      DXVK_SHA256: 40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Install host build tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y debootstrap git cmake ninja-build build-essential \
-            file binutils libcapstone-dev curl xz-utils tar python3 pax-utils \
-            qemu-user-static binfmt-support ccache
-          # Register the x86_64 ELF handler on this ARM64 runner before any
-          # amd64 package maintainer script is executed inside the chroot.
-          sudo modprobe binfmt_misc || true
-          if ! mountpoint -q /proc/sys/fs/binfmt_misc; then
-            sudo mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc
-          fi
-          # GitHub's ARM64 runner may pre-register QEMU in the kernel without
-          # shipping a matching update-binfmts database entry. Prefer the live
-          # kernel registration; only import/enable a descriptor when absent.
-          if [ -r /proc/sys/fs/binfmt_misc/qemu-x86_64 ]; then
-            cat /proc/sys/fs/binfmt_misc/qemu-x86_64
-            grep -q '^enabled' /proc/sys/fs/binfmt_misc/qemu-x86_64
-          else
-            sudo update-binfmts --import qemu-x86_64 || true
-            sudo update-binfmts --enable qemu-x86_64
-            test -r /proc/sys/fs/binfmt_misc/qemu-x86_64
-            grep -q '^enabled' /proc/sys/fs/binfmt_misc/qemu-x86_64
-          fi
+      - name: Install Box64 host build tools
+        run: sudo apt-get update && sudo apt-get install -y git cmake ninja-build build-essential libcapstone-dev ccache file binutils
       - name: Restore Box64 compiler cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
-          key: box64-arm64-${{ env.BOX64_REF }}-sd888-dynarec-release-v1
+          key: box64-arm64-${{ env.BOX64_REF }}-sd888-dynarec-release-v2
           restore-keys: |
             box64-arm64-${{ env.BOX64_REF }}-sd888-dynarec-
-      - name: Restore Debian package archive cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/apt-cache
-          key: debian-bookworm-arm64-amd64-runtime-packages-v1
-      - name: Build Box64 for ARM64 glibc
+      - name: Build pinned Box64
         run: |
           set -euo pipefail
           git clone https://github.com/ptitSeb/box64.git box64-src
@@ -148,25 +60,52 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_INSTALL_PREFIX=/usr/local \
-            -DSD888=ON \
-            -DARM_DYNAREC=ON \
-            -DNO_LIB_INSTALL=ON \
-            -DNO_CONF_INSTALL=ON
+            -DSD888=ON -DARM_DYNAREC=ON -DNO_LIB_INSTALL=ON -DNO_CONF_INSTALL=ON
           cmake --build box64-build --parallel 2
           install -D -m 0755 "$(find box64-build -type f -name box64 -perm -111 -print -quit)" box64-install/usr/local/bin/box64
           file box64-install/usr/local/bin/box64
           readelf -h box64-install/usr/local/bin/box64 | grep -q 'Machine:.*AArch64'
           ldd box64-install/usr/local/bin/box64 | tee box64-ldd.txt
           ccache --show-stats | tee box64-ccache-stats.txt
+      - name: Upload reusable Box64 build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: box64-arm64-glibc-sd888
+          path: |
+            box64-install/
+            box64-src/LICENSE
+            box64-upstream-commit.txt
+            box64-ldd.txt
+            box64-ccache-stats.txt
+          if-no-files-found: error
+          retention-days: 7
 
-      - name: Download and verify pinned Wine and DXVK
+  build-rootfs:
+    name: Build ARM64 glibc rootfs and Windows runtime components
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    env:
+      DEBIAN_SUITE: ${{ inputs.debian_suite || 'bookworm' }}
+      WINE_SHA256: 40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y debootstrap git cmake ninja-build build-essential \
+            file binutils curl xz-utils tar python3 pax-utils
+      - name: Restore Debian package archive cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/apt-cache
+          key: debian-bookworm-amd64-${{ hashFiles('runtime/rootfs/packages-amd64.txt') }}-v1
+      - name: Download and verify pinned Wine
         run: |
           set -euo pipefail
           mkdir -p downloads
           curl -fL --retry 3 https://github.com/Kron4ek/Wine-Builds/releases/download/11.19/wine-11.19-amd64.tar.xz -o downloads/wine.tar.xz
-          curl -fL --retry 3 https://github.com/doitsujin/DXVK/releases/download/v3.1.1/dxvk-3.1.1.tar.gz -o downloads/dxvk.tar.gz
           echo "$WINE_SHA256  downloads/wine.tar.xz" | sha256sum -c -
-          echo "$DXVK_SHA256  downloads/dxvk.tar.gz" | sha256sum -c -
 
       - name: Bootstrap Debian ARM64 glibc rootfs and amd64 Wine libraries
         run: |
@@ -179,50 +118,28 @@ jobs:
           mkdir -p "$RUNNER_TEMP/apt-cache/archives/partial"
           sudo cp -a "$RUNNER_TEMP/apt-cache/archives/." "$ROOTFS/var/cache/apt/archives/" 2>/dev/null || true
           sudo cp /etc/resolv.conf "$ROOTFS/etc/resolv.conf"
-          # Keep a private emulator copy in the guest root while dpkg runs.
-          # The host binfmt registration handles normal execve from maintainer scripts.
-          sudo install -D -m 0755 "$(command -v qemu-x86_64-static)" \
-            "$ROOTFS/usr/bin/qemu-x86_64-static"
-          file "$ROOTFS/usr/bin/qemu-x86_64-static"
           sudo chroot "$ROOTFS" /usr/bin/dpkg --add-architecture amd64
           sudo chroot "$ROOTFS" /usr/bin/apt-get -o Dpkg::Use-Pty=0 update
-          # dpkg/apt maintainer scripts may allocate a pseudo-terminal even in CI.
-          # Mount devpts explicitly inside the guest chroot; always unmount on exit.
-          sudo mkdir -p "$ROOTFS/dev/pts"
-          sudo mount -t devpts devpts "$ROOTFS/dev/pts" -o gid=5,mode=620,ptmxmode=666
-          trap 'sudo umount "$ROOTFS/dev/pts" 2>/dev/null || true' EXIT
-          sudo chroot "$ROOTFS" /usr/bin/apt-get -o Dpkg::Use-Pty=0 install -y --no-install-recommends \
-            libc6:amd64 libgcc-s1:amd64 libstdc++6:amd64 zlib1g:amd64 \
-            libasound2:amd64 libpulse0:amd64 libdbus-1-3:amd64 \
-            libfreetype6:amd64 libfontconfig1:amd64 libgnutls30:amd64 \
-            libx11-6:amd64 libxext6:amd64 libxrender1:amd64 libxrandr2:amd64 \
-            libxi6:amd64 libxcursor1:amd64 libxinerama1:amd64 \
-            libxcomposite1:amd64 libxdamage1:amd64 libxfixes3:amd64 \
-            libxkbcommon0:amd64 libxss1:amd64 libxtst6:amd64 \
-            libxmu6:amd64 libxpm4:amd64 \
-            libwayland-client0:amd64 libwayland-egl1:amd64 \
-            libvulkan1:amd64 libgl1:amd64 libegl1:amd64 libgbm1:amd64 \
-            libgl1-mesa-dri:amd64 libglx-mesa0:amd64 libegl-mesa0:amd64 \
-            libglx0:amd64 libdrm2:amd64 mesa-utils:amd64 x11-utils:amd64 \
-            libunwind8:amd64 libatomic1:amd64 libglib2.0-0:amd64 \
-            libgstreamer1.0-0:amd64 libgstreamer-plugins-base1.0-0:amd64 \
-            libkrb5-3:amd64 libldap-2.5-0:amd64
+          PACKAGES="$(grep -Ev '^[[:space:]]*(#|$)' runtime/rootfs/packages-amd64.txt | tr '\n' ' ')"
+          sudo chroot "$ROOTFS" /usr/bin/apt-get -o Dpkg::Use-Pty=0 --download-only install -y --no-install-recommends $PACKAGES 2>&1 | tee apt-get-download.log
+          # Extract .deb payloads without executing foreign-architecture maintainer scripts.
+          : > rootfs-package-manifest-amd64.txt
+          for deb in "$ROOTFS"/var/cache/apt/archives/*.deb; do
+            [ -f "$deb" ] || continue
+            architecture="$(dpkg-deb -f "$deb" Architecture)"
+            if [ "$architecture" = "amd64" ] || [ "$architecture" = "all" ]; then
+              sudo dpkg-deb -x "$deb" "$ROOTFS"
+            fi
+          done
           sudo cp -a "$ROOTFS/var/cache/apt/archives/." "$RUNNER_TEMP/apt-cache/archives/" 2>/dev/null || true
-          sudo install -D -m 0755 box64-install/usr/local/bin/box64 "$ROOTFS/usr/local/bin/box64"
-          sudo mkdir -p "$ROOTFS/opt/wine" "$ROOTFS/opt/dxvk"
-          mkdir wine-extract dxvk-extract
+          sudo mkdir -p "$ROOTFS/opt/wine"
+          mkdir wine-extract
           tar -xJf downloads/wine.tar.xz -C wine-extract --strip-components=1
           WINE_BIN="$(find wine-extract -type f -path '*/bin/wine' -print -quit)"
           test -n "$WINE_BIN"
           WINE_DIR="$(dirname "$(dirname "$WINE_BIN")")"
           sudo cp -a "$WINE_DIR/." "$ROOTFS/opt/wine/"
-          tar -xzf downloads/dxvk.tar.gz -C dxvk-extract --strip-components=1
-          test -d dxvk-extract/x64 && test -d dxvk-extract/x32
-          sudo cp -a dxvk-extract/. "$ROOTFS/opt/dxvk/"
           test -x "$ROOTFS/opt/wine/bin/wine"
-          test -x "$ROOTFS/usr/local/bin/box64"
-          test -s "$ROOTFS/opt/dxvk/x64/d3d11.dll"
-          test -s "$ROOTFS/opt/dxvk/x64/dxgi.dll"
           sudo readelf -h "$ROOTFS/opt/wine/bin/wine" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
           test -s "$ROOTFS/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so"
           test -x "$ROOTFS/usr/bin/glxinfo"
@@ -242,15 +159,19 @@ jobs:
           file "$ROOTFS/opt/wine/bin/wine" \
             "$ROOTFS/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so" \
             "$ROOTFS/usr/bin/glxinfo" "$ROOTFS/usr/bin/xmessage"
-          sudo chroot "$ROOTFS" /usr/local/bin/box64 /opt/wine/bin/wine --version \
-            | tee wine-box64-smoke.txt
-          grep -Eiq 'wine-11\.19|wine version 11\.19' wine-box64-smoke.txt
           # The host binfmt path is no longer needed after package configuration.
-          sudo rm -f "$ROOTFS/usr/bin/qemu-x86_64-static"
+          du -sb "$ROOTFS" > rootfs-size-before-trim.txt
           sudo chroot "$ROOTFS" /usr/bin/apt-get -o Dpkg::Use-Pty=0 clean
-          sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/locale/"*
+          sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/info/"*
+          sudo rm -rf "$ROOTFS/var/cache/"*
+          sudo find "$ROOTFS/usr/share/locale" -mindepth 1 -maxdepth 1 ! -name en ! -name en_US ! -name en_GB -exec rm -rf {} +
+          sudo rm -rf "$ROOTFS/usr/include"
+          sudo find "$ROOTFS" -type f -name '*.a' -delete
+          sudo find "$ROOTFS" -type f -name '*.debug' -delete
+          sudo find "$ROOTFS" -type d -name __pycache__ -prune -exec rm -rf {} +
           sudo find "$ROOTFS/usr/share/doc" -type f ! -name copyright -delete
           sudo find "$ROOTFS/usr/share/doc" -mindepth 1 -type d -empty -delete
+          du -sb "$ROOTFS" > rootfs-size-after-trim.txt
           # The Android installer rejects absolute/escaping symlinks. In a chroot,
           # absolute links resolve from the guest root; rewrite them as equivalent
           # relative links that remain inside this rootfs before packaging.
@@ -280,13 +201,13 @@ jobs:
           print("Rewrote %d absolute symlinks; all symlinks remain rootfs-confined." % rewritten)
           PY
           sudo dpkg-query --admindir="$ROOTFS/var/lib/dpkg" -W -f='${Package}:${Architecture}=${Version}\n' > rootfs-package-manifest.txt
+          cat rootfs-package-manifest-amd64.txt >> rootfs-package-manifest.txt
           mkdir -p rootfs-artifact/provenance/licenses
-          cp box64-src/LICENSE rootfs-artifact/provenance/licenses/BOX64-LICENSE
-          cp runtime/licenses/WINE-LICENSE runtime/licenses/WINE-COPYING.LIB runtime/licenses/WINE-NOTICES.md runtime/licenses/DXVK-LICENSE rootfs-artifact/provenance/licenses/
-          cp box64-upstream-commit.txt box64-ldd.txt box64-ccache-stats.txt wine-lddtree.txt virgl-lddtree.txt rootfs-package-manifest.txt wine-box64-smoke.txt rootfs-artifact/provenance/
+          cp runtime/licenses/WINE-LICENSE runtime/licenses/WINE-COPYING.LIB runtime/licenses/WINE-NOTICES.md rootfs-artifact/provenance/licenses/
+          cp wine-lddtree.txt virgl-lddtree.txt rootfs-package-manifest.txt rootfs-size-before-trim.txt rootfs-size-after-trim.txt rootfs-artifact/provenance/
           printf 'guest_driver=virgl_dri.so\narchitecture=x86_64\nsource=Debian Bookworm libgl1-mesa-dri\ntransport=VirGL over X11/DRI3\n' > rootfs-artifact/provenance/MESA-VIRGL-BUILD-INFO.txt
-          sha256sum downloads/wine.tar.xz downloads/dxvk.tar.gz > rootfs-artifact/provenance/UPSTREAM-ARCHIVE-SHA256SUMS
-          printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=3.1.1\n' "$DEBIAN_SUITE" > rootfs-artifact/provenance/ROOTFS-BUILD-INFO.txt
+          sha256sum downloads/wine.tar.xz > rootfs-artifact/provenance/UPSTREAM-ARCHIVE-SHA256SUMS
+          printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=not-bundled\n' "$DEBIAN_SUITE" > rootfs-artifact/provenance/ROOTFS-BUILD-INFO.txt
           # Upload one root-owned archive instead of traversing restricted Debian paths.
           # /dev is bind-mounted from Android by PRoot; omit Linux device nodes because
           # unprivileged artifact extraction cannot recreate mknod entries.
@@ -309,7 +230,7 @@ jobs:
         run: |
           set +e
           mkdir -p runtime-failure-logs
-          for f in apt-get-install.log box64-ccache-stats.txt box64-ldd.txt wine-lddtree.txt virgl-lddtree.txt wine-box64-smoke.txt; do
+          for f in apt-get-download.log box64-ccache-stats.txt box64-ldd.txt wine-lddtree.txt virgl-lddtree.txt wine-box64-smoke.txt; do
             [ -f "$f" ] && cp "$f" runtime-failure-logs/
           done
           sudo dpkg --audit > runtime-failure-logs/dpkg-audit.txt 2>&1
@@ -326,17 +247,19 @@ jobs:
 
   assemble:
     name: Assemble installable app-private runtime archive
-    runs-on: ubuntu-24.04
-    needs: [build-proot, build-rootfs]
+    runs-on: ubuntu-24.04-arm
+    needs: [build-box64, build-rootfs]
     timeout-minutes: 45
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Download PRoot component
+      - name: Install runtime validation tools
+        run: sudo apt-get update && sudo apt-get install -y file binutils binutils-x86-64-linux-gnu pax-utils
+      - name: Download Box64 artifact
         uses: actions/download-artifact@v4
         with:
-          name: runtime-proot-android-arm64
-          path: proot-artifact
+          name: box64-arm64-glibc-sd888
+          path: box64-artifact
       - name: Download glibc rootfs component
         uses: actions/download-artifact@v4
         with:
@@ -351,16 +274,42 @@ jobs:
           tar -xzf rootfs-archive/rootfs-component.tar.gz -C rootfs-unpacked
           test -d rootfs-unpacked/rootfs
           test -d rootfs-unpacked/provenance
-          cp -a proot-artifact/root/. "$OUT/"
           cp -a rootfs-unpacked/rootfs "$OUT/rootfs"
+          sudo install -D -m 0755 box64-artifact/box64-install/usr/local/bin/box64 "$OUT/rootfs/usr/local/bin/box64"
           cp -a rootfs-unpacked/provenance "$OUT/provenance"
-          cp -a proot-artifact/provenance/. "$OUT/provenance/"
           mkdir -p "$OUT/provenance/licenses"
-          cp proot-artifact/provenance/PROOT-COPYING "$OUT/provenance/licenses/PROOT-COPYING"
+          cp box64-artifact/box64-src/LICENSE "$OUT/provenance/licenses/BOX64-LICENSE"
+          cp box64-artifact/box64-upstream-commit.txt box64-artifact/box64-ldd.txt box64-artifact/box64-ccache-stats.txt "$OUT/provenance/"
           cp runtime/rootfs/README.md "$OUT/README.md"
-          (cd "$OUT" && sha256sum bin/proot libexec/proot/loader libexec/proot/loader32 rootfs/usr/local/bin/box64 rootfs/opt/wine/bin/wine rootfs/opt/dxvk/x64/d3d11.dll rootfs/opt/dxvk/x64/dxgi.dll rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so rootfs/usr/bin/glxinfo rootfs/usr/bin/xmessage > provenance/RUNTIME-SHA256SUMS)
+          du -sb "$OUT/rootfs" > runtime-tree-size-before-strip.txt
+          : > runtime-strip-failures.txt
+          while IFS= read -r -d '' elf; do
+            if file -b "$elf" | grep -q '^ELF'; then
+              if file -b "$elf" | grep -q 'x86-64'; then
+                x86_64-linux-gnu-strip --strip-unneeded "$elf" || printf '%s\n' "$elf" >> runtime-strip-failures.txt
+              else
+                strip --strip-unneeded "$elf" || printf '%s\n' "$elf" >> runtime-strip-failures.txt
+              fi
+            fi
+          done < <(find "$OUT/rootfs" -type f -print0)
+          du -sb "$OUT/rootfs" > runtime-tree-size-after-strip.txt
+          cp runtime-strip-failures.txt runtime-tree-size-before-strip.txt runtime-tree-size-after-strip.txt "$OUT/provenance/"
+          sudo mount --bind /dev "$OUT/rootfs/dev"
+          sudo mount -t proc proc "$OUT/rootfs/proc"
+          sudo mount -t sysfs sysfs "$OUT/rootfs/sys"
+          trap 'sudo umount "$OUT/rootfs/sys" 2>/dev/null || true; sudo umount "$OUT/rootfs/proc" 2>/dev/null || true; sudo umount "$OUT/rootfs/dev" 2>/dev/null || true' EXIT
+          file "$OUT/rootfs/usr/local/bin/box64" "$OUT/rootfs/opt/wine/bin/wine" "$OUT/rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so"
+          sudo chroot "$OUT/rootfs" env BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib /usr/local/bin/box64 /opt/wine/bin/wine --version 2>&1 | tee wine-box64-smoke.txt
+          grep -Eiq 'wine-11\.19|wine version 11\.19' wine-box64-smoke.txt
+          cp wine-box64-smoke.txt "$OUT/provenance/"
+          sudo umount "$OUT/rootfs/sys"
+          sudo umount "$OUT/rootfs/proc"
+          sudo umount "$OUT/rootfs/dev"
+          trap - EXIT
+          (cd "$OUT" && sha256sum rootfs/usr/local/bin/box64 rootfs/opt/wine/bin/wine rootfs/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so rootfs/usr/bin/glxinfo rootfs/usr/bin/xmessage > provenance/RUNTIME-SHA256SUMS)
           tar --numeric-owner --xattrs --acls -czf ghost-town-wine-runtime-arm64.tar.gz -C "$OUT" .
           sha256sum ghost-town-wine-runtime-arm64.tar.gz > ghost-town-wine-runtime-arm64.tar.gz.sha256
+          python3 tools/validate_runtime_archive.py ghost-town-wine-runtime-arm64.tar.gz
           du -h ghost-town-wine-runtime-arm64.tar.gz
           python3 tools/audit_runtime_tree.py "$OUT" | tee runtime-tree-size-audit.txt
           printf '\\nARCHIVE_BYTES=' >> runtime-tree-size-audit.txt
@@ -368,27 +317,10 @@ jobs:
       - name: Upload complete runtime bundle
         uses: actions/upload-artifact@v4
         with:
-          name: ghost-town-wine-runtime-arm64-debian-bookworm
+          name: ghost-town-wine-runtime-0.5.0-alpha.2-arm64-debian-bookworm
           path: |
             ghost-town-wine-runtime-arm64.tar.gz
             ghost-town-wine-runtime-arm64.tar.gz.sha256
             runtime-tree-size-audit.txt
           if-no-files-found: error
           retention-days: 30
-      - name: Attach runtime bundle to v0.5.0-alpha.2 pre-release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v0.5.0-alpha.2
-          target_commitish: main
-          name: Ghost Town Recomp 0.5.0-alpha.2 - VirGL Guest Runtime
-          prerelease: true
-          body: |
-            PRE-RELEASE ONLY. This bundle is a separately managed runtime payload for integration testing.
-            The Android alpha APK provides a managed HTTPS download action for this project-owned archive with SHA-256 verification and transactional app-private extraction. Physical-device download/install validation is still pending.
-            Includes Debian Bookworm ARM64/glibc, Box64, Wine 11.19 amd64, DXVK 3.1.1, Mesa VirGL guest DRI driver, X11/GLX smoke utilities, and static Android ARM64 PRoot.
-            No claim of Overcooked 2 execution or playability. The X11/VirGL display session is an integration foundation only; physical-device X11, GLX/VirGL, WineD3D, audio/input, and gameplay validation remain pending. DXVK/guest Vulkan remains a separate unvalidated path.
-            See docs/V0.4.0_EXECUTION_GATES.md and docs/PROVENANCE.md.
-          files: |
-            ghost-town-wine-runtime-arm64.tar.gz
-            ghost-town-wine-runtime-arm64.tar.gz.sha256
-          fail_on_unmatched_files: true

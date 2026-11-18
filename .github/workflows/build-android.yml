@@ -1,18 +1,28 @@
-name: Ghost Town Recomp Android Build and v0.5.0 Alpha Release
+name: Ghost Town Recomp Android APK Build and Size Audit
 
 on:
   push:
     branches:
       - main
       - master
+    paths:
+      - 'android/**'
+      - 'runtime/manifest.json'
+      - 'tools/**'
+      - '.github/workflows/build-android.yml'
   pull_request:
     branches:
       - main
       - master
+    paths:
+      - 'android/**'
+      - 'runtime/manifest.json'
+      - 'tools/**'
+      - '.github/workflows/build-android.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -22,6 +32,7 @@ jobs:
   probe-tests:
     name: Game installation probe tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,6 +40,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Validate Python tools and runtime manifest
+        run: |
+          python -m json.tool runtime/manifest.json >/dev/null
+          python -m py_compile tools/audit_apk_size.py tools/validate_runtime_archive.py tools/audit_runtime_tree.py
       - name: Run probe unit tests
         run: python -m unittest discover -s tools/tests -v
 
@@ -36,6 +51,7 @@ jobs:
     name: Build Android ARM64 APK
     runs-on: ubuntu-latest
     needs: probe-tests
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,7 +79,7 @@ jobs:
       - name: Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platforms;android-34 build-tools;34.0.0 ndk;26.3.11579264 cmake;3.22.1'
+          packages: 'platforms;android-34 build-tools;34.0.0 ndk;26.3.11579264 ndk;28.2.13676358 cmake;3.22.1'
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -86,24 +102,32 @@ jobs:
           WINLATOR_SO="$(find build-native-arm64 -type f -name 'libwinlator.so' -print -quit)"
           test -n "$WINLATOR_SO"
           echo "Winlator X11 JNI bridge built: $WINLATOR_SO"
-      - name: Embed verified runtime bundle into APK assets
+      - name: Build static Android PRoot into APK native libraries (W^X-safe)
         run: |
           set -euo pipefail
-          mkdir -p android/app/src/main/assets/runtime/parts
-          BASE="https://github.com/dnctf/ghost-town-recomp/releases/download/v0.4.0-alpha.1"
-          curl -fL --retry 5 --retry-all-errors "$BASE/ghost-town-wine-runtime-arm64.tar.gz" -o "$RUNNER_TEMP/runtime.tar.gz"
-          curl -fL --retry 5 --retry-all-errors "$BASE/ghost-town-wine-runtime-arm64.tar.gz.sha256" -o "$RUNNER_TEMP/runtime.sha256"
-          EXPECTED="$(awk '{print $1}' "$RUNNER_TEMP/runtime.sha256")"
-          echo "$EXPECTED  $RUNNER_TEMP/runtime.tar.gz" | sha256sum -c -
-          test "$(stat -c%s "$RUNNER_TEMP/runtime.tar.gz")" -gt 100000000
-          python3 tools/validate_runtime_archive.py "$RUNNER_TEMP/runtime.tar.gz"
-          split -b 64m -d -a 4 "$RUNNER_TEMP/runtime.tar.gz" android/app/src/main/assets/runtime/parts/runtime-
-          for part in android/app/src/main/assets/runtime/parts/runtime-[0-9][0-9][0-9][0-9]; do
-            mv "$part" "$part.bin"
+          git clone https://github.com/berilevi/proot-static.git proot-src
+          git -C proot-src checkout --detach 6f8ebfd8e24887dfba64c3f2d7d5fe9dc059b60e
+          git -C proot-src rev-parse HEAD > proot-upstream-commit.txt
+          cd proot-src
+          NDK="$ANDROID_HOME/ndk/28.2.13676358" \
+          OUT="$RUNNER_TEMP/proot-static-build" \
+          REPO_ARTIFACT_DIR="$GITHUB_WORKSPACE/proot-src/dist/aarch64" \
+            tools/build-static-aarch64.sh
+          cd "$GITHUB_WORKSPACE"
+          DEST="android/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$DEST" android/app/src/main/assets/licenses
+          install -m 0755 proot-src/dist/aarch64/proot "$DEST/libproot.so"
+          install -m 0755 proot-src/dist/aarch64/loader "$DEST/libproot-loader.so"
+          install -m 0644 proot-src/COPYING android/app/src/main/assets/licenses/PROOT-COPYING
+          for f in "$DEST/libproot.so" "$DEST/libproot-loader.so"; do
+            readelf -h "$f" | grep -q 'Class:.*ELF64'
+            readelf -h "$f" | grep -q 'Machine:.*AArch64'
+            if readelf -l "$f" | grep -q 'Requesting program interpreter'; then
+              echo "PRoot must be statically linked: $f" >&2
+              exit 1
+            fi
           done
-          (cd android/app/src/main/assets/runtime/parts && sha256sum runtime-*.bin > SHA256SUMS)
-          test -s android/app/src/main/assets/runtime/parts/SHA256SUMS
-          test "$(find android/app/src/main/assets/runtime/parts -maxdepth 1 -type f -name 'runtime-*.bin' | wc -l)" -gt 0
+          sha256sum "$DEST"/*.so | tee proot-native-sha256.txt
 
       - name: Build debug and release APK
         working-directory: android
@@ -129,65 +153,12 @@ jobs:
       - name: Upload APKs and native library
         uses: actions/upload-artifact@v4
         with:
-          name: ghost-town-recomp-0.5.0-alpha.1-arm64
+          name: ghost-town-recomp-0.5.0-alpha.2-arm64
           path: |
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
             build-native-arm64/**/*.so
+            proot-native-sha256.txt
+            proot-upstream-commit.txt
+            android/app/src/main/assets/licenses/PROOT-COPYING
           if-no-files-found: error
-      - name: Publish v0.4.0-alpha.1 tester pre-release
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, 'release-v0.5.0-alpha.1')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v0.5.0-alpha.1
-          target_commitish: main
-          name: Ghost Town Recomp 0.5.0-alpha.1 - Bundled Runtime Repair
-          prerelease: true
-          body: |
-            See CHANGELOG.md, docs/CONTRIBUTOR_TESTING.md, docs/V0.4.0_EXECUTION_GATES.md, and docs/PROVENANCE.md.
-            Alpha foundation release: APK bundles the Wine/Box64 runtime archive and provisions it automatically on first launch. Runtime extraction now handles repeated hardlink entries and safely rebases absolute symlinks that remain inside the private staging root. The normal UI uses only the bundled runtime and offers an install/repair action; no manual runtime archive picker or runtime download is required.
-            Includes ARM64 PRoot, Debian Bookworm ARM64/amd64 rootfs, Box64 ARM64, Wine 11.19 amd64, and DXVK 3.1.1 in the managed runtime archive.
-            This is NOT a playable Overcooked 2 release. Turnip/libadrenotools, glibc-visible Vulkan WSI/presentation, Wine process launcher, audio/input bridge, and physical MatePad gameplay evidence remain incomplete.
-            Does not include proprietary game binaries or user game assets.
-          files: |
-            android/app/build/outputs/apk/debug/*.apk
-            android/app/build/outputs/apk/release/*.apk
-            build-native-arm64/**/*.so
-          generate_release_notes: true
-
-  runtime-components:
-    name: Package verified Wine and DXVK components
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Install archive tools
-        run: sudo apt-get update && sudo apt-get install -y curl xz-utils tar file zstd
-      - name: Download pinned upstream releases
-        run: |
-          set -euo pipefail
-          mkdir -p downloads bundle/wine bundle/dxvk
-          curl -fL --retry 3 https://github.com/Kron4ek/Wine-Builds/releases/download/11.19/wine-11.19-amd64.tar.xz -o downloads/wine.tar.xz
-          curl -fL --retry 3 https://github.com/doitsujin/DXVK/releases/download/v3.1.1/dxvk-3.1.1.tar.gz -o downloads/dxvk.tar.gz
-      - name: Verify SHA-256 and extract components
-        run: |
-          set -euo pipefail
-          echo "40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e  downloads/wine.tar.xz" | sha256sum -c -
-          echo "40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608  downloads/dxvk.tar.gz" | sha256sum -c -
-          tar -xJf downloads/wine.tar.xz -C bundle/wine --strip-components=1
-          tar -xzf downloads/dxvk.tar.gz -C bundle/dxvk --strip-components=1
-          WINE_BIN="$(find bundle/wine -type f -path '*/bin/wine' -print -quit)"
-          test -n "$WINE_BIN"
-          test -d bundle/dxvk/x64
-          test -d bundle/dxvk/x32
-          mkdir -p bundle/provenance
-          sha256sum downloads/* > bundle/provenance/SHA256SUMS
-          printf 'Wine=11.19 amd64\\nDXVK=3.1.1\\nWine target=Linux x86_64; requires Box64 + ARM64 glibc userspace\\nDXVK target=Windows DLLs for Wine prefix; requires Vulkan bridge\\n' > bundle/provenance/COMPONENTS.txt
-          cp docs/runtime-bundle-README.md bundle/README.md
-      - name: Upload Wine and DXVK contributor bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: ghost-town-wine-11.19-dxvk-3.1.1
-          path: bundle/
-          if-no-files-found: error
-          retention-days: 30

@@ -37,3 +37,17 @@ with zipfile.ZipFile(path) as zf:
     dex = [i for i in entries if i.filename.endswith(".dex")]
     print("DEX uncompressed_bytes=" + str(sum(i.file_size for i in dex)))
     print("DEX compressed_bytes=" + str(sum(i.compress_size for i in dex)))
+    required_native = {
+        "lib/arm64-v8a/libproot.so",
+        "lib/arm64-v8a/libproot-loader.so",
+        "lib/arm64-v8a/libvirglrenderer.so",
+    }
+    present = {i.filename for i in entries}
+    missing = sorted(required_native - present)
+    if missing:
+        raise SystemExit("Missing W^X-safe ARM64 native payload(s): " + ", ".join(missing))
+    embedded_runtime = [i.filename for i in entries if i.filename.startswith("assets/runtime/parts/")]
+    if embedded_runtime:
+        raise SystemExit("Runtime payload must not be embedded in the base APK: " + ", ".join(embedded_runtime[:5]))
+    print("W_X_SAFE_PROOT_NATIVE_LIBS=present")
+    print("EMBEDDED_RUNTIME_PARTS=0")

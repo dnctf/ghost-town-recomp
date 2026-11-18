@@ -17,8 +17,9 @@ android {
         applicationId "com.overcookedrecomp.app"
         minSdk 29
         targetSdk 34
-        versionCode 10
-        versionName "0.5.0-alpha.1"
+        versionCode 11
+        versionName "0.5.0-alpha.2"
+        buildConfigField "String", "RUNTIME_MANIFEST_URL", "\"https://raw.githubusercontent.com/dnctf/ghost-town-recomp/main/runtime/manifest.json\""
 
         ndk {
             abiFilters 'arm64-v8a'
@@ -33,15 +34,10 @@ android {
         }
     }
 
-    // The runtime archive is already gzip-compressed; avoid AGP recompressing
-    // hundreds of megabytes into a byte array during asset packaging.
-    androidResources {
-        noCompress += ['gz', 'bin']
-    }
-
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            keepDebugSymbols += ['**/libproot.so', '**/libproot-loader.so']
         }
     }
 

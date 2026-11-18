@@ -3,39 +3,41 @@
   "target": "android-arm64-snapdragon-888-adreno-660",
   "release": "0.5.0-alpha.2",
   "release_channel": "pre-release",
-  "status": "Wine prefix bootstrap and X11/VirGL host integration foundation; no game-playability claim",
+  "status": "Managed runtime pack separated from the APK; no game-playability claim",
   "components": {
     "proot": {
       "upstream": "https://github.com/berilevi/proot-static",
       "abi": "arm64-v8a",
       "libc": "bionic",
-      "status": "existing v0.3.3 bundle build; device ptrace validation pending",
-      "license": "GPL-2.0-or-later"
+      "status": "Android/Bionic static PRoot packaged in APK jniLibs; HarmonyOS execution validation pending",
+      "license": "GPL-2.0-or-later",
+      "source_commit": "6f8ebfd8e24887dfba64c3f2d7d5fe9dc059b60e"
     },
     "rootfs": {
       "distribution": "Debian Bookworm",
       "architecture": "arm64 + amd64 multiarch",
-      "status": "existing v0.3.3 runtime build; imagefs migration and first-run provisioning integration pending",
+      "status": "Debian Bookworm ARM64/glibc rootfs with amd64 WineD3D and Mesa VirGL libraries; package payload is extracted without foreign maintainer scripts",
       "license": "Debian package-specific; preserve copyright files"
     },
     "box64": {
       "upstream": "https://github.com/ptitSeb/box64",
       "architecture": "aarch64 host / x86_64 guest",
-      "status": "existing workflow build; immutable source pin and on-device dynarec validation required",
-      "license": "MIT"
+      "status": "Pinned ARM64 build produced in a separate cached CI job and reused by the runtime pack assembly; device dynarec validation pending",
+      "license": "MIT",
+      "source_commit": "7fab05334445948c918281b54f2a604ff63337f7"
     },
     "wine": {
       "upstream": "https://github.com/Kron4ek/Wine-Builds",
       "version": "11.19-amd64",
       "sha256": "40068b3825887224d4b95364e3f49342d4bf7efac5486614b8bc4e7173bbef3e",
-      "status": "existing runtime bundle; prefix initialization and Overcooked2.exe execution not verified",
+      "status": "Wine 11.19 amd64 archive SHA-256 pinned; CI Box64 version smoke test required; no game launch or physical-device validation claimed",
       "license": "LGPL-2.1-or-later plus third-party notices"
     },
     "dxvk": {
       "upstream": "https://github.com/doitsujin/DXVK",
       "version": "3.1.1",
       "sha256": "40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608",
-      "status": "existing DLL payload; D3D11/Vulkan device and presentation not verified",
+      "status": "NOT_BUNDLED; defer until guest Vulkan self-test and visible D3D11 presentation are independently validated",
       "license": "zlib"
     },
     "turnip": {
@@ -64,24 +66,36 @@
       "driver": "/usr/lib/x86_64-linux-gnu/dri/virgl_dri.so",
       "architecture": "x86_64 Wine guest",
       "transport": "VirGL over X11/DRI3 to Android GLES host renderer",
-      "status": "included in v0.5.0-alpha.2 runtime; guest driver enumeration and physical-device presentation still require validation",
+      "status": "Debian Bookworm amd64 Mesa VirGL driver included; X11/GLX presentation still requires physical-device validation",
       "license": "Mesa component licenses; preserve Debian copyright files"
     }
   },
   "runtime_layout": {
-    "host_install_dir": "filesDir/imagefs",
+    "host_install_dir": "filesDir/runtime/wine",
     "staging_dir": "filesDir/imagefs.installing",
     "legacy_v033_dir": "filesDir/runtime/wine",
-    "first_run": "managed-download-and-verified-extract planned; manual tar import remains in alpha"
+    "first_run": "Manifest-driven HTTPS runtime pack download with Range resume, SHA-256 verification, storage preflight, progress and atomic extraction",
+    "proot_location": "APK nativeLibraryDir (read-only extracted jniLibs); never execute PRoot from writable filesDir"
   },
   "graphics_defaults": {
     "render_width": 1280,
     "render_height": 720,
     "vsync": false,
     "driver": "virgl-wined3d (initial rendering path)",
-    "driver_fallback": "WineD3D software fallback; DXVK remains disabled until guest Vulkan is independently validated",
+    "driver_fallback": "WineD3D over VirGL; DXVK remains unbundled until guest Vulkan is validated",
     "dxvk_async": false,
     "dxvk_async_note": "Do not enable DXVK_ASYNC unless using a specifically pinned compatible fork; upstream DXVK 3.1.1 does not imply async patch support."
   },
-  "release_gate": "Do not claim Overcooked! 2 playable until a visible X11 window, a visible D3D11 smoke frame, audio/input, and a physical-device gameplay session are verified."
+  "release_gate": "Do not claim Overcooked! 2 playable until a visible X11 window, a visible D3D11 smoke frame, audio/input, and a physical-device gameplay session are verified.",
+  "runtime_pack": {
+    "status": "pending",
+    "version": "0.5.0-alpha.2",
+    "url": "",
+    "size_bytes": 0,
+    "sha256": "",
+    "expanded_size_bytes": 0,
+    "minimum_app_version": "0.5.0-alpha.2",
+    "compression": "tar.gz",
+    "note": "Populate URL, exact byte sizes, and SHA-256 from the validated runtime build before publishing the GitHub Release asset."
+  }
 }

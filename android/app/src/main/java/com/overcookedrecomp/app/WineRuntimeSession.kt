@@ -3,16 +3,14 @@ package com.overcookedrecomp.app
 import android.content.Context
 import java.io.File
 import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
 
 /**
  * Owns the first real Wine guest bootstrap.
  *
  * This is deliberately not a game launcher: it creates an isolated 64-bit
- * prefix, installs the pinned DXVK DLLs into that prefix, and records every
- * command. Game execution remains blocked until a display backend is available.
+ * prefix and records every command. DXVK remains disabled until guest Vulkan
+ * and D3D11 presentation are independently validated.
  */
 object WineRuntimeSession {
     private const val GUEST_HOME = "/home/ghosttown"
@@ -72,46 +70,15 @@ object WineRuntimeSession {
                 sessionLog.appendText("Wine prefix sudah ada; melewati wineboot --init.\n")
             }
 
-            installDxvk(root, hostPrefix, logDir, context)
+            sessionLog.appendText("DXVK disabled: guest Vulkan has not passed its validation gate.\n")
             val serverStop = stopWineServer(context, root, hostPrefix, logDir)
             if (!serverStop.success) sessionLog.appendText("WARNING: wineserver cleanup returned ${serverStop.exitCode ?: "timeout"}: ${serverStop.output.takeLast(500)}\n")
-            sessionLog.appendText("Prefix siap dan DXVK DLL/registry berhasil dipasang.\n")
-            Result(true, "Wine prefix 64-bit berhasil disiapkan dan DXVK sudah dipasang. Ini belum membuktikan Vulkan/D3D11 dapat tampil.", sessionLog.absolutePath)
+            sessionLog.appendText("Prefix siap; DXVK tetap nonaktif sampai guest Vulkan tervalidasi.\n")
+            Result(true, "Wine prefix 64-bit berhasil disiapkan. DXVK tetap nonaktif sampai guest Vulkan tervalidasi.", sessionLog.absolutePath)
         } catch (error: Throwable) {
             sessionLog.appendText("ERROR: ${error.javaClass.simpleName}: ${error.message}\n")
             Result(false, error.message ?: error.javaClass.simpleName, sessionLog.absolutePath)
         }
-    }
-
-    private fun installDxvk(root: File, hostPrefix: File, logDir: File, context: Context) {
-        val dxvk = File(root, "rootfs/opt/dxvk/x64")
-        val system32 = File(hostPrefix, "drive_c/windows/system32")
-        if (!File(dxvk, "d3d11.dll").isFile || !File(dxvk, "dxgi.dll").isFile) {
-            throw IOException("Payload DXVK x64 tidak lengkap.")
-        }
-        if (!system32.exists() && !system32.mkdirs()) {
-            throw IOException("Direktori Windows system32 tidak dapat dibuat.")
-        }
-
-        listOf("d3d11.dll", "dxgi.dll", "d3d10core.dll").forEach { name ->
-            val source = File(dxvk, name)
-            if (source.isFile) {
-                Files.copy(source.toPath(), File(system32, name).toPath(), StandardCopyOption.REPLACE_EXISTING)
-            }
-        }
-
-        val rootDir = File(context.filesDir, "runtime/wine")
-        val regD3d11 = runGuest(
-            context, rootDir, hostPrefix, logDir, "dxvk-reg-d3d11.log",
-            listOf("/opt/wine/bin/wine", "reg", "add", "HKCU\\Software\\Wine\\DllOverrides", "/v", "d3d11", "/d", "native", "/f")
-        )
-        if (!regD3d11.success) throw IOException("Registrasi DXVK d3d11 gagal: ${regD3d11.output.takeLast(1000)}")
-
-        val regDxgi = runGuest(
-            context, rootDir, hostPrefix, logDir, "dxvk-reg-dxgi.log",
-            listOf("/opt/wine/bin/wine", "reg", "add", "HKCU\\Software\\Wine\\DllOverrides", "/v", "dxgi", "/d", "native", "/f")
-        )
-        if (!regDxgi.success) throw IOException("Registrasi DXVK dxgi gagal: ${regDxgi.output.takeLast(1000)}")
     }
 
     private data class CommandResult(val success: Boolean, val exitCode: Int?, val output: String)
@@ -137,10 +104,10 @@ object WineRuntimeSession {
             File(rootfs, "usr/bin/box64").isFile -> "/usr/bin/box64"
             else -> throw IOException("Box64 tidak ditemukan di rootfs.")
         }
-        val proot = File(root, "bin/proot")
-        val loader = File(root, "libexec/proot/loader")
-        val loader32 = File(root, "libexec/proot/loader32")
-        if (!proot.canExecute() || !loader.isFile || !loader32.isFile) {
+        val nativeLibDir = File(context.applicationInfo.nativeLibraryDir)
+        val proot = File(nativeLibDir, "libproot.so")
+        val loader = File(nativeLibDir, "libproot-loader.so")
+        if (!proot.canExecute() || !loader.canExecute()) {
             throw IOException("PRoot atau companion loader tidak lengkap.")
         }
 
@@ -172,7 +139,6 @@ object WineRuntimeSession {
                     env["WINEDEBUG"] = "-all"
                     env["BOX64_LD_LIBRARY_PATH"] = "/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib"
                     env["PROOT_LOADER"] = loader.absolutePath
-                    env["PROOT_LOADER_32"] = loader32.absolutePath
                     env["PROOT_NO_SECCOMP"] = "1"
                     env["PATH"] = "/usr/local/bin:/usr/bin:/bin"
                     env.remove("DISPLAY")
