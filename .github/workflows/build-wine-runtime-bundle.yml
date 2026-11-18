@@ -125,7 +125,7 @@ jobs:
         run: |
           source runtime/scripts/ci-diagnostics.sh 02-download-debian-packages
           sudo chroot "$ROOTFS" /usr/bin/apt-get -o Dpkg::Use-Pty=0 update
-          PACKAGES="$(grep -Ev '^[[:space:]]*(#|$)' runtime/rootfs/packages-amd64.txt | tr '\\n' ' ')"
+          PACKAGES="$(grep -Ev '^[[:space:]]*(#|$)' runtime/rootfs/packages-amd64.txt | tr '\n' ' ')"
           sudo chroot "$ROOTFS" /usr/bin/apt-get -o Dpkg::Use-Pty=0 --download-only install -y --no-install-recommends $PACKAGES 2>&1 | tee -a logs/apt-get-download.log
 
       - name: Extract Debian package payloads and pinned Wine
@@ -137,7 +137,6 @@ jobs:
             architecture="$(dpkg-deb -f "$deb" Architecture)"
             if [ "$architecture" = "amd64" ] || [ "$architecture" = "all" ]; then
               sudo dpkg-deb -x "$deb" "$ROOTFS"
-              printf '%s\\n' "$(dpkg-deb -f "$deb" Package):$architecture=$(dpkg-deb -f "$deb" Version)" >> rootfs-package-manifest-amd64.txt
             fi
           done
           sudo cp -a "$ROOTFS/var/cache/apt/archives/." "$RUNNER_TEMP/apt-cache/archives/" 2>/dev/null || true
@@ -211,14 +210,14 @@ jobs:
                       rewritten += 1
           print("Rewrote %d absolute symlinks; all symlinks remain rootfs-confined." % rewritten)
           PY
-          sudo dpkg-query --admindir="$ROOTFS/var/lib/dpkg" -W -f='${Package}:${Architecture}=${Version}\\n' > rootfs-package-manifest.txt
+          sudo dpkg-query --admindir="$ROOTFS/var/lib/dpkg" -W -f='${Package}:${Architecture}=${Version}\n' > rootfs-package-manifest.txt
           cat rootfs-package-manifest-amd64.txt >> rootfs-package-manifest.txt
           mkdir -p rootfs-artifact/provenance/licenses
           cp runtime/licenses/WINE-LICENSE runtime/licenses/WINE-COPYING.LIB runtime/licenses/WINE-NOTICES.md rootfs-artifact/provenance/licenses/
           cp wine-lddtree.txt virgl-lddtree.txt rootfs-package-manifest.txt rootfs-size-before-trim.txt rootfs-size-after-trim.txt rootfs-artifact/provenance/
-          printf 'guest_driver=virgl_dri.so\\narchitecture=x86_64\\nsource=Debian Bookworm libgl1-mesa-dri\\ntransport=VirGL over X11/DRI3\\n' > rootfs-artifact/provenance/MESA-VIRGL-BUILD-INFO.txt
+          printf 'guest_driver=virgl_dri.so\narchitecture=x86_64\nsource=Debian Bookworm libgl1-mesa-dri\ntransport=VirGL over X11/DRI3\n' > rootfs-artifact/provenance/MESA-VIRGL-BUILD-INFO.txt
           sha256sum downloads/wine.tar.xz > rootfs-artifact/provenance/UPSTREAM-ARCHIVE-SHA256SUMS
-          printf 'debian_suite=%s\\nrootfs_arch=arm64\\nforeign_arch=amd64\\nbox64_profile=Snapdragon 888\\nwine=11.19-amd64\\ndxvk=not-bundled\\n' "$DEBIAN_SUITE" > rootfs-artifact/provenance/ROOTFS-BUILD-INFO.txt
+          printf 'debian_suite=%s\nrootfs_arch=arm64\nforeign_arch=amd64\nbox64_profile=Snapdragon 888\nwine=11.19-amd64\ndxvk=not-bundled\n' "$DEBIAN_SUITE" > rootfs-artifact/provenance/ROOTFS-BUILD-INFO.txt
           sudo tar --numeric-owner --xattrs --acls --exclude='rootfs/dev/*' \
             -czf "$GITHUB_WORKSPACE/rootfs-component.tar.gz" \
             -C "$GITHUB_WORKSPACE/rootfs-artifact" rootfs provenance
@@ -244,9 +243,9 @@ jobs:
           sudo dpkg --audit > runtime-failure-logs/dpkg-audit.txt 2>&1
           df -h > runtime-failure-logs/disk-space.txt
           free -h > runtime-failure-logs/memory.txt
-          printf 'DEBIAN_SUITE=%s\\nROOTFS=%s\\nRUNNER_TEMP=%s\\nGITHUB_WORKSPACE=%s\\n' "$DEBIAN_SUITE" "$ROOTFS" "$RUNNER_TEMP" "$GITHUB_WORKSPACE" > runtime-failure-logs/environment.txt
+          printf 'DEBIAN_SUITE=%s\nROOTFS=%s\nRUNNER_TEMP=%s\nGITHUB_WORKSPACE=%s\n' "$DEBIAN_SUITE" "$ROOTFS" "$RUNNER_TEMP" "$GITHUB_WORKSPACE" > runtime-failure-logs/environment.txt
           if [ -d "$ROOTFS" ]; then
-            sudo find "$ROOTFS" -maxdepth 5 -printf '%y %m %u:%g %s %p -> %l\\n' | head -n 1000 > runtime-failure-logs/rootfs-find.txt
+            sudo find "$ROOTFS" -maxdepth 5 -printf '%y %m %u:%g %s %p -> %l\n' | head -n 1000 > runtime-failure-logs/rootfs-find.txt
             sudo ls -lR "$ROOTFS" 2>&1 | head -n 1000 > runtime-failure-logs/rootfs-ls.txt
           else
             echo "ROOTFS directory does not exist: $ROOTFS" > runtime-failure-logs/rootfs-find.txt
@@ -329,7 +328,7 @@ jobs:
           python3 tools/validate_runtime_archive.py ghost-town-wine-runtime-arm64.tar.gz
           du -h ghost-town-wine-runtime-arm64.tar.gz
           python3 tools/audit_runtime_tree.py "$OUT" | tee runtime-tree-size-audit.txt
-          printf '\\nARCHIVE_BYTES=' >> runtime-tree-size-audit.txt
+          printf '\nARCHIVE_BYTES=' >> runtime-tree-size-audit.txt
           stat -c '%s' ghost-town-wine-runtime-arm64.tar.gz >> runtime-tree-size-audit.txt
       - name: Upload complete runtime bundle
         uses: actions/upload-artifact@v4
