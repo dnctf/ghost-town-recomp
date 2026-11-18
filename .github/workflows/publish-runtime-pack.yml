@@ -10,7 +10,7 @@ on:
       source_run_id:
         description: Successful runtime build run ID
         required: true
-        default: '44279571506'
+        default: '44283143664'
         type: string
 
 permissions:
@@ -23,11 +23,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      SOURCE_RUN_ID: ${{ inputs.source_run_id || '44279571506' }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id || '44283143664' }}
       RUNTIME_TAG: runtime-v0.5.0-alpha.2
-      BUILD_COMMIT: d15cc4e04bd8b311af1b4c4d70027ca0f84ec598
-      EXPECTED_SIZE: '354498740'
-      EXPECTED_SHA256: 9d4e17f055736c0113db1dcb355c619332a1479e84e2ca43f4fde64cc0f5c6a3
+      BUILD_COMMIT: f662dcc4036d251c460a47ded016ec793f634d37
+      EXPECTED_SIZE: '354535881'
+      EXPECTED_SHA256: 7a9600a22e0ef6ebef799cb4031c0c33310d1b2f7164d8d7aac70ed20f99edaf
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ghost-town-wine-runtime-0.5.0-alpha.2-arm64-debian-bookworm
-          run-id: ${{ inputs.source_run_id || '44279571506' }}
+          run-id: ${{ inputs.source_run_id || '44283143664' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: runtime-artifact
       - name: Verify checksum, exact size and archive contents
