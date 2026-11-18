@@ -6,6 +6,7 @@ ROOTFS="$(realpath "$ROOTFS")"
 case "$D_TIMEOUT" in 180|600) ;; *) echo "Unsupported wineboot timeout: $D_TIMEOUT" >&2; exit 64 ;; esac
 cleanup_mounts() {
   set +e
+  if [ -n "${LOG_TAIL_PID:-}" ]; then kill -TERM "$LOG_TAIL_PID" 2>/dev/null || true; wait "$LOG_TAIL_PID" 2>/dev/null || true; fi
   if [ -n "${WINESERVER_ENTRY:-}" ] && [ -x "$ROOTFS/usr/local/bin/box64" ]; then
     timeout --signal=TERM --kill-after=3s 8s sudo chroot "$ROOTFS" /usr/bin/env \
       BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
@@ -26,6 +27,7 @@ cleanup_mounts() {
 }
 trap cleanup_mounts EXIT
 XVFB_PID=""
+LOG_TAIL_PID=""
 test -x "$ROOTFS/usr/local/bin/box64"
 sudo test -e "$ROOTFS/usr/lib/x86_64-linux-gnu/libbsd.so.0"
 sudo test -e "$ROOTFS/usr/lib/x86_64-linux-gnu/libmd.so.0"
@@ -146,18 +148,29 @@ run_wineboot_d() {
     test -n "$BOX64_LD_LIBRARY_PATH"
     test -S /tmp/.X11-unix/X99
   ' | tee -a "$log"
+  echo "WINEBOOT_LIMIT_SECONDS=90 WINESERVER_WAIT_LIMIT_SECONDS=45" | tee -a "$log"
   start="$(date +%s)"
+  tail -n +1 -F "$log" &
+  LOG_TAIL_PID=$!
   set +e
   timeout --signal=TERM --kill-after=10s "${limit}s" sudo chroot "$ROOTFS" /usr/bin/env "${guest_env[@]}" /bin/sh -c '
-    set -e
     box64="$1"; wineboot_entry="$2"; wineserver_entry="$3"
-    "$box64" "$wineboot_entry" --init
+    echo "[GUEST] wineboot --init starting"
+    /usr/bin/timeout --signal=TERM --kill-after=5s 90s "$box64" "$wineboot_entry" --init
+    wineboot_rc=$?
+    echo "[GUEST] wineboot --init exit_code=$wineboot_rc"
+    [ "$wineboot_rc" -eq 0 ] || exit "$wineboot_rc"
+    echo "[GUEST] wineserver -w starting"
     /usr/bin/timeout --signal=TERM --kill-after=5s 45s "$box64" "$wineserver_entry" -w
+    wait_rc=$?
+    echo "[GUEST] wineserver -w exit_code=$wait_rc"
+    [ "$wait_rc" -eq 0 ] || exit "$wait_rc"
     test -s "$WINEPREFIX/system.reg"
     test -s "$WINEPREFIX/user.reg"
   ' _ /usr/local/bin/box64 "$WINEBOOT_ENTRY" "$WINESERVER_ENTRY" >> "$log" 2>&1
   rc=$?
   set -e
+  if [ -n "$LOG_TAIL_PID" ]; then kill -TERM "$LOG_TAIL_PID" 2>/dev/null || true; wait "$LOG_TAIL_PID" 2>/dev/null || true; LOG_TAIL_PID=""; fi
   elapsed=$(( $(date +%s) - start ))
   if [ "$rc" -eq 0 ]; then
     for registry in system.reg user.reg; do
