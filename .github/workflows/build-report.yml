@@ -16,7 +16,7 @@ jobs:
     name: Generate always-on build report
     if: always()
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout exact build commit
         uses: actions/checkout@v4
@@ -26,20 +26,102 @@ jobs:
           path: artifacts
           merge-multiple: true
         continue-on-error: true
+      - name: Fetch GitHub run, jobs, artifacts and previous APK baseline
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT_WORKFLOW: ${{ inputs.workflow_name }}
+        run: |
+          set +e
+          mkdir -p reports previous-apk artifacts
+          API_OK=1
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > reports/run.json || API_OK=0
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" > reports/jobs.json || API_OK=0
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" > reports/artifacts.json || API_OK=0
+          if [ "$API_OK" -eq 1 ]; then
+            echo "REPORT_API_STATUS=ok" >> "$GITHUB_ENV"
+          else
+            echo "REPORT_API_STATUS=failed" >> "$GITHUB_ENV"
+          fi
+          echo "REPORT_RUN_JSON_FILE=reports/run.json" >> "$GITHUB_ENV"
+          echo "REPORT_JOBS_JSON_FILE=reports/jobs.json" >> "$GITHUB_ENV"
+          echo "REPORT_ARTIFACTS_JSON_FILE=reports/artifacts.json" >> "$GITHUB_ENV"
+          echo "REPORT_PREVIOUS_APK_DIR=previous-apk" >> "$GITHUB_ENV"
+          echo "REPORT_RUNNER_MACHINE=$(uname -m)" >> "$GITHUB_ENV"
+          echo "REPORT_RUNNER_NPROC=$(nproc)" >> "$GITHUB_ENV"
+          echo "REPORT_RUNNER_RAM=$(awk '/MemTotal/ {printf \"%d MiB\", $2/1024}' /proc/meminfo)" >> "$GITHUB_ENV"
+          gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq '.commit.message' > reports/commit-message.txt
+          if [ -s reports/commit-message.txt ]; then
+            echo "REPORT_COMMIT_MESSAGE<<REPORT_COMMIT_EOF" >> "$GITHUB_ENV"
+            cat reports/commit-message.txt >> "$GITHUB_ENV"
+            echo "REPORT_COMMIT_EOF" >> "$GITHUB_ENV"
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq '[.files[].filename] | join(\"; \")' > reports/changed-files.txt
+          if [ -s reports/changed-files.txt ]; then
+            echo "REPORT_CHANGED_FILES=$(cat reports/changed-files.txt)" >> "$GITHUB_ENV"
+          fi
+          if [[ "$REPORT_WORKFLOW" == *APK* ]] && [ "$API_OK" -eq 1 ]; then
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" > reports/recent-runs.json
+            python3 - <<'PY' > reports/previous-apk-candidates.txt
+          import json, os
+          d=json.load(open("reports/recent-runs.json"))
+          current=int(os.environ["GITHUB_RUN_ID"])
+          name=os.environ["REPORT_WORKFLOW"]
+          for r in d.get("workflow_runs",[]):
+              if r.get("id") != current and r.get("name") == name and r.get("conclusion") == "success":
+                  print(r["id"])
+          PY
+            while IFS= read -r candidate; do
+              [ -n "$candidate" ] || continue
+              if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate/artifacts" --jq '.artifacts[] | select(.name == "apk-size-audit") | .id' | grep -q .; then
+                if gh run download "$candidate" --repo "$GITHUB_REPOSITORY" --name apk-size-audit --dir previous-apk; then
+                  echo "REPORT_PREVIOUS_APK_RUN=$candidate" >> "$GITHUB_ENV"
+                  break
+                fi
+              fi
+            done < reports/previous-apk-candidates.txt
+          fi
+          exit 0
       - name: Generate quote-box report
+        if: always()
         env:
           REPORT_WORKFLOW: ${{ inputs.workflow_name }}
           REPORT_JOB_RESULTS: ${{ inputs.job_results }}
           REPORT_ARTIFACT_DIR: artifacts
-          REPORT_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          REPORT_RUN_JSON_FILE: reports/run.json
+          REPORT_JOBS_JSON_FILE: reports/jobs.json
+          REPORT_ARTIFACTS_JSON_FILE: reports/artifacts.json
+          REPORT_API_STATUS: ${{ env.REPORT_API_STATUS }}
+          REPORT_PREVIOUS_APK_DIR: previous-apk
+          REPORT_PREVIOUS_APK_RUN: ${{ env.REPORT_PREVIOUS_APK_RUN }}
+          REPORT_COMMIT_MESSAGE: ${{ env.REPORT_COMMIT_MESSAGE }}
+          REPORT_CHANGED_FILES: ${{ env.REPORT_CHANGED_FILES }}
+          REPORT_RUNNER_MACHINE: ${{ env.REPORT_RUNNER_MACHINE }}
+          REPORT_RUNNER_NPROC: ${{ env.REPORT_RUNNER_NPROC }}
+          REPORT_RUNNER_RAM: ${{ env.REPORT_RUNNER_RAM }}
         run: |
           mkdir -p reports
           bash tools/build-report.sh reports
+      - name: Ensure a fallback report exists
+        if: always()
+        run: |
+          mkdir -p reports
+          if ! compgen -G 'reports/build-report-*.md' >/dev/null; then
+            {
+              echo '> # LAPORAN BUILD — ${{ inputs.workflow_name }} #${{ github.run_number }}'
+              echo '> **Waktu:** TIDAK TERSEDIA'
+              echo '> **Repo/Branch:** ${{ github.repository }} / ${{ github.ref_name }}'
+              echo '> **Commit:** ${{ github.sha }}'
+              echo '> **Hasil keseluruhan:** TIDAK TERSEDIA'
+              echo '> Laporan detail gagal dibuat; periksa job log. Data tidak boleh dianggap sukses.'
+            } > reports/build-report-fallback.md
+            cat reports/build-report-fallback.md >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Upload report artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-report-${{ github.workflow }}-${{ github.run_number }}
-          path: reports/
+          path: reports/build-report-*.md
           if-no-files-found: error
           retention-days: 30
