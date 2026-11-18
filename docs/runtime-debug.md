@@ -98,3 +98,32 @@ The next diagnostics collection writes complete inventories to files before trun
 - Added `runtime/scripts/ci-wine-smoke.sh`: sequential rungs a-e; exits at first failed rung; dynamic `wine`/`wine64` and `wineboot` detection; per-rung logs and selected entry-point listing.
 - Runtime smoke logs upload with `if: always()`. The smoke is executed on a native ARM64 CI runner and does not imply Android-device validation.
 - Standalone Wine experiment is deferred until rung c or d fails, or Debian Wine proves unstable. No alternate Wine build is added now.
+
+
+## Smoke ladder Run #38
+
+- Run: [44227356269](https://github.com/dnctf/ghost-town-recomp/actions/runs/44227356269), commit `6259ffee02969d8206edd7bad754d80a5c0574f2`, completed **failure**.
+- Box64 ARM64 build succeeded and uploaded artifact `box64-arm64-glibc-sd888` (6,694,447 bytes). Rootfs bootstrap, package download/extraction, Wine fatal validation and advisory graphics inventory all passed.
+- Rootfs failed at `Trim and package rootfs component`; assemble was skipped. **No rung a-e ran** and there are no rung exit codes, durations, or pass/fail log lines.
+- Exact evidence from `logs/05-trim-package-rootfs.log`:
+  ```
+  du: cannot read directory '.../rootfs/var/cache/ldconfig': Permission denied
+  du: cannot read directory '.../rootfs/var/cache/apt/archives/partial': Permission denied
+  du: cannot read directory '.../rootfs/etc/ssl/private': Permission denied
+  [ERROR] stage=05-trim-package-rootfs line=2 exit_code=1 command=du -sb "$ROOTFS" > rootfs-size-before-trim.txt
+  ```
+- Root cause: root-owned rootfs directories are unreadable by the runner account; unprivileged GNU `du` returned exit code 1. This is a permissions/measurement failure, not a Wine/Box64 execution failure.
+- Minimal correction: pre-trim and post-trim byte measurements now use `sudo du -sb`; rootfs content and trim policy are unchanged.
+- Downloaded and inspected [runtime-build-diagnostics artifact](https://github.com/dnctf/ghost-town-recomp/actions/runs/44227356269/artifacts/14392959332). It contains stage logs, full find/list inventories, symlink inventory, key directories, package audit, tool versions and rootfs size. No smoke artifact exists because assemble was skipped.
+- Rootfs size from the always-run diagnostic collector: `1,724,121,646` bytes. No valid before/after trimming measurement was produced.
+- Native runner and chroot mount details were not explicitly logged as smoke diagnostics in Run #38.
+
+| Rung | Status | Command | Exit code | Duration | Evidence |
+|---|---|---|---:|---:|---|
+| a | NOT RUN | `box64 --version` | — | — | Assemble job skipped |
+| b | NOT RUN | Box64 runs x86_64 `wineserver --version` | — | — | Assemble job skipped |
+| c | NOT RUN | `box64 wine --version` | — | — | Assemble job skipped |
+| d | NOT RUN | `wineboot` with temporary prefix and `WINEDLLOVERRIDES=mscoree,mshtml=` | — | — | Assemble job skipped |
+| e | NOT RUN | `wine cmd /c ver` | — | — | Assemble job skipped |
+
+- Standalone Wine remains deferred: rung c/d has not been reached and Debian Wine has not demonstrated instability.

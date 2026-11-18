@@ -186,7 +186,7 @@ jobs:
       - name: Trim and package rootfs component
         run: |
           source runtime/scripts/ci-diagnostics.sh 05-trim-package-rootfs
-          du -sb "$ROOTFS" > rootfs-size-before-trim.txt
+          sudo du -sb "$ROOTFS" > rootfs-size-before-trim.txt
           sudo chroot "$ROOTFS" /usr/bin/apt-get -o Dpkg::Use-Pty=0 clean
           sudo rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/usr/share/man/"* "$ROOTFS/usr/share/info/"*
           sudo rm -rf "$ROOTFS/var/cache/"*
@@ -197,7 +197,7 @@ jobs:
           sudo find "$ROOTFS" -type d -name __pycache__ -prune -exec rm -rf {} +
           sudo find "$ROOTFS/usr/share/doc" -type f ! -name copyright -delete
           sudo find "$ROOTFS/usr/share/doc" -mindepth 1 -type d -empty -delete
-          du -sb "$ROOTFS" > rootfs-size-after-trim.txt
+          sudo du -sb "$ROOTFS" > rootfs-size-after-trim.txt
           sudo python3 - "$ROOTFS" <<'PY'
           import os
           import sys
