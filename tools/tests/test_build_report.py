@@ -2,7 +2,7 @@ import json, os, subprocess, tempfile, unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 class ReportTests(unittest.TestCase):
- def run_report(self, artifacts, jobs, workflow="Example", api_status="failed", run=None, api_jobs=None):
+ def run_report(self, artifacts, jobs, workflow="Runtime Example", api_status="failed", run=None, api_jobs=None):
   with tempfile.TemporaryDirectory() as t:
    root=Path(t); art=root/"artifacts"; art.mkdir()
    for n,c in artifacts.items():
@@ -14,7 +14,7 @@ class ReportTests(unittest.TestCase):
    if api_jobs is not None:
     p=root/"jobs.json"; p.write_text(json.dumps(api_jobs)); env["REPORT_JOBS_JSON_FILE"]=str(p)
    result=subprocess.run(["bash",str(ROOT/"tools/build-report.sh"),str(root/"reports")],env=env,capture_output=True,text=True)
-   if result.returncode: raise AssertionError(result.stderr+"\\n"+result.stdout)
+   if result.returncode: raise AssertionError(result.stderr+"\n"+result.stdout)
    return next((root/"reports").glob("*.md")).read_text()
  def test_api_failure_marks_only_api_fields_unavailable(self):
   x=self.run_report({},'{"compile":{"result":"failure"}}',api_status="failed")
@@ -32,10 +32,10 @@ class ReportTests(unittest.TestCase):
   self.assertIn("50s (50s)",x)
  def test_runtime_failure_midway_keeps_partial_ladder(self):
   logs={
-   "a-box64-version.log":"exit_code=0\\nduration_seconds=1\\nBox64 arm64 v0.4.5\\n",
-   "b-x86_64-utility.log":"exit_code=0\\nduration_seconds=1\\nWine 11.19\\n",
-   "c-wine-version.log":"wine-11.19\\nexit_code=0\\nduration_seconds=1\\n",
-   "d-wineboot.log":"[RUN] rung=d-wineboot timeout_seconds=600\\nSIGSEGV\\nexit_code=124\\nduration_seconds=600\\n"
+   "a-box64-version.log":"exit_code=0\nduration_seconds=1\nBox64 arm64 v0.4.5\n",
+   "b-x86_64-utility.log":"exit_code=0\nduration_seconds=1\nWine 11.19\n",
+   "c-wine-version.log":"wine-11.19\nexit_code=0\nduration_seconds=1\n",
+   "d-wineboot.log":"[RUN] rung=d-wineboot timeout_seconds=600\nSIGSEGV\nexit_code=124\nduration_seconds=600\n"
   }
   x=self.run_report(logs,'{"rootfs":{"result":"failure"}}',workflow="Build Complete Wine Runtime",api_status="failed")
   self.assertIn("| d | box64 wineboot | 124 | 600 | TIMEOUT |",x)
@@ -48,6 +48,6 @@ class ReportTests(unittest.TestCase):
   self.assertIn("durasi total 20s (20s)",x)
   self.assertIn("10s (10s)",x)
  def test_success_log(self):
-  x=self.run_report({"a-box64-version.log":"exit_code=0\\nduration_seconds=1\\nBox64 arm64 v0.4.5\\n"},'{"smoke":{"result":"success"}}')
+  x=self.run_report({"a-box64-version.log":"exit_code=0\nduration_seconds=1\nBox64 arm64 v0.4.5\n"},'{"smoke":{"result":"success"}}')
   self.assertIn("| a | box64 --version | 0 | 1 | PASS |",x)
 if __name__=="__main__": unittest.main()
