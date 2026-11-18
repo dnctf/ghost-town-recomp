@@ -178,3 +178,17 @@ The next diagnostics collection writes complete inventories to files before trun
 - Box64 is now built inside a native ARM64 `debian:bookworm` job container. The build records `ldd --version`, the top three GLIBC symbol versions, and fails if the binary requires a version newer than the build container. The rootfs job independently compares the binary's maximum required GLIBC symbol against its installed `libc6:arm64` package before rung a.
 - The rootfs job now depends on the Box64 build artifact, repairs the evidenced ARM64 `/lib` loader/library paths, installs Box64, and executes rungs a-e on the **untrimmed** rootfs. The smoke artifact upload is a separate `if: always()` step before trim, so a trim failure cannot erase the smoke result. Trim uses host-side `sudo rm -rf` only; no rootfs executable is run during cleanup. Before/after sizes remain measured with `sudo du -sb`.
 - Run #39 itself did not run any smoke rung: the workflow stopped at trim before assembly. All rung results remain **NOT RUN** until a later run provides per-rung logs.
+
+
+## Run #40: Bookworm container shell selection
+
+- Run: [44234796366](https://github.com/dnctf/ghost-town-recomp/actions/runs/44234796366), commit `583fbb33d408dc379a16baaefa69568cc37ea986`, failed in the first Box64 container setup step before package installation or compilation.
+- Exact log:
+  ```
+  shell: sh -e {0}
+  /__w/_temp/748e20fe-b3da-486f-8106-6962e59c80ce.sh: 1: set: Illegal option -o pipefail
+  [error] Process completed with exit code 2.
+  ```
+- Root cause: GitHub Actions selected POSIX `sh` inside the Debian job container, while the step uses Bash's `pipefail` option. This is a shell-selection/configuration failure, not a package or compiler failure.
+- Fix: set job-level `defaults.run.shell: bash` for the Bookworm Box64 container job. No package, compiler, Box64 source, or runtime behavior changed.
+- Box64 compilation did not run; the rootfs dependency job was not reached. Smoke ladder a-e remains **NOT RUN**.
