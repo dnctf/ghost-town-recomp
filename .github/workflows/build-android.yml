@@ -143,6 +143,7 @@ jobs:
           for apk in android/app/build/outputs/apk/debug/*.apk android/app/build/outputs/apk/release/*.apk; do
             [ -f "$apk" ] || continue
             python3 tools/audit_apk_size.py "$apk" | tee "size-audit/$(basename "$apk").txt"
+            sha256sum "$apk" | tee -a "size-audit/$(basename "$apk").txt"
           done
           test -s size-audit/app-release.apk.txt
       - name: Upload APK size audit
