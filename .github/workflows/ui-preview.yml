@@ -1,0 +1,145 @@
+name: Ghost Town UI Preview APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/app/build.gradle'
+      - 'android/app/src/main/**'
+      - 'android/app/src/test/**'
+      - 'android/build.gradle'
+      - 'android/settings.gradle'
+      - 'android/gradle.properties'
+      - 'docs/design-tokens.md'
+      - 'docs/ui/**'
+      - 'docs/ui-preview.md'
+      - '.github/workflows/ui-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ghost-town-ui-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-preview:
+    name: Lint, test and build installable UI preview
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout UI source
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Initialize native source dependencies
+        run: |
+          git submodule update --init --recursive external/libadrenotools
+          git submodule update --init external/winlatorxr
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 build-tools;34.0.0 ndk;26.3.11579264 ndk;28.2.13676358 cmake;3.22.1'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.5'
+
+      - name: Build native libraries required by the existing app module
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmake/3.22.1/bin/cmake" \
+            -S android/native \
+            -B build-native-arm64 \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/26.3.11579264/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-29 \
+            -DANDROID_STL=c++_static \
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384" \
+            -DCMAKE_BUILD_TYPE=Release
+          "$ANDROID_HOME/cmake/3.22.1/bin/cmake" --build build-native-arm64 -j"$(nproc)"
+          find build-native-arm64 -type f -name '*.so' -print | sort | tee native-libraries.txt
+          test -n "$(find build-native-arm64 -type f -name 'libvirglrenderer.so' -print -quit)"
+          test -n "$(find build-native-arm64 -type f -name 'libwinlator.so' -print -quit)"
+
+      - name: Build W^X-safe ARM64 PRoot libraries
+        run: |
+          set -euo pipefail
+          git clone https://github.com/berilevi/proot-static.git proot-src
+          git -C proot-src checkout --detach 6f8ebfd8e24887dfba64c3f2d7d5fe9dc059b60e
+          git -C proot-src rev-parse HEAD > proot-upstream-commit.txt
+          cd proot-src
+          NDK="$ANDROID_HOME/ndk/28.2.13676358" \
+          OUT="$RUNNER_TEMP/proot-static-build" \
+          REPO_ARTIFACT_DIR="$GITHUB_WORKSPACE/proot-src/dist/aarch64" \
+            tools/build-static-aarch64.sh
+          cd "$GITHUB_WORKSPACE"
+          DEST="android/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$DEST" android/app/src/main/assets/licenses
+          install -m 0755 proot-src/dist/aarch64/proot "$DEST/libproot.so"
+          install -m 0755 proot-src/dist/aarch64/loader "$DEST/libproot-loader.so"
+          install -m 0644 proot-src/COPYING android/app/src/main/assets/licenses/PROOT-COPYING
+          for f in "$DEST/libproot.so" "$DEST/libproot-loader.so"; do
+            readelf -h "$f" | grep -q 'Class:.*ELF64'
+            readelf -h "$f" | grep -q 'Machine:.*AArch64'
+            if readelf -l "$f" | grep -q 'Requesting program interpreter'; then
+              echo "PRoot must be statically linked: $f" >&2
+              exit 1
+            fi
+          done
+          sha256sum "$DEST"/*.so | tee proot-native-sha256.txt
+
+      - name: Run Play launch-state unit tests, lint and build debug APK
+        working-directory: android
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Audit APK contents and compare package size
+        id: apk-audit
+        run: |
+          set -euo pipefail
+          APK="$(find android/app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)"
+          test -s "$APK"
+          mkdir -p ui-preview-report
+          python3 tools/audit_apk_size.py "$APK" | tee ui-preview-report/apk-size-audit.txt
+          unzip -lv "$APK" | tail -n 8 | tee ui-preview-report/unzip-summary.txt
+          APK_BYTES="$(stat -c '%s' "$APK")"
+          BASELINE_APK_BYTES=13135290
+          DELTA_BYTES="$((APK_BYTES - BASELINE_APK_BYTES))"
+          python3 - "$APK_BYTES" "$BASELINE_APK_BYTES" "$DELTA_BYTES" <<'PY' | tee ui-preview-report/apk-size-delta.txt
+          import sys
+          current, baseline, delta = map(int, sys.argv[1:])
+          pct = (delta * 100.0 / baseline) if baseline else 0.0
+          print(f"baseline_debug_apk_bytes={baseline}")
+          print(f"preview_debug_apk_bytes={current}")
+          print(f"delta_bytes={delta:+d}")
+          print(f"delta_percent={pct:+.2f}%")
+          print("baseline_source=Run 44224359054 artifact app-debug.apk.txt (same app/native source before UI-only commits)")
+          PY
+          grep -q '^EMBEDDED_RUNTIME_PARTS=0$' ui-preview-report/apk-size-audit.txt
+          echo "apk_path=$APK" >> "$GITHUB_OUTPUT"
+          echo "apk_bytes=$APK_BYTES" >> "$GITHUB_OUTPUT"
+
+      - name: Upload installable UI preview APK and reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghost-town-ui-preview-0.5.0-alpha.2-${{ github.sha }}
+          path: |
+            ${{ steps.apk-audit.outputs.apk_path }}
+            ui-preview-report/
+            native-libraries.txt
+            proot-native-sha256.txt
+            proot-upstream-commit.txt
+            docs/design-tokens.md
+            docs/ui-preview.md
+          if-no-files-found: error
+          retention-days: 30
