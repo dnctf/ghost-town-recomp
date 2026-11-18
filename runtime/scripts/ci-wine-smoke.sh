@@ -97,15 +97,27 @@ run_wineboot_d() {
     echo "command=sudo chroot ROOTFS env ... box64 $WINEBOOT_ENTRY"
   } | tee "$log"
   setsid --wait bash -o pipefail -c '
-    rootfs="$1"; entry="$2"; logfile="$3"
+    rootfs="$1"; entry="$2"; logfile="$3"; wineserver_entry="$4"
     sudo chroot "$rootfs" env \
       BOX64_LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib \
       BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all,+timestamp,+process \
       HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke TMPDIR=/tmp \
       WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix WINEDLLOVERRIDES=mscoree,mshtml= \
-      DISPLAY=:99 FONTCONFIG_FILE=/etc/fonts/fonts.conf WAYLAND_DISPLAY= /usr/local/bin/box64 "$entry" 2>&1 |
+      DISPLAY=:99 FONTCONFIG_FILE=/etc/fonts/fonts.conf WAYLAND_DISPLAY= \
+      /usr/local/bin/box64 "$entry" --init 2>&1 |
       while IFS= read -r line; do printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$line"; done >> "$logfile"
-  ' _ "$ROOTFS" "$WINEBOOT_ENTRY" "$log" &
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+      sudo chroot "$rootfs" env \
+        BOX64_LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/opt/wine/lib64:/opt/wine/lib \
+        HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke \
+        WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix \
+        DISPLAY=:99 FONTCONFIG_FILE=/etc/fonts/fonts.conf \
+        /usr/local/bin/box64 "$wineserver_entry" -w
+      rc=$?
+    fi
+    exit "$rc"
+  ' _ "$ROOTFS" "$WINEBOOT_ENTRY" "$log" "$WINESERVER_ENTRY" &
   D_SUPERVISOR_PID=$!
   D_PID="$D_SUPERVISOR_PID"
   printf "%s\\n" "$D_PID" > "$LOG_DIR/d-process.pid"
@@ -133,6 +145,17 @@ run_wineboot_d() {
   fi
   set +e; wait "$D_SUPERVISOR_PID"; rc=$?; set -e
   [ "$timed_out" -eq 0 ] || rc=124
+  if [ "$rc" -eq 0 ]; then
+    for registry in system.reg user.reg; do
+      if ! sudo test -s "$ROOTFS/tmp/ghost-town-wine-smoke-prefix/$registry"; then
+        echo "[FAIL] missing or empty registry: $registry" | tee -a "$log"
+        rc=66
+      else
+        bytes="$(sudo stat -c %s "$ROOTFS/tmp/ghost-town-wine-smoke-prefix/$registry")"
+        echo "[PASS] registry=$registry bytes=$bytes" | tee -a "$log"
+      fi
+    done
+  fi
   snapshot_d final
   grep -E '\[BOX64\]' "$log" > "$LOG_DIR/d-box64.log" || true
   grep -E 'wineserver|wineboot|wine ' "$LOG_DIR/d-snapshots"/*-wine-processes.txt > "$LOG_DIR/d-wineserver-processes.log" || true
