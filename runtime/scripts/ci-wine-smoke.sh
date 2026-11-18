@@ -9,7 +9,7 @@ cleanup_mounts() {
   if [ -n "${WINESERVER_ENTRY:-}" ] && [ -x "$ROOTFS/usr/local/bin/box64" ]; then
     timeout --signal=TERM --kill-after=3s 8s sudo chroot "$ROOTFS" /usr/bin/env \
       BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
-      BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
+      BOX64_LD_PRELOAD=libmd.so.0:libbsd.so.0 BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
       HOME=/tmp/ghost-town-wine-smoke-home USER=wine-smoke \
       WINEARCH=win64 WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix \
       /usr/local/bin/box64 "$WINESERVER_ENTRY" -k >> "$LOG_DIR/cleanup-wineserver.log" 2>&1
@@ -27,6 +27,8 @@ cleanup_mounts() {
 trap cleanup_mounts EXIT
 XVFB_PID=""
 test -x "$ROOTFS/usr/local/bin/box64"
+sudo test -e "$ROOTFS/usr/lib/x86_64-linux-gnu/libbsd.so.0"
+sudo test -e "$ROOTFS/usr/lib/x86_64-linux-gnu/libmd.so.0"
 command -v Xvfb >/dev/null 2>&1 || { echo "[FAIL] Xvfb missing on CI host" >&2; exit 1; }
 Xvfb :99 -screen 0 1024x768x24 -nolisten tcp -ac > "$LOG_DIR/xvfb.log" 2>&1 &
 XVFB_PID=$!
@@ -71,13 +73,13 @@ run_rung() {
   start="$(date +%s)"
   {
     echo "[RUN] rung=$rung timeout_seconds=$limit"
-    echo "environment: DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe FONTCONFIG_FILE=/etc/fonts/fonts.conf BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib BOX64_PRELOAD=libmd.so.0:libbsd.so.0"
+    echo "environment: DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe FONTCONFIG_FILE=/etc/fonts/fonts.conf BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib BOX64_LD_PRELOAD=libmd.so.0:libbsd.so.0 BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0"
     printf 'command='; printf '%q ' "$@"; echo
   } | tee "$log"
   set +e
   timeout --signal=TERM --kill-after=10s "$limit"s sudo chroot "$ROOTFS" /usr/bin/env \
     BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib \
-    BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
+    BOX64_LD_PRELOAD=libmd.so.0:libbsd.so.0 BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0 \
     BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all \
     DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
     FONTCONFIG_FILE=/etc/fonts/fonts.conf WAYLAND_DISPLAY= \
@@ -121,7 +123,7 @@ run_wineboot_d() {
   sudo mkdir -p "$ROOTFS/tmp/ghost-town-wine-smoke-home"
   local -a guest_env=(
     BOX64_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/opt/wine/lib/wine/x86_64-unix:/opt/wine/lib64:/opt/wine/lib
-    BOX64_PRELOAD=libmd.so.0:libbsd.so.0
+    BOX64_LD_PRELOAD=libmd.so.0:libbsd.so.0 BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0
     BOX64_LOG=1 BOX64_SHOWSEGV=1 WINEDEBUG=err+all,+timestamp,+process
     DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe
     FONTCONFIG_FILE=/etc/fonts/fonts.conf WAYLAND_DISPLAY=
@@ -132,7 +134,7 @@ run_wineboot_d() {
   {
     echo "[RUN] rung=d-wineboot timeout_seconds=$limit"
     echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "environment: DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe FONTCONFIG_FILE=/etc/fonts/fonts.conf BOX64_LD_LIBRARY_PATH=${guest_env[0]#BOX64_LD_LIBRARY_PATH=} BOX64_PRELOAD=libmd.so.0:libbsd.so.0 WINEDLLOVERRIDES=mscoree,mshtml= WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix"
+    echo "environment: DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe FONTCONFIG_FILE=/etc/fonts/fonts.conf BOX64_LD_LIBRARY_PATH=${guest_env[0]#BOX64_LD_LIBRARY_PATH=} BOX64_LD_PRELOAD=libmd.so.0:libbsd.so.0 BOX64_EMULATED_LIBS=libbsd.so.0:libmd.so.0 BOX64_PRELOAD=libmd.so.0:libbsd.so.0 WINEDLLOVERRIDES=mscoree,mshtml= WINEPREFIX=/tmp/ghost-town-wine-smoke-prefix"
     echo "command=sudo chroot ROOTFS /usr/bin/env ... box64 wineboot --init; box64 wineserver -w"
   } | tee "$log"
   sudo chroot "$ROOTFS" /usr/bin/env "${guest_env[@]}" /bin/sh -c '
@@ -169,6 +171,10 @@ run_wineboot_d() {
   fi
   timeout --signal=TERM --kill-after=3s 8s sudo chroot "$ROOTFS" /usr/bin/env "${guest_env[@]}" /usr/local/bin/box64 "$WINESERVER_ENTRY" -k >> "$LOG_DIR/d-wineserver-kill.log" 2>&1 || true
   grep -F '[BOX64]' "$log" > "$LOG_DIR/d-box64.log" || true
+  if grep -Eq 'Symbol (strunvis|vis|strvis) not found' "$log"; then
+    echo "[FAIL] libedit BSD symbols remain unresolved after Box64 preload" | tee -a "$log"
+    rc=67
+  fi
   { echo "exit_code=$rc"; echo "duration_seconds=$elapsed"; echo "timeout_seconds=$limit"; echo "box64_log_lines=$(wc -l < "$LOG_DIR/d-box64.log")"; } | tee -a "$log"
   if [ "$rc" -ne 0 ]; then
     if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then echo "[TIMEOUT] rung=d-wineboot elapsed_seconds=$elapsed" | tee -a "$log"; fi
