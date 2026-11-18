@@ -132,6 +132,23 @@ jobs:
           done
           sha256sum "$DEST"/*.so | tee proot-native-sha256.txt
 
+      - name: Verify active runtime manifest included in APK
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          pack = json.loads(Path("runtime/manifest.json").read_text())["runtime_pack"]
+          assert pack["status"] == "published", "runtime pack is not published"
+          assert pack["version"] == "0.5.0-alpha.2"
+          assert pack["url"] == "https://github.com/dnctf/ghost-town-recomp/releases/download/runtime-v0.5.0-alpha.2/ghost-town-wine-runtime-arm64.tar.gz"
+          assert pack["size_bytes"] == 354535881
+          assert pack["sha256"] == "7a9600a22e0ef6ebef799cb4031c0c33310d1b2f7164d8d7aac70ed20f99edaf"
+          assert pack["expanded_size_bytes"] == 1541355744
+          print("Published runtime manifest verified for APK packaging")
+          PY
+
       - name: Build debug and release APK
         working-directory: android
         run: gradle testDebugUnitTest assembleDebug assembleRelease --no-daemon --stacktrace
