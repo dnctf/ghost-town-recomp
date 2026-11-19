@@ -64,3 +64,57 @@ The launcher should own game discovery, user-selected paths, runtime selection, 
 ## Explicit non-claims
 
 No listed game is certified playable by this audit. File detection, metadata parsing, native compilation, and Vulkan surface creation are not equivalent to successful gameplay.
+
+## Dedicated game-session lifecycle refactor (2026-11-19)
+
+- Added a platform-independent `GameSessionStateMachine` to validate launch/session transitions without coupling it to Android Activity, Wine, X11, or Vulkan operations.
+- States cover preparation, file validation, runtime initialization, GPU initialization, loading, session start, running, stopping, stopped, failed, and crashed.
+- Failed/crashed states preserve the stage at which failure occurred and can retry from preparation. Invalid transitions are rejected.
+- Foundation only: this lifecycle is not yet wired into the existing Activity/runtime pipeline and does not claim to launch or render a game. Integration is gated on build/test verification.
+
+## Game-library integration audit (2026-11-19)
+
+The current branch was rechecked after the dedicated-session lifecycle addition. Existing components should be reused rather than duplicated:
+
+- `GameStorageVerifier.java` detects Unity data-folder markers, Mono `Assembly-CSharp.dll`, IL2CPP `global-metadata.dat`, parses Windows PE executable headers, and calculates SHA-256 for inspected binaries.
+- `GameFileImporter.java` supports SAF-based EXE import, ZIP extraction, and recursive folder copying into app-private storage.
+- `tools/game_installation_probe.py` independently inspects a Windows Unity installation layout and reports whether executable, UnityPlayer, data directory, and Mono/IL2CPP metadata are present. It correctly labels this as installation completeness, not runtime compatibility.
+- `RuntimeLaunchGate.kt` gates on installed runtime and a display marker; it does not prove a game-specific session is launchable.
+- `DashboardActivity.kt` still uses demo game entries and the UI-preview preference for the selected library folder. The library picker currently records the SAF URI; the demo dashboard is not yet a live game catalog.
+
+### Integration gaps / next sequence
+
+1. Replace demo game records with a real catalog backed by the selected SAF directory or imported app-private files.
+2. Make scanning asynchronous and bounded; report scan progress and cancellation, and avoid hashing entire game payloads during each dashboard refresh.
+3. Reuse `GameStorageVerifier` for PE and Unity metadata checks. Distinguish `DATA_ONLY`, `EXE_ONLY`, `INCOMPLETE`, `INSTALLATION_COMPLETE`, `UNSUPPORTED_ARCH`, and `RUNTIME_UNAVAILABLE`; never translate file detection into `READY_TO_PLAY`.
+4. Persist catalog records and their source URI/path with permission revalidation. Do not assume persisted SAF access remains valid.
+5. Integrate the state machine only after catalog validation is connected to the launch controller. Keep legacy Wine/X11/Vulkan compatibility code until replacement paths have CI and device evidence.
+
+### CI verification for this branch
+
+GitHub Actions run #319 completed successfully on the branch commit. Reported jobs passed: Python probe tests, Android ARM64 native/APK build (debug and release), Android lint, APK size audit, and artifact upload. The workflow runs `gradle testDebugUnitTest` as part of the Android build step. CI success is compile/test/package evidence only; it is not physical-device or gameplay evidence.
+
+
+## Autonomous refactoring foundations (stages 2–7)
+
+This branch adds isolated foundations without enabling game launch in the UI:
+
+- GameInstallationRegistry.kt: file-backed catalog using Properties, temporary-file promotion, stable root IDs, CRUD and snapshots.
+- GameValidationPipeline.kt: conservative filesystem validation, executable containment, architecture allow-list, Unity core + Mono/IL2CPP marker, SHA-256 fingerprint. Validation is file evidence only and never executes the EXE.
+- GameRuntimeController.kt: serialized lifecycle coordinator over a driver interface. No concrete Wine/Box64 driver is wired; this is orchestration scaffolding, not an executable launcher.
+- GraphicsRuntimeSelector.kt: capability-based DXVK/Turnip/Vulkan and WineD3D fallback decision. Presence checks are experimental and not proof of rendering.
+- AndroidGameSessionHost.kt: contract for immersive Activity/Surface/input/lifecycle callbacks. Actual Android Surface implementation and first-frame proof are still pending.
+- RuntimeDiagnostics.kt: session log with rotation and tail reader.
+
+
+Unit tests added for catalog persistence, stable IDs, validation containment/fingerprint, graphics selection, controller success/failure transitions. CI must confirm them.
+
+
+### Remaining integration gates
+1. SAF game-folder permission and scanning adapter to catalog (Dashboard still demo).
+2. Concrete runtime driver owning PRoot/Wine/Box64 process lifetime, cancellation, cleanup and log capture.
+3. Real graphics initialization + presentation bridge and frame callback.
+4. Native Android Surface host and input forwarding integration.
+5. Device test on target hardware with legally obtained supported game installation.
+
+No game is marked playable by this commit; READY means only that file-only validation passed.

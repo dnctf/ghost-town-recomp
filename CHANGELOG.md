@@ -98,3 +98,19 @@ Release candidate commit: CI publishes tag `v0.3.1` only after probe tests, ARM6
 - Add prefix, DXVK installation, and game launch scripts as isolated guest-side entry points.
 - Add component provenance and explicit device-verification gates.
 - Mark Turnip/adrenotools, Wine display/Vulkan bridge, audio/input integration, and physical gameplay validation as incomplete. This pre-release does not claim game execution or playability.
+
+## Unreleased
+
+- Added a dedicated game-session lifecycle model with validated transitions, failure-stage tracking, stop/crash handling, and retry support. It remains additive and is not yet connected to the runtime launch pipeline.
+
+## Unreleased — game-library audit
+- Re-audited existing Android game verification/import components and documented the live catalog integration gaps. Existing verifiers/importers are to be reused rather than duplicated.
+- Verified GitHub Actions run #319 succeeded for the dedicated-session branch: probe tests, Android ARM64 APK build, lint, size audit, and artifacts. This does not constitute physical-device or gameplay validation.
+
+
+## Unreleased — runtime catalog and orchestration
+- Added persistent app-private game installation registry, stable root IDs and CRUD.
+- Added file-only Unity validation pipeline with executable path containment, architecture check and metadata fingerprint.
+- Added runtime controller driver boundary, graphics capability selector, Android session-host contract and rotating diagnostic log.
+- Added JVM tests for catalog persistence, validation, graphics fallback and lifecycle controller outcomes.
+- Foundations only: Dashboard/SAF integration, concrete Wine/Box64 driver, real Vulkan/DXVK presentation, first-frame proof and device gameplay remain gated.
