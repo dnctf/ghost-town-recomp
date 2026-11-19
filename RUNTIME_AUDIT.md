@@ -71,3 +71,25 @@ No listed game is certified playable by this audit. File detection, metadata par
 - States cover preparation, file validation, runtime initialization, GPU initialization, loading, session start, running, stopping, stopped, failed, and crashed.
 - Failed/crashed states preserve the stage at which failure occurred and can retry from preparation. Invalid transitions are rejected.
 - Foundation only: this lifecycle is not yet wired into the existing Activity/runtime pipeline and does not claim to launch or render a game. Integration is gated on build/test verification.
+
+## Game-library integration audit (2026-11-19)
+
+The current branch was rechecked after the dedicated-session lifecycle addition. Existing components should be reused rather than duplicated:
+
+- `GameStorageVerifier.java` detects Unity data-folder markers, Mono `Assembly-CSharp.dll`, IL2CPP `global-metadata.dat`, parses Windows PE executable headers, and calculates SHA-256 for inspected binaries.
+- `GameFileImporter.java` supports SAF-based EXE import, ZIP extraction, and recursive folder copying into app-private storage.
+- `tools/game_installation_probe.py` independently inspects a Windows Unity installation layout and reports whether executable, UnityPlayer, data directory, and Mono/IL2CPP metadata are present. It correctly labels this as installation completeness, not runtime compatibility.
+- `RuntimeLaunchGate.kt` gates on installed runtime and a display marker; it does not prove a game-specific session is launchable.
+- `DashboardActivity.kt` still uses demo game entries and the UI-preview preference for the selected library folder. The library picker currently records the SAF URI; the demo dashboard is not yet a live game catalog.
+
+### Integration gaps / next sequence
+
+1. Replace demo game records with a real catalog backed by the selected SAF directory or imported app-private files.
+2. Make scanning asynchronous and bounded; report scan progress and cancellation, and avoid hashing entire game payloads during each dashboard refresh.
+3. Reuse `GameStorageVerifier` for PE and Unity metadata checks. Distinguish `DATA_ONLY`, `EXE_ONLY`, `INCOMPLETE`, `INSTALLATION_COMPLETE`, `UNSUPPORTED_ARCH`, and `RUNTIME_UNAVAILABLE`; never translate file detection into `READY_TO_PLAY`.
+4. Persist catalog records and their source URI/path with permission revalidation. Do not assume persisted SAF access remains valid.
+5. Integrate the state machine only after catalog validation is connected to the launch controller. Keep legacy Wine/X11/Vulkan compatibility code until replacement paths have CI and device evidence.
+
+### CI verification for this branch
+
+GitHub Actions run #319 completed successfully on the branch commit. Reported jobs passed: Python probe tests, Android ARM64 native/APK build (debug and release), Android lint, APK size audit, and artifact upload. The workflow runs `gradle testDebugUnitTest` as part of the Android build step. CI success is compile/test/package evidence only; it is not physical-device or gameplay evidence.
