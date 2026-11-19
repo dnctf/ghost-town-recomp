@@ -102,3 +102,7 @@ Release candidate commit: CI publishes tag `v0.3.1` only after probe tests, ARM6
 ## Unreleased
 
 - Added a dedicated game-session lifecycle model with validated transitions, failure-stage tracking, stop/crash handling, and retry support. It remains additive and is not yet connected to the runtime launch pipeline.
+
+## Unreleased — game-library audit
+- Re-audited existing Android game verification/import components and documented the live catalog integration gaps. Existing verifiers/importers are to be reused rather than duplicated.
+- Verified GitHub Actions run #319 succeeded for the dedicated-session branch: probe tests, Android ARM64 APK build, lint, size audit, and artifacts. This does not constitute physical-device or gameplay validation.
