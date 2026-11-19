@@ -64,3 +64,10 @@ The launcher should own game discovery, user-selected paths, runtime selection, 
 ## Explicit non-claims
 
 No listed game is certified playable by this audit. File detection, metadata parsing, native compilation, and Vulkan surface creation are not equivalent to successful gameplay.
+
+## Dedicated game-session lifecycle refactor (2026-11-19)
+
+- Added a platform-independent `GameSessionStateMachine` to validate launch/session transitions without coupling it to Android Activity, Wine, X11, or Vulkan operations.
+- States cover preparation, file validation, runtime initialization, GPU initialization, loading, session start, running, stopping, stopped, failed, and crashed.
+- Failed/crashed states preserve the stage at which failure occurred and can retry from preparation. Invalid transitions are rejected.
+- Foundation only: this lifecycle is not yet wired into the existing Activity/runtime pipeline and does not claim to launch or render a game. Integration is gated on build/test verification.

@@ -98,3 +98,7 @@ Release candidate commit: CI publishes tag `v0.3.1` only after probe tests, ARM6
 - Add prefix, DXVK installation, and game launch scripts as isolated guest-side entry points.
 - Add component provenance and explicit device-verification gates.
 - Mark Turnip/adrenotools, Wine display/Vulkan bridge, audio/input integration, and physical gameplay validation as incomplete. This pre-release does not claim game execution or playability.
+
+## Unreleased
+
+- Added a dedicated game-session lifecycle model with validated transitions, failure-stage tracking, stop/crash handling, and retry support. It remains additive and is not yet connected to the runtime launch pipeline.
