@@ -93,3 +93,28 @@ The current branch was rechecked after the dedicated-session lifecycle addition.
 ### CI verification for this branch
 
 GitHub Actions run #319 completed successfully on the branch commit. Reported jobs passed: Python probe tests, Android ARM64 native/APK build (debug and release), Android lint, APK size audit, and artifact upload. The workflow runs `gradle testDebugUnitTest` as part of the Android build step. CI success is compile/test/package evidence only; it is not physical-device or gameplay evidence.
+
+
+## Autonomous refactoring foundations (stages 2–7)
+
+This branch adds isolated foundations without enabling game launch in the UI:
+
+- GameInstallationRegistry.kt: file-backed catalog using Properties, temporary-file promotion, stable root IDs, CRUD and snapshots.
+- GameValidationPipeline.kt: conservative filesystem validation, executable containment, architecture allow-list, Unity core + Mono/IL2CPP marker, SHA-256 fingerprint. Validation is file evidence only and never executes the EXE.
+- GameRuntimeController.kt: serialized lifecycle coordinator over a driver interface. No concrete Wine/Box64 driver is wired; this is orchestration scaffolding, not an executable launcher.
+- GraphicsRuntimeSelector.kt: capability-based DXVK/Turnip/Vulkan and WineD3D fallback decision. Presence checks are experimental and not proof of rendering.
+- AndroidGameSessionHost.kt: contract for immersive Activity/Surface/input/lifecycle callbacks. Actual Android Surface implementation and first-frame proof are still pending.
+- RuntimeDiagnostics.kt: session log with rotation and tail reader.
+
+
+Unit tests added for catalog persistence, stable IDs, validation containment/fingerprint, graphics selection, controller success/failure transitions. CI must confirm them.
+
+
+### Remaining integration gates
+1. SAF game-folder permission and scanning adapter to catalog (Dashboard still demo).
+2. Concrete runtime driver owning PRoot/Wine/Box64 process lifetime, cancellation, cleanup and log capture.
+3. Real graphics initialization + presentation bridge and frame callback.
+4. Native Android Surface host and input forwarding integration.
+5. Device test on target hardware with legally obtained supported game installation.
+
+No game is marked playable by this commit; READY means only that file-only validation passed.
