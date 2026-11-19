@@ -14,5 +14,5 @@ class GameRuntimeControllerTest{
  private val report=ValidationReport("g",ValidationCode.READY,"ok","hash")
  private val graphics=GraphicsSelection(GraphicsBackend.WINED3D,"fallback",false)
  @Test fun successfulDriverAdvancesToRunningAndStops(){val c=GameRuntimeController(driver=FakeRuntimeDriver(),graphics=graphics);assertTrue(c.start(game,report).started);assertEquals(GameSessionState.RUNNING,c.current().state);assertFalse(c.stop().started);assertEquals(GameSessionState.STOPPED,c.current().state)}
- @Test fun failedDriverStopsAtFailureAndAllowsRetry(){val d=FakeRuntimeDriver("gpu");val c=GameRuntimeController(driver=d,graphics=graphics);assertFalse(c.start(game,report).started);assertEquals(GameSessionState.FAILED,c.current().state);assertEquals(GameSessionState.INITIALIZING_GPU,c.current().failureStage);assertFalse(c.start(game.copy(id="other"),report).started)}
+ @Test fun failedDriverStopsAtFailureAndAllowsRetry(){val d=FakeRuntimeDriver("gpu");val c=GameRuntimeController(driver=d,graphics=graphics);assertFalse(c.start(game,report).started);assertEquals(GameSessionState.FAILED,c.current().state);assertEquals(GameSessionState.INITIALIZING_GPU,c.current().failureStage);d.failAt=null;assertTrue(c.start(game,report).started);assertEquals(GameSessionState.RUNNING,c.current().state)}
 }
