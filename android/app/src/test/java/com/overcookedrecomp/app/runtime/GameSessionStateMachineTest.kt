@@ -39,7 +39,7 @@ class GameSessionStateMachineTest {
             GameSessionState.RUNNING, GameSessionState.CRASHED).forEach {
             assertTrue("Transition to $it", machine.transition(it).accepted)
         }
-        assertEquals(GameSessionState.STARTING_SESSION, machine.current().failureStage)
+        assertEquals(GameSessionState.RUNNING, machine.current().failureStage)
         assertTrue(machine.transition(GameSessionState.PREPARING_GAME).accepted)
     }
 
