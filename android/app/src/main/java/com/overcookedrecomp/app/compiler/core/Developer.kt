@@ -16,8 +16,8 @@ enum class Developer(
 ) {
     GHOST_TOWN_GAMES(
         devId = "ghost_town",
-        displayName = "Ghost Town Games / Team17",
-        studioName = "Ghost Town Games / Team17 Digital",
+        displayName = "SMG Studio / DevM Games",
+        studioName = "SMG Studio / DevM Games (Team17 publisher)",
         iconRes = R.drawable.ic_overcooked,
         accentColorHex = "#FF9F1C"
     );
