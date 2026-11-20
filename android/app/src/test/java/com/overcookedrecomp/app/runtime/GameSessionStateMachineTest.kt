@@ -4,13 +4,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class GameSessionStateMachineTest {
-    @Test fun acceptsExpectedLaunchSequence() {
+    @Test fun acceptsExpectedLaunchSequenceButWaitsForFirstFrame() {
         val machine = GameSessionStateMachine()
         listOf(GameSessionState.PREPARING_GAME, GameSessionState.CHECKING_FILES,
             GameSessionState.INITIALIZING_RUNTIME, GameSessionState.INITIALIZING_GPU,
             GameSessionState.LOADING_GAME, GameSessionState.STARTING_SESSION,
-            GameSessionState.RUNNING).forEach { assertTrue(machine.transition(it).accepted) }
-        assertEquals(GameSessionState.RUNNING, machine.current().state)
+            GameSessionState.WAITING_FOR_FIRST_FRAME).forEach {
+            assertTrue(machine.transition(it).accepted)
+        }
+        assertEquals(GameSessionState.WAITING_FOR_FIRST_FRAME, machine.current().state)
+        assertTrue(machine.transition(GameSessionState.RUNNING).accepted)
     }
 
     @Test fun rejectsSkippedStages() {
@@ -36,7 +39,8 @@ class GameSessionStateMachineTest {
         listOf(GameSessionState.PREPARING_GAME, GameSessionState.CHECKING_FILES,
             GameSessionState.INITIALIZING_RUNTIME, GameSessionState.INITIALIZING_GPU,
             GameSessionState.LOADING_GAME, GameSessionState.STARTING_SESSION,
-            GameSessionState.RUNNING, GameSessionState.CRASHED).forEach {
+            GameSessionState.WAITING_FOR_FIRST_FRAME, GameSessionState.RUNNING,
+            GameSessionState.CRASHED).forEach {
             assertTrue("Transition to $it", machine.transition(it).accepted)
         }
         assertEquals(GameSessionState.RUNNING, machine.current().failureStage)
