@@ -116,7 +116,9 @@ private fun ConsoleDashboard() {
             }
             libraryUri = uri.toString()
             context.getSharedPreferences("moving-out-2", Context.MODE_PRIVATE).edit().putString("game_folder_uri", libraryUri).apply()
-            mo2Validation = MovingOut2InstallationValidator.validate(context, uri)\n            val validationNotice = if (mo2Validation.detected) "File baseline Moving Out 2 terdeteksi; runtime belum teruji." else mo2Validation.summary\n            notices = (notices + Notice(nextNoticeId, "VALIDASI FILE", validationNotice)).takeLast(2)
+            mo2Validation = MovingOut2InstallationValidator.validate(context, uri)
+val validationNotice = if (mo2Validation.detected) "File baseline Moving Out 2 terdeteksi; runtime belum teruji." else mo2Validation.summary
+notices = (notices + Notice(nextNoticeId, "VALIDASI FILE", validationNotice)).takeLast(2)
             nextNoticeId++
         }
     }
@@ -226,6 +228,7 @@ private fun ConsoleDashboard() {
                     )
                     DashboardTab.LIBRARY -> LibraryScreen(
                         libraryUri = libraryUri,
+                        validation = mo2Validation,
                         onPick = { picker.launch(null) }
                     )
                     DashboardTab.RUNTIME -> RuntimeScreen(gate = gate)
@@ -642,7 +645,9 @@ private fun LibraryScreen(libraryUri: String?, validation: MovingOut2Installatio
             Text("PILIH LOKASI DATA", color = C.TextSecondary, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Bold)
             Text(folderName, color = C.TextPrimary, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Button(onClick = onPick, modifier = Modifier.heightIn(min = 52.dp)) { Text("PILIH FOLDER  ·  SAF") }
-            Text(validation.summary, color = if (validation.detected) C.Accent else C.Warning, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)\n            if (validation.missing.isNotEmpty()) Text("Missing: " + validation.missing.joinToString(", "), color = C.TextMuted, fontSize = 10.sp)\n            Text("Pemeriksaan file bersifat read-only. File game tidak dieksekusi, disalin, atau didistribusikan oleh validator.", color = C.TextMuted, fontSize = 11.sp)
+            Text(validation.summary, color = if (validation.detected) C.Accent else C.Warning, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+if (validation.missing.isNotEmpty()) Text("Missing: " + validation.missing.joinToString(", "), color = C.TextMuted, fontSize = 10.sp)
+Text("Pemeriksaan file bersifat read-only. File game tidak dieksekusi, disalin, atau didistribusikan oleh validator.", color = C.TextMuted, fontSize = 11.sp)
         }
     }
 }
