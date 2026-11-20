@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="480" viewBox="0 0 1440 480" role="img" aria-labelledby="title desc">
+<title id="title">Moving Out 2 — Android Compatibility Project</title>
+<desc id="desc">Original vector banner for a Moving Out 2 focused Android compatibility project, featuring colorful moving boxes, a sofa, and a hand truck.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#13283a"/><stop offset="1" stop-color="#315a68"/></linearGradient>
+  <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd37a"/><stop offset="1" stop-color="#ff9e57"/></linearGradient>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#091520" flood-opacity=".35"/></filter>
+</defs>
+<rect width="1440" height="480" rx="34" fill="url(#bg)"/>
+<circle cx="1110" cy="235" r="178" fill="#f7b65e" opacity=".11"/>
+<path d="M0 390 Q220 340 450 400 T900 390 T1440 370 V480 H0Z" fill="#0e1d2a" opacity=".6"/>
+<g filter="url(#shadow)" stroke="#14283a" stroke-width="10" stroke-linejoin="round">
+  <rect x="915" y="220" width="174" height="160" rx="18" fill="#f0b34d"/>
+  <path d="M1002 220 V380 M915 280 H1089" stroke="#d28b32" stroke-width="8" fill="none"/>
+  <rect x="1090" y="280" width="150" height="105" rx="16" fill="#62b9b2"/>
+  <path d="M1165 280 V385 M1090 333 H1240" stroke="#3b8f8a" stroke-width="7" fill="none"/>
+  <rect x="830" y="318" width="102" height="68" rx="12" fill="#f37e56"/>
+  <path d="M881 318 V386" stroke="#d85f40" stroke-width="7" fill="none"/>
+  <g transform="translate(790 125) rotate(-8)">
+    <path d="M18 20 H48 V240 H18" fill="none" stroke="#d9e5e8" stroke-width="14" stroke-linecap="round"/>
+    <circle cx="31" cy="255" r="26" fill="#192a38" stroke="#d9e5e8" stroke-width="8"/>
+    <rect x="44" y="104" width="140" height="122" rx="16" fill="#e98b51"/>
+    <path d="M114 104 V226 M44 164 H184" stroke="#c56b3c" stroke-width="8" fill="none"/>
+  </g>
+  <g transform="translate(1010 72)">
+    <rect x="0" y="0" width="90" height="80" rx="18" fill="#f6d16d"/>
+    <path d="M45 0 V80 M0 40 H90" stroke="#dfa94e" stroke-width="7" fill="none"/>
+  </g>
+  <g transform="translate(1070 104)">
+    <rect x="0" y="0" width="104" height="86" rx="16" fill="#7b98c6"/>
+    <path d="M52 0 V86 M0 43 H104" stroke="#5875a4" stroke-width="8" fill="none"/>
+  </g>
+  <g transform="translate(122 260)">
+    <path d="M20 100 Q28 60 80 60 H190 Q230 62 240 100 V130 H20Z" fill="#f2ad57"/>
+    <rect x="45" y="24" width="82" height="64" rx="24" fill="#f2ad57"/>
+    <rect x="148" y="24" width="82" height="64" rx="24" fill="#f2ad57"/>
+    <rect x="22" y="104" width="218" height="30" rx="15" fill="#d9873f"/>
+    <rect x="44" y="130" width="30" height="42" rx="10" fill="#24384a"/>
+    <rect x="185" y="130" width="30" height="42" rx="10" fill="#24384a"/>
+  </g>
+</g>
+<g font-family="Arial, Helvetica, sans-serif" fill="#ffffff">
+  <text x="92" y="106" font-size="24" font-weight="700" letter-spacing="7" fill="#f6c76b">DEDICATED ANDROID PROJECT</text>
+  <text x="92" y="178" font-size="68" font-weight="900" letter-spacing="1">MOVING OUT 2</text>
+  <text x="95" y="220" font-size="27" font-weight="600" fill="#d8e6ed">Windows PC → Android ARM64</text>
+  <rect x="94" y="238" width="470" height="5" rx="3" fill="#f6c76b"/>
+  <text x="95" y="285" font-size="23" fill="#e7eef3">Game-specific runtime · Compatibility research</text>
+  <text x="95" y="322" font-size="23" fill="#e7eef3">Graphics · Input · Audio · Performance</text>
+  <rect x="94" y="350" width="274" height="48" rx="24" fill="#f6c76b"/>
+  <text x="231" y="381" font-size="20" font-weight="800" text-anchor="middle" fill="#14283a">GHOST TOWN PROJECT</text>
+</g>
+</svg>
