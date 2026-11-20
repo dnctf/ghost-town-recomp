@@ -96,7 +96,8 @@ private fun ConsoleDashboard() {
     var uiScale by remember { mutableFloatStateOf(1f) }
     var uiSounds by remember { mutableStateOf(false) }
     var controlsMap by remember { mutableStateOf("Default · Gamepad") }
-    var libraryUri by remember { mutableStateOf(context.getSharedPreferences("ui-preview", Context.MODE_PRIVATE).getString("library_uri", null)) }
+    var libraryUri by remember { mutableStateOf(context.getSharedPreferences("moving-out-2", Context.MODE_PRIVATE).getString("game_folder_uri", null)) }
+    var mo2Validation by remember { mutableStateOf(MovingOut2InstallationValidator.Report(false, false, "Folder game belum dipilih.", listOf("Pilih folder Moving Out 2"), emptyList())) }
     var timeText by remember { mutableStateOf("--:--") }
     var battery by remember { mutableIntStateOf(-1) }
     var thermal by remember { mutableStateOf("TERMAL: —") }
@@ -106,7 +107,7 @@ private fun ConsoleDashboard() {
         Notice(2, "RUNTIME PENDING", "Pemasangan belum tersedia")
     )) }
     var nextNoticeId by remember { mutableIntStateOf(3) }
-    val selected = targetGames[selectedIndex.coerceIn(0, targetGames.lastIndex)]
+    val selected = targetGames[selectedIndex.coerceIn(0, targetGames.lastIndex)].copy(readiness = mo2Validation.summary)
     val playState = PlayLaunchPolicy.resolve(gate.runtimeInstalled, gate.displaySelfTestPassed)
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -548,7 +549,7 @@ private fun GameDetailsSheet(
         Text(game.title, color = C.TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         Text("Kartu ini memakai artwork abstrak buatan sendiri. Tidak ada file game atau aset komersial yang disertakan.", color = C.TextSecondary, fontSize = 12.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            StatBlock("DATA GAME", "Belum diverifikasi")
+            StatBlock("DATA GAME", game.readiness)
             StatBlock("RUNTIME", if (runtimeInstalled) "Terdeteksi" else "Belum terpasang")
             StatBlock("DISPLAY SELF-TEST", if (displayPassed) "Lolos" else "Belum lolos")
         }
@@ -641,7 +642,7 @@ private fun LibraryScreen(libraryUri: String?, onPick: () -> Unit) {
             Text("PILIH LOKASI DATA", color = C.TextSecondary, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Bold)
             Text(folderName, color = C.TextPrimary, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Button(onClick = onPick, modifier = Modifier.heightIn(min = 52.dp)) { Text("PILIH FOLDER  ·  SAF") }
-            Text("Akses folder disimpan melalui Storage Access Framework. Preview tidak menyalin atau mendistribusikan data game.", color = C.TextMuted, fontSize = 11.sp)
+            Text(validation.summary, color = if (validation.detected) C.Accent else C.Warning, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)\n            if (validation.missing.isNotEmpty()) Text("Missing: " + validation.missing.joinToString(", "), color = C.TextMuted, fontSize = 10.sp)\n            Text("Pemeriksaan file bersifat read-only. File game tidak dieksekusi, disalin, atau didistribusikan oleh validator.", color = C.TextMuted, fontSize = 11.sp)
         }
     }
 }
