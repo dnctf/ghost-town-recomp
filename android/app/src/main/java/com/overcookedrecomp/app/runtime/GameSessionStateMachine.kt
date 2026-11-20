@@ -6,8 +6,8 @@ package com.overcookedrecomp.app.runtime
  */
 enum class GameSessionState {
     IDLE, PREPARING_GAME, CHECKING_FILES, INITIALIZING_RUNTIME,
-    INITIALIZING_GPU, LOADING_GAME, STARTING_SESSION, RUNNING,
-    STOPPING, STOPPED, FAILED, CRASHED
+    INITIALIZING_GPU, LOADING_GAME, STARTING_SESSION,
+    WAITING_FOR_FIRST_FRAME, RUNNING, STOPPING, STOPPED, FAILED, CRASHED
 }
 
 data class GameSessionSnapshot(
@@ -23,7 +23,8 @@ data class GameSessionSnapshot(
             GameSessionState.PREPARING_GAME, GameSessionState.CHECKING_FILES,
             GameSessionState.INITIALIZING_RUNTIME, GameSessionState.INITIALIZING_GPU,
             GameSessionState.LOADING_GAME, GameSessionState.STARTING_SESSION,
-            GameSessionState.RUNNING, GameSessionState.STOPPING
+            GameSessionState.WAITING_FOR_FIRST_FRAME, GameSessionState.RUNNING,
+            GameSessionState.STOPPING
         )
         private val RETRY_STATES = setOf(
             GameSessionState.STOPPED, GameSessionState.FAILED, GameSessionState.CRASHED
@@ -70,7 +71,8 @@ class GameSessionStateMachine(initial: GameSessionState = GameSessionState.IDLE)
         GameSessionState.INITIALIZING_RUNTIME -> setOf(GameSessionState.INITIALIZING_GPU, GameSessionState.FAILED, GameSessionState.STOPPING)
         GameSessionState.INITIALIZING_GPU -> setOf(GameSessionState.LOADING_GAME, GameSessionState.FAILED, GameSessionState.STOPPING)
         GameSessionState.LOADING_GAME -> setOf(GameSessionState.STARTING_SESSION, GameSessionState.FAILED, GameSessionState.STOPPING)
-        GameSessionState.STARTING_SESSION -> setOf(GameSessionState.RUNNING, GameSessionState.FAILED, GameSessionState.CRASHED, GameSessionState.STOPPING)
+        GameSessionState.STARTING_SESSION -> setOf(GameSessionState.WAITING_FOR_FIRST_FRAME, GameSessionState.FAILED, GameSessionState.CRASHED, GameSessionState.STOPPING)
+        GameSessionState.WAITING_FOR_FIRST_FRAME -> setOf(GameSessionState.RUNNING, GameSessionState.FAILED, GameSessionState.CRASHED, GameSessionState.STOPPING)
         GameSessionState.RUNNING -> setOf(GameSessionState.CRASHED, GameSessionState.STOPPING)
         GameSessionState.STOPPING -> setOf(GameSessionState.STOPPED, GameSessionState.FAILED)
         GameSessionState.STOPPED, GameSessionState.FAILED, GameSessionState.CRASHED -> setOf(GameSessionState.PREPARING_GAME)
