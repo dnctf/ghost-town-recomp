@@ -9,6 +9,7 @@ on:
       - 'android/**'
       - 'runtime/manifest.json'
       - 'tools/**'
+      - 'profiles/**'
       - '.github/workflows/build-android.yml'
   pull_request:
     branches:
