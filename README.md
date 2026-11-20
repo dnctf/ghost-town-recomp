@@ -1,107 +1,83 @@
 # Ghost Town Recomp
 
-> **Status: Experimental Android PC-game runtime research — no game is currently verified playable.**
+> **Moving Out 2 only — Android ARM64 compatibility/runtime research. Gameplay is not verified playable.**
 
-Ghost Town Recomp is an Android ARM64 application and runtime research project exploring the launch and presentation of selected PC games in a game-focused, native fullscreen Android experience. The initial focus is Windows x86_64 Unity titles, with Overcooked! 2 and Moving Out 2 as research candidates.
+Ghost Town Recomp is a dedicated Android application and game-specific compatibility project for **Moving Out 2 PC**. The project is no longer pursuing Overcooked! 2, the original Moving Out, a multi-game launcher, or generic PC-game compatibility.
 
-## Purpose
+## Project scope
 
-- **Game library:** let users select and inspect their own game files.
-- **Installation verification:** check executables, Unity data, Mono/IL2CPP markers, architecture, dependencies and installation fingerprints.
-- **Compatibility profiles:** define per-game runtime, graphics, dependency, environment and input settings.
-- **Runtime orchestration:** research and integrate PRoot, Box64 and Wine; supervise game process lifecycle, stop and recovery.
-- **Graphics:** investigate Vulkan, DXVK, WineD3D, Turnip and Android surface presentation.
-- **Android session experience:** target immersive fullscreen, touch/gamepad, lifecycle handling and diagnostics—not a desktop-style UI.
-- **Diagnostics:** stage-aware reports to help isolate installation, runtime, graphics, input, audio and lifecycle failures.
+- **Only target game:** Moving Out 2 PC, user-provided game files.
+- **Known baseline:** version 1.2.274, Windows x64 / AMD64, Unity 2021.3.16f1, IL2CPP, Production/Steam build evidence.
+- **Android target:** ARM64 (AArch64), with device-specific graphics/runtime testing.
+- **Application purpose:** dedicated Moving Out 2 setup, compatibility verification, runtime configuration, launch/session control, game input, diagnostics and Android experience.
+- **Game data:** executable, Unity assets, native libraries, metadata, saves and proprietary game content are not distributed or committed.
+- **Status:** experimental. No end-to-end game boot, first frame, menu, or gameplay is claimed.
 
-## Target
+## Moving Out 2 baseline
 
-- Device validation target: Huawei MatePad Air 2023 (ARM64 Snapdragon platform).
-- Research candidates: Overcooked! 2 and Moving Out 2, using game files supplied by the user.
-- Platform: Android ARM64.
-- Game files and proprietary assets are not included; users must provide legally obtained copies.
+Based on files supplied for local inspection (not stored in this repository):
 
-## Current update — 19 November 2026
+- mo2.exe
+- GameAssembly.dll
+- UnityPlayer.dll
+- baselib.dll
+- BuildInfo.json
+- global-metadata.dat (IL2CPP metadata version 29 identified in research)
+- Unity resource files and native plugin inventory, including Crashpad, FMOD, Resonance Audio, Burst, NanoSockets and Steam-related components.
 
-### Foundations present
+Unity resource marker versions showed a discrepancy: one resource marker identified 2021.3.13f1 while another identified 2021.3.16f1. The provenance of the discrepancy is not yet resolved. The baseline Unity version above is based on BuildInfo/metadata evidence; verify the exact player build before compatibility decisions.
 
-- Android app and Compose dashboard/preview.
-- SAF folder-picker foundation.
-- Windows PE and Unity installation inspection helpers.
-- Python game-installation probe tooling.
-- Dedicated game-session lifecycle model.
-- File-backed game catalog and file-only validation foundation.
-- Runtime controller abstraction, graphics backend selection foundation, Android session-host contract and diagnostic logging foundation.
-- Existing runtime/bootstrap research components for PRoot, Box64 and Wine, plus native Vulkan/audio/input scaffolding.
+## Technical direction
 
-### Integration status
+Moving Out 2 is a **Windows x86_64 Unity IL2CPP game**. Android ARM64 cannot execute its Windows PE executable and x86_64 native dependencies directly. Until a viable game-specific native recompilation/port is demonstrated, the compatibility strategy must keep a Windows execution layer (for example Wine + Box64) under evaluation. Unity IL2CPP metadata availability is not proof that gameplay can be rebuilt or ported.
 
-| Subsystem | Status |
-|---|---|
-| Android build/CI foundation | Verified in recorded CI runs; check current workflow for latest status |
-| Game detection and file validation | Partial; file evidence only |
-| SAF scanner and live catalog | Partial; picker exists, catalog integration remains |
-| Profile JSON runtime resolver | Not integrated |
-| Persistent game process supervisor | Not verified end-to-end |
-| Wine/Box64 game launch | Not verified end-to-end |
-| DXVK/Vulkan game rendering | Not verified |
-| Android game-frame surface bridge | Not verified |
-| First frame / black-screen gate | Not verified |
-| Game input and audio transport | Not verified end-to-end |
-| Pause/resume, recovery and stable session | Not verified on device |
-| Gameplay on target device | Not verified |
+The runtime stack is selected from test evidence—not by assuming every existing component is required:
 
-Dedicated-session foundation commit: `db3051080566c92ae2050ca130848f2f3db7115f`. The lifecycle/catalog/validation/controller/graphics-selector/host modules are integration foundations, not a complete launcher. CI status should be checked against the latest commit/run before stating that the current branch is green.
+- Windows execution/compatibility layer and x86_64 translation
+- Unity Player and native plugin compatibility
+- graphics API translation and Android Vulkan/GPU driver compatibility
+- Android surface/presentation path
+- game input and local controller support
+- audio transport
+- lifecycle, process supervision, storage, diagnostics and performance/thermal controls
 
-## Intended architecture
+**Do not remove Wine, Box64, PRoot, graphics bridges, DXVK, Turnip, or other compatibility components solely because the project is now game-specific.** Audit each component against Moving Out 2 and remove or disable it only after a replacement path and regression checks are established. Game-specific scope is not the same as native recompilation.
 
-```text
-Android UI / Game Library
-    -> SAF selection + persisted permission
-    -> Scanner / Installation Validator
-    -> Game Identity + Compatibility Profile
-    -> Runtime Config Resolver
-    -> Runtime Controller / Process Supervisor
-    -> PRoot -> Box64 -> Wine -> Windows game
-    -> Wine display backend / internal X11 compatibility
-    -> Vulkan / DXVK or validated graphics fallback
-    -> Android fullscreen presentation surface
-    -> Input + Audio + Lifecycle + Diagnostics
-```
+## Development priorities
 
-This is the target architecture, not a statement that all connections exist. Retain legacy X11/desktop-related components, Wine, Box64, PRoot, IPC/shared-memory paths, Vulkan bridge, DXVK and Turnip while their roles are audited and integration/replacement paths are proven. Internal compatibility components must not become user-facing desktop controls.
+1. Freeze Moving Out 2's verified game/build/engine facts and data fingerprints.
+2. Audit existing code and workflows; identify Overcooked/original Moving Out/multi-game remnants and classify them for removal, isolation, or reuse.
+3. Fix installation validation to recognize the actual Moving Out 2 PC layout and required files; never mark a game ready from a single generic Unity marker.
+4. Audit and choose a realistic runtime path for Windows x64 Unity IL2CPP on Android ARM64.
+5. Prove runtime initialization, process launch, graphics device, swapchain/presentation, and the actual game's first frame separately.
+6. Integrate input, audio, pause/resume, termination, crash recovery and diagnostics.
+7. Validate on a physical device; record game build, device, Android version, driver/runtime versions, resolution, frame rate, memory, thermals, stability and test evidence.
+8. Only then claim a compatibility milestone.
 
-## First-frame acceptance gates
+## Architecture principle
 
-Do not use a single generic GPU-ready flag. Required milestones remain distinct:
+This repository is **game-specific**, not a universal PC launcher:
 
-```text
-GAME_VALIDATED
- -> RUNTIME_INITIALIZED
- -> GAME_PROCESS_STARTED (real PID)
- -> GPU_INITIALIZED
- -> SWAPCHAIN_CREATED
- -> SURFACE_ATTACHED
- -> FIRST_FRAME_PRESENTED
- -> RUNNING
-```
 
-These milestones must be proven by the actual renderer/session path. A native Vulkan clear-frame test is not evidence that a Wine/DXVK game frame is displayed.
+Moving Out 2 installation (Windows x86_64 / Unity IL2CPP)
+        -> Moving Out 2-specific installation validator + profile
+        -> Android app / session manager / diagnostics
+        -> Pinned and tested compatibility runtime (selected by evidence)
+        -> Windows x86_64 Unity Player + Moving Out 2
+        -> Android display, input, audio and lifecycle bridges
 
-## Roadmap
+A component's presence in the repository or runtime pack is not evidence that it is integrated or that the game runs.
 
-1. Build gate and audit actual runtime/native integration points.
-2. SAF scanner/catalog, persisted permission recovery, deduplication, profile schema validation and resolver.
-3. Concrete runtime driver with process ownership, PID/exit monitoring, stream capture, timeouts, cancellation, cleanup and recovery.
-4. Graphics gates, DXVK/fallback initialization, swapchain/surface attachment and renderer first-frame event.
-5. Lifecycle-safe session controls, touch/gamepad bridge and audio.
-6. Correlated session diagnostics, export and first-game device validation.
-7. Compatibility expansion only after repeatable per-game device evidence.
+## Research and audit documents
+
+- MOVING_OUT_2_ONLY_SCOPE.md: migration decisions, audit/removal policy, and dedicated target acceptance gates.
+- RUNTIME_AUDIT.md: current runtime integration gaps.
+- docs/: architecture and runtime research; historical documents must be clearly marked as superseded where they still describe Overcooked! 2.
 
 ## Build and CI
 
-Check [GitHub Actions](https://github.com/dnctf/ghost-town-recomp/actions) for workflow results. CI validates only the build/test/package steps included in that workflow; it does not establish Windows game execution, graphics presentation or gameplay. Development notes and audits are in `docs/` and [RUNTIME_AUDIT.md](RUNTIME_AUDIT.md).
+Use GitHub Actions to verify Android source/build/package steps. CI passing is not game-playability evidence. No proprietary game files may be uploaded as artifacts or committed.
 
-## Legal
+## Legal / distribution
 
-This independent research project is not affiliated with or endorsed by the game or technology rights holders. Game executables and proprietary assets are not distributed here. Users are responsible for providing game copies they are legally entitled to use.
+Independent research; not affiliated with or endorsed by the rights holders. Moving Out 2 executable, assets, metadata, save data and proprietary plugins are not redistributed. Users supply game files they are legally entitled to use.
