@@ -1,84 +1,107 @@
-# Ghost Town Recomp
+<div align="center">
 
-> **Moving Out 2 only — Android ARM64 compatibility/runtime research. Gameplay is not verified playable.**
+<img src="docs/assets/moving-out-2-banner.svg" alt="Moving Out 2 Android compatibility project banner" width="100%"/>
 
-Ghost Town Recomp is a dedicated Android application and game-specific compatibility project for **Moving Out 2 PC**. The project is no longer pursuing Overcooked! 2, the original Moving Out, a multi-game launcher, or generic PC-game compatibility.
+# Moving Out 2 — Android Compatibility Project
 
-## Project scope
+**Ghost Town Project · Dedicated Android ARM64 runtime research**
 
-- **Only target game:** Moving Out 2 PC, user-provided game files.
-- **Known baseline:** version 1.2.274, Windows x64 / AMD64, Unity 2021.3.16f1, IL2CPP, Production/Steam build evidence.
-- **Android target:** ARM64 (AArch64), with device-specific graphics/runtime testing.
-- **Application purpose:** dedicated Moving Out 2 setup, compatibility verification, runtime configuration, launch/session control, game input, diagnostics and Android experience.
-- **Game data:** executable, Unity assets, native libraries, metadata, saves and proprietary game content are not distributed or committed.
-- **Status:** experimental. No end-to-end game boot, first frame, menu, or gameplay is claimed.
+[![Android](https://img.shields.io/badge/Platform-Android_ARM64-3DDC84?logo=android&logoColor=white)]()
+[![Target](https://img.shields.io/badge/Game-Moving_Out_2-F4B75D)]()
+[![Status](https://img.shields.io/badge/Status-Experimental-orange)]()
 
-## Moving Out 2 baseline
+</div>
 
-Based on files supplied for local inspection (not stored in this repository):
+> **Experimental project.** APK build status does not mean the Windows game is booting or playable. Game first-frame, menu and gameplay compatibility have not yet been verified.
 
-- mo2.exe
-- GameAssembly.dll
-- UnityPlayer.dll
-- baselib.dll
-- BuildInfo.json
-- global-metadata.dat (IL2CPP metadata version 29 identified in research)
-- Unity resource files and native plugin inventory, including Crashpad, FMOD, Resonance Audio, Burst, NanoSockets and Steam-related components.
+## Project goal
 
-Unity resource marker versions showed a discrepancy: one resource marker identified 2021.3.13f1 while another identified 2021.3.16f1. The provenance of the discrepancy is not yet resolved. The baseline Unity version above is based on BuildInfo/metadata evidence; verify the exact player build before compatibility decisions.
+This repository is dedicated exclusively to exploring and building an Android application/runtime capable of launching **Moving Out 2 (PC)** on Android ARM64 devices.
 
-## Technical direction
+This is not a general-purpose PC game launcher. Overcooked! 2, the original Moving Out, and multi-game support are out of active scope.
 
-Moving Out 2 is a **Windows x86_64 Unity IL2CPP game**. Android ARM64 cannot execute its Windows PE executable and x86_64 native dependencies directly. Until a viable game-specific native recompilation/port is demonstrated, the compatibility strategy must keep a Windows execution layer (for example Wine + Box64) under evaluation. Unity IL2CPP metadata availability is not proof that gameplay can be rebuilt or ported.
+## Target baseline
 
-The runtime stack is selected from test evidence—not by assuming every existing component is required:
+| Item | Evidence baseline |
+|---|---|
+| Game | Moving Out 2 (PC) |
+| Version | 1.2.274 |
+| Build | Production / Steam |
+| Windows architecture | x86_64 / AMD64 |
+| Engine | Unity 2021.3.16f1 baseline |
+| Scripting backend | IL2CPP |
+| Android target | ARM64 / AArch64 |
+| IL2CPP metadata | Version 29 identified in supplied data |
+| Graphics API | Not yet conclusively verified |
 
-- Windows execution/compatibility layer and x86_64 translation
-- Unity Player and native plugin compatibility
-- graphics API translation and Android Vulkan/GPU driver compatibility
-- Android surface/presentation path
-- game input and local controller support
-- audio transport
-- lifecycle, process supervision, storage, diagnostics and performance/thermal controls
+Baseline file evidence provided for inspection includes `mo2.exe`, `GameAssembly.dll`, `UnityPlayer.dll`, `baselib.dll`, `BuildInfo.json`, `global-metadata.dat`, Unity resources and plugin libraries. Proprietary game files are not included in this repository.
 
-**Do not remove Wine, Box64, PRoot, graphics bridges, DXVK, Turnip, or other compatibility components solely because the project is now game-specific.** Audit each component against Moving Out 2 and remove or disable it only after a replacement path and regression checks are established. Game-specific scope is not the same as native recompilation.
+## Technical reality and strategy
 
-## Development priorities
+Moving Out 2 is a Windows x86_64 Unity IL2CPP game. Windows PE executables and x86_64 native plugins do not run directly on Android ARM64.
 
-1. Freeze Moving Out 2's verified game/build/engine facts and data fingerprints.
-2. Audit existing code and workflows; identify Overcooked/original Moving Out/multi-game remnants and classify them for removal, isolation, or reuse.
-3. Fix installation validation to recognize the actual Moving Out 2 PC layout and required files; never mark a game ready from a single generic Unity marker.
-4. Audit and choose a realistic runtime path for Windows x64 Unity IL2CPP on Android ARM64.
-5. Prove runtime initialization, process launch, graphics device, swapchain/presentation, and the actual game's first frame separately.
-6. Integrate input, audio, pause/resume, termination, crash recovery and diagnostics.
-7. Validate on a physical device; record game build, device, Android version, driver/runtime versions, resolution, frame rate, memory, thermals, stability and test evidence.
-8. Only then claim a compatibility milestone.
+The active compatibility research therefore evaluates a game-specific Windows execution path, including Wine and Box64, plus the graphics/presentation, audio, input, storage and Android lifecycle bridges needed for this title.
 
-## Architecture principle
+- Compatibility components are retained until their dependencies are audited and tests prove they can be removed.
+- DXVK, Vulkan, Turnip, display bridges and other graphics components are evaluated based on logs and game evidence; they are not blindly enabled or removed.
+- IL2CPP metadata and Unity assets are research inputs, not proof that the game can be natively recompiled.
+- No first-frame, menu, gameplay or performance claim is made without real evidence.
 
-This repository is **game-specific**, not a universal PC launcher:
+## App responsibilities
 
+- Moving Out 2-only game-file import and identity verification
+- Runtime setup and dependency status
+- Dedicated launch/session supervision
+- Android display and graphics compatibility diagnostics
+- Touch/controller mapping
+- Audio integration and lifecycle handling
+- Crash/error logging and performance measurements
+- Device-specific compatibility profiles
 
-Moving Out 2 installation (Windows x86_64 / Unity IL2CPP)
-        -> Moving Out 2-specific installation validator + profile
-        -> Android app / session manager / diagnostics
-        -> Pinned and tested compatibility runtime (selected by evidence)
-        -> Windows x86_64 Unity Player + Moving Out 2
-        -> Android display, input, audio and lifecycle bridges
+## Development status
 
-A component's presence in the repository or runtime pack is not evidence that it is integrated or that the game runs.
+| Milestone | Status |
+|---|---|
+| Moving Out 2 scope defined | Complete |
+| Initial source audit | In progress |
+| Remove multi-game/demo launcher behavior | Pending |
+| Strict Moving Out 2 PC file validation | Pending |
+| Runtime dependency audit | Pending |
+| Real Windows game process launch | Not verified |
+| Game-rendered first frame | Not verified |
+| Main menu | Not verified |
+| Gameplay | Not verified |
+| Physical-device performance/stability | Not verified |
 
-## Research and audit documents
+## Repository documents
 
-- MOVING_OUT_2_ONLY_SCOPE.md: migration decisions, audit/removal policy, and dedicated target acceptance gates.
-- MOVING_OUT_2_COMPATIBILITY_AUDIT.md: initial source-level findings and ordered refactor plan.
-- RUNTIME_AUDIT.md: historical runtime integration gaps; reconcile with Moving Out 2-only scope.
-- docs/: architecture and runtime research; Overcooked! 2 documents are historical inputs and not active requirements.
+- [Moving Out 2 only scope and migration plan](MOVING_OUT_2_ONLY_SCOPE.md)
+- [Initial compatibility audit](MOVING_OUT_2_COMPATIBILITY_AUDIT.md)
+- [Runtime audit notes](RUNTIME_AUDIT.md)
 
-## Build and CI
+## Build
 
-Use GitHub Actions to verify Android source/build/package steps. CI passing is not game-playability evidence. No proprietary game files may be uploaded as artifacts or committed.
+Android project lives under `android/`. The project targets ARM64. Build/CI success is reported independently from game compatibility.
 
-## Legal / distribution
+The current CI workflow may still package legacy compatibility and diagnostic components while the dedicated runtime migration is underway. Runtime slimming must be based on a dependency audit, not assumptions.
 
-Independent research; not affiliated with or endorsed by the rights holders. Moving Out 2 executable, assets, metadata, save data and proprietary plugins are not redistributed. Users supply game files they are legally entitled to use.
+## Game files and privacy
+
+Users provide their own legally obtained game installation. Executables, assets, metadata, save files and proprietary native plugins must not be committed, distributed in APKs, uploaded to CI, or attached to build artifacts.
+
+## Roadmap
+
+1. Audit and map existing launcher/runtime code.
+2. Remove misleading demo/multi-game UI and status flows.
+3. Implement Moving Out 2-specific installation verification.
+4. Establish a real supervised runtime launch path.
+5. Validate graphics presentation and the game's first frame.
+6. Integrate input, audio and Android lifecycle.
+7. Test menu and gameplay on physical ARM64 devices.
+8. Measure FPS, memory, thermal behavior, stability and startup time.
+9. Slim and pin runtime dependencies based on evidence.
+10. Prepare an APK release only after compatibility gates pass.
+
+## Legal / attribution
+
+Moving Out 2 is the property of its respective rights holders. This independent compatibility research project is not affiliated with or endorsed by them. The repository does not redistribute proprietary game content.
