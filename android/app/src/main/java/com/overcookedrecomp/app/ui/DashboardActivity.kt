@@ -530,7 +530,7 @@ private fun BottomHints(label: String = "A PILIH    /    B KEMBALI    /    MENU 
         Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 34.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("GHOST TOWN RECOMP   ·   UI PREVIEW", color = C.TextMuted, fontSize = 9.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
+        Text("MOVING OUT 2 ANDROID   ·   COMPATIBILITY BUILD", color = C.TextMuted, fontSize = 9.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
         Text(label, color = C.TextSecondary, fontSize = 9.sp, letterSpacing = 0.7.sp)
     }
 }
@@ -548,12 +548,12 @@ private fun GameDetailsSheet(
         Text(game.title, color = C.TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         Text("Kartu ini memakai artwork abstrak buatan sendiri. Tidak ada file game atau aset komersial yang disertakan.", color = C.TextSecondary, fontSize = 12.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            StatBlock("DATA GAME", "Belum dipilih")
+            StatBlock("DATA GAME", "Belum diverifikasi")
             StatBlock("RUNTIME", if (runtimeInstalled) "Terdeteksi" else "Belum terpasang")
             StatBlock("DISPLAY SELF-TEST", if (displayPassed) "Lolos" else "Belum lolos")
         }
         val reason = when (state) {
-            PlayLaunchState.READY -> "Gate terpenuhi, tetapi peluncuran game tetap dinonaktifkan pada UI Preview."
+            PlayLaunchState.READY -> "Runtime/display gate terdeteksi, tetapi integrasi launch game belum tersedia."
             PlayLaunchState.BLOCKED_RUNTIME -> "Runtime belum terpasang."
             PlayLaunchState.BLOCKED_DISPLAY -> "Display belum lolos tes."
             PlayLaunchState.PROCESSING -> "Memeriksa kesiapan..."
@@ -582,15 +582,15 @@ private fun GameDetailsSheet(
             }
             Button(
                 onClick = { },
-                enabled = state == PlayLaunchState.READY,
+                enabled = false,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = C.Accent, contentColor = C.Storm,
                     disabledContainerColor = C.SurfaceElevated, disabledContentColor = C.TextMuted
                 ),
                 modifier = Modifier.heightIn(min = 48.dp)
-            ) { Text("PLAY", fontWeight = FontWeight.Bold) }
+            ) { Text("PLAY  ·  BELUM TERSEDIA", fontWeight = FontWeight.Bold) }
         }
-        Text("Preview build: Play tidak menjalankan proses game.", color = C.TextMuted, fontSize = 10.sp)
+        Text("Status UI tidak membuktikan game dapat berjalan. Launch dinonaktifkan sampai runtime terintegrasi.", color = C.TextMuted, fontSize = 10.sp)
         TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) { Text("TUTUP") }
     }
 }
