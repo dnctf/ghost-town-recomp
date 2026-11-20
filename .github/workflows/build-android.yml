@@ -1,4 +1,4 @@
-name: Ghost Town Recomp Android APK Build and Size Audit
+name: Moving Out 2 Android APK Build and Size Audit
 
 on:
   push:
@@ -175,7 +175,7 @@ jobs:
       - name: Upload APKs and native library
         uses: actions/upload-artifact@v4
         with:
-          name: ghost-town-recomp-0.5.0-alpha.2-arm64
+          name: moving-out-2-android-0.5.0-alpha.2-arm64
           path: |
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
