@@ -61,15 +61,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private enum class DashboardTab(val label: String) { GAMES("Games"), LIBRARY("Library"), RUNTIME("Runtime"), SETTINGS("Settings") }
-private data class DemoGame(val title: String, val initials: String, val genre: String, val lastPlayed: String, val readiness: String, val runtime: String, val colors: List<Color>)
+private enum class DashboardTab(val label: String) { GAMES("Moving Out 2"), LIBRARY("Game Files"), RUNTIME("Runtime"), SETTINGS("Settings") }
+private data class TargetGame(val title: String, val initials: String, val genre: String, val lastPlayed: String, val readiness: String, val runtime: String, val colors: List<Color>)
 private data class Notice(val id: Int, val title: String, val detail: String)
 
-private val demoGames = listOf(
-    DemoGame("Ember Circuit", "EC", "Arcade / DEMO", "Belum pernah", "Data belum dipilih", "Bookworm · pending", listOf(Color(0xFF315A60), Color(0xFF172A3A))),
-    DemoGame("Cloud Harbor", "CH", "Adventure / DEMO", "Kemarin · 18:42", "Data terdeteksi", "Bookworm · pending", listOf(Color(0xFF596A83), Color(0xFF29384D))),
-    DemoGame("Mosslight", "ML", "Puzzle / DEMO", "12 Nov 2026", "Belum diverifikasi", "Bookworm · pending", listOf(Color(0xFF486C58), Color(0xFF1B3834))),
-    DemoGame("Signal Drift", "SD", "Racing / DEMO", "Belum pernah", "Data belum dipilih", "Bookworm · pending", listOf(Color(0xFF80624A), Color(0xFF382D36)))
+private val targetGames = listOf(
+    TargetGame("Moving Out 2", "MO2", "UNITY IL2CPP / WINDOWS x64", "Belum dimainkan", "Belum divalidasi", "Runtime belum tersedia", listOf(Color(0xFFCE8D45), Color(0xFF263B4C)))
 )
 
 class DashboardActivity : ComponentActivity() {
@@ -109,7 +106,7 @@ private fun ConsoleDashboard() {
         Notice(2, "RUNTIME PENDING", "Pemasangan belum tersedia")
     )) }
     var nextNoticeId by remember { mutableIntStateOf(3) }
-    val selected = demoGames[selectedIndex.coerceIn(0, demoGames.lastIndex)]
+    val selected = targetGames[selectedIndex.coerceIn(0, targetGames.lastIndex)]
     val playState = PlayLaunchPolicy.resolve(gate.runtimeInstalled, gate.displaySelfTestPassed)
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -182,7 +179,7 @@ private fun ConsoleDashboard() {
                     Key.DirectionRight -> {
                         if (tabsFocused || activeTab != DashboardTab.GAMES) {
                             activeTab = DashboardTab.entries[(activeTab.ordinal + 1).coerceAtMost(DashboardTab.entries.lastIndex)]
-                        } else if (!detailsOpen) selectedIndex = (selectedIndex + 1).coerceAtMost(demoGames.lastIndex)
+                        } else if (!detailsOpen) selectedIndex = (selectedIndex + 1).coerceAtMost(targetGames.lastIndex)
                         true
                     }
                     Key.DirectionUp -> { tabsFocused = true; true }
@@ -269,18 +266,18 @@ private fun ConsoleDashboard() {
             }
         }
         if (searchOpen) {
-            val matches = demoGames.withIndex().filter { it.value.title.contains(searchQuery, ignoreCase = true) }
+            val matches = targetGames.withIndex().filter { it.value.title.contains(searchQuery, ignoreCase = true) }
             AlertDialog(
                 onDismissRequest = { searchOpen = false },
                 containerColor = C.Surface,
-                title = { Text("Cari game DEMO", color = C.TextPrimary) },
+                title = { Text("Moving Out 2", color = C.TextPrimary) },
                 text = {
                     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             singleLine = true,
-                            label = { Text("Nama game") }
+                            label = { Text("Cari Moving Out 2") }
                         )
                         Spacer(Modifier.height(8.dp))
                         matches.forEach { match ->
@@ -293,7 +290,7 @@ private fun ConsoleDashboard() {
                                 Text(match.value.title, color = C.TextPrimary)
                             }
                         }
-                        if (matches.isEmpty()) Text("Tidak ada game DEMO yang cocok.", color = C.TextMuted, fontSize = 11.sp)
+                        if (matches.isEmpty()) Text("Moving Out 2 tidak ditemukan.", color = C.TextMuted, fontSize = 11.sp)
                     }
                 },
                 confirmButton = { TextButton(onClick = { searchOpen = false }) { Text("TUTUP") } }
@@ -304,7 +301,7 @@ private fun ConsoleDashboard() {
                 onDismissRequest = { contextMenuOpen = false },
                 containerColor = C.Surface,
                 title = { Text("Menu · ${selected.title}", color = C.TextPrimary) },
-                text = { Text("DEMO · Detail game, pilih folder data, atau lihat status runtime.", color = C.TextSecondary) },
+                text = { Text("Moving Out 2 · Verifikasi game, folder data, dan kesiapan runtime.", color = C.TextSecondary) },
                 confirmButton = {
                     TextButton(onClick = { contextMenuOpen = false; detailsOpen = true }) { Text("DETAIL") }
                 },
@@ -333,7 +330,7 @@ private fun TopBar(
                 Text("GT", color = C.Storm, fontWeight = FontWeight.Black, fontSize = 15.sp)
             }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("GHOST TOWN", color = C.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
+                Text("MOVING OUT 2", color = C.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
                 Text("PROFIL LOKAL  ·  ${if (runtimeReady) "RUNTIME: SIAP" else "RUNTIME: BELUM TERPASANG"}", color = if (runtimeReady) C.Accent else C.Warning, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
             }
         }
@@ -388,17 +385,17 @@ private fun GamesHome(
     onAddGame: () -> Unit,
     onRuntime: () -> Unit,
     onSearch: () -> Unit,
-    selected: DemoGame,
+    selected: TargetGame,
     onDetails: () -> Unit
 ) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("YOUR LIBRARY  /  DEMO", color = C.Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-                    Text("Pilih petualangan berikutnya.", color = C.TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+                    Text("DEDICATED GAME  /  MOVING OUT 2", color = C.Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                    Text("Windows PC game · Android ARM64 target", color = C.TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                 }
-                Text("4 GAME CONTOH", color = C.TextMuted, fontSize = 10.sp, letterSpacing = 1.sp)
+                Text("GAME-SPECIFIC RUNTIME", color = C.TextMuted, fontSize = 10.sp, letterSpacing = 1.sp)
             }
             Spacer(Modifier.height(16.dp))
             Row(
@@ -406,7 +403,7 @@ private fun GamesHome(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                demoGames.forEachIndexed { index, game ->
+                targetGames.forEachIndexed { index, game ->
                     GameCard(
                         game = game,
                         selected = selectedIndex == index,
@@ -414,7 +411,7 @@ private fun GamesHome(
                         onLongClick = { onLongSelect(index) }
                     )
                 }
-                UtilityCard("＋", "Tambah game", "Pilih folder data", onAddGame)
+                UtilityCard("＋", "Import Moving Out 2", "Pilih folder game", onAddGame)
                 UtilityCard("◈", "Runtime", "Komponen & unduhan", onRuntime)
             }
         }
@@ -436,7 +433,7 @@ private fun GamesHome(
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onSearch, modifier = Modifier.heightIn(min = 48.dp)) { Text("CARI  Y", color = C.TextSecondary, fontSize = 10.sp) }
                 Button(onClick = onDetails, colors = ButtonDefaults.buttonColors(containerColor = C.Accent, contentColor = C.Storm), modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("DETAIL GAME  →", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Text("DETAIL MOVING OUT 2  →", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         }
@@ -445,7 +442,7 @@ private fun GamesHome(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun GameCard(game: DemoGame, selected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun GameCard(game: TargetGame, selected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     val width = if (selected) 252.dp else 174.dp
     val height = if (selected) 188.dp else 148.dp
     val animatedWidth by androidx.compose.animation.core.animateDpAsState(targetValue = width, animationSpec = tween(GhostTownSpace.FocusDuration), label = "card-width")
