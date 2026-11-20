@@ -115,8 +115,8 @@ private fun ConsoleDashboard() {
                 context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             }
             libraryUri = uri.toString()
-            context.getSharedPreferences("ui-preview", Context.MODE_PRIVATE).edit().putString("library_uri", libraryUri).apply()
-            notices = (notices + Notice(nextNoticeId, "FOLDER TERSAMBUNG", "Akses folder tersimpan")).takeLast(2)
+            context.getSharedPreferences("moving-out-2", Context.MODE_PRIVATE).edit().putString("game_folder_uri", libraryUri).apply()
+            mo2Validation = MovingOut2InstallationValidator.validate(context, uri)\n            val validationNotice = if (mo2Validation.detected) "File baseline Moving Out 2 terdeteksi; runtime belum teruji." else mo2Validation.summary\n            notices = (notices + Notice(nextNoticeId, "VALIDASI FILE", validationNotice)).takeLast(2)
             nextNoticeId++
         }
     }
@@ -628,7 +628,7 @@ private fun RuntimeRow(label: String, status: String, ready: Boolean) {
 }
 
 @Composable
-private fun LibraryScreen(libraryUri: String?, onPick: () -> Unit) {
+private fun LibraryScreen(libraryUri: String?, validation: MovingOut2InstallationValidator.Report, onPick: () -> Unit) {
     val context = LocalContext.current
     val folderName = libraryUri?.let { uri -> runCatching { DocumentFile.fromTreeUri(context, android.net.Uri.parse(uri))?.name }.getOrNull() ?: uri } ?: "Belum ada folder yang dipilih"
     Column(Modifier.fillMaxSize().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
