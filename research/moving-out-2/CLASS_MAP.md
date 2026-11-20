@@ -2,9 +2,9 @@
 
 ## Status
 
-**NOT TESTED — metadata artifact not present in the baseline repository inventory.**
+**PARTIALLY VERIFIED — user-supplied metadata is present locally and its header identifies IL2CPP metadata version 29. Full assembly/type/method table parsing is NOT TESTED.**
 
-The baseline inventory lists `GameAssembly.dll` but does not list `global-metadata.dat`. The metadata file is often located below `<Game>_Data/il2cpp_data/Metadata/global-metadata.dat`, but that conventional path is not proof of availability for this build.
+The baseline inventory did not list `global-metadata.dat`; a user has since supplied it for local analysis. The file is 15,397,704 bytes, begins with sanity magic `0xFAB11BAF`, and declares metadata version `29`. It is not committed to the repository. The matching `GameAssembly.dll` has not yet been supplied in this analysis session.
 
 ## What is blocked
 
@@ -27,4 +27,4 @@ The parser must not be used to claim that a Moving Out 2 metadata file has been 
 
 ## Required input
 
-A local, user-provided `global-metadata.dat` can be analyzed in-session. It must not be committed, attached to a release, or redistributed. If unavailable, continue with binary strings/import analysis and label all class-map claims NOT TESTED.
+The user-supplied `global-metadata.dat` was analyzed locally and must not be committed, attached to a release, or redistributed. Next required input is the matching `GameAssembly.dll` (or a text-only PE/import/export report plus a locally run parser output). Keep full type/method mapping labelled NOT TESTED until parser validation and binary cross-reference are complete.
