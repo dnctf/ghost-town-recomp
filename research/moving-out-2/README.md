@@ -7,7 +7,9 @@
 - Research branch: `research/moving-out-2-baseline`
 - Research PR: [#11](https://github.com/dnctf/ghost-town-recomp/pull/11) — open, draft; not merged.
 - Moving Out 2 sample: Windows x64 Unity IL2CPP, Unity 2021.3.16f1 / build 1.2.274 are **baseline leads** from earlier binary inspection. The original binaries are not mounted in this continuation.
-- `global-metadata.dat`: not listed in the baseline inventory; class/method mapping is blocked until a user-provided local artifact is available.
+- `global-metadata.dat`: now supplied and structurally identified as IL2CPP metadata version 29. A complete type/method map still requires a validated v29 parser and the matching `GameAssembly.dll`.
+- Metadata strings identify Photon Fusion, Steam/Team17 CrossPlay, Unity Input System, FMOD, Addressables, and URP-related assemblies/APIs. These are static metadata findings, not runtime initialization proof.
+- Unity resource markers disagree: `unity default resources` reports `2021.3.13f1`, while `unity_builtin_extra` reports `2021.3.16f1`; provenance must be reconciled.
 - Ghost Town: source audit found Wine/Box64 bootstrap and X11/VirGL scaffolding, but no verified Moving Out 2 launch, IL2CPP execution, guest audio/input bridge, or game first frame.
 - Lifecycle correctness: controller now waits in `WAITING_FOR_FIRST_FRAME` after session start and requires explicit renderer confirmation before `RUNNING`. The real renderer callback is not yet wired.
 - Tests and CI: source-level regression tests were added; execution status must be checked in the PR workflow before claiming they pass.
@@ -19,6 +21,7 @@
 | [FILE_INVENTORY.md](FILE_INVENTORY.md) | Baseline inventory, hashes, missing artifacts, next required inputs |
 | [BINARY_ANALYSIS.md](BINARY_ANALYSIS.md) | PE/dependency analysis, reproducible read-only commands, evidence limits |
 | [CLASS_MAP.md](CLASS_MAP.md) | IL2CPP metadata availability and parser limitations |
+| [IL2CPP_METADATA_ADDENDUM.md](IL2CPP_METADATA_ADDENDUM.md) | User-supplied metadata v29, assembly/API evidence, Unity resource findings, fingerprints and next experiments |
 | [RUNTIME_FLOW.md](RUNTIME_FLOW.md) | Startup/lifecycle evidence model and first-frame gate |
 | [GRAPHICS_ANALYSIS.md](GRAPHICS_ANALYSIS.md) | D3D/Vulkan uncertainty, DXVK, Turnip, VirGL and Android surface |
 | [CPU_COMPATIBILITY.md](CPU_COMPATIBILITY.md) | x86-64, Burst, Box64 and ARM64 validation |
@@ -52,12 +55,13 @@ The SHA-256 values and approximate sizes for the 17 previously supplied files ar
 
 ## Immediate next requirements
 
-1. If available, analyze a local `global-metadata.dat` in-session; do not commit it.
-2. Obtain text-only PE headers/imports/exports and plugin-directory listing from the user's legitimate Windows installation.
-3. Wire actual renderer first-present callback to the new controller gate.
-4. Implement a supervised Wine/Box64 game process driver.
-5. Validate guest X11/VirGL or Vulkan presentation on target Android hardware before enabling DXVK/Turnip.
-6. Validate guest input/audio and collect reproducible device diagnostics.
+1. Obtain or verify the matching `GameAssembly.dll` and produce a text-only PE/import/export report; do not commit proprietary binaries.
+2. Implement and test a version-29 IL2CPP metadata parser, then cross-reference metadata with the matching native binary.
+3. Reconcile the `2021.3.13f1` vs `2021.3.16f1` Unity resource markers against original installation paths.
+4. Wire actual renderer first-present callback to the new controller gate.
+5. Implement a supervised Wine/Box64 game process driver.
+6. Validate guest X11/VirGL or Vulkan presentation on target Android hardware before enabling DXVK/Turnip.
+7. Validate guest input/audio and collect reproducible device diagnostics.
 
 ## Do not commit
 
