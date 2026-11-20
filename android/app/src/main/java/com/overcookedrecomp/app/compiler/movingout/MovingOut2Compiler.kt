@@ -11,14 +11,12 @@ import java.io.FileInputStream
 import java.security.MessageDigest
 
 /**
- * Compiler dan Manager untuk game "Moving Out 2" (Ghost Town Games / Team17)
- * Berfungsi ganda:
- * (a) Compiler game Moving Out 2 (adaptasi pipeline physics joint, arcade chaos, dan co-op delivery)
- * (b) Launcher untuk game developer Ghost Town Games
+ * Game profile/validator for Moving Out 2 (SMG Studio and DevM Games; published by Team17)
+ * Validates the supplied Moving Out 2 PC installation and delegates to the app runtime session.
  */
 class MovingOut2Compiler : GameCompiler {
 
-    override val developer: Developer = Developer.GHOST_TOWN_GAMES
+    override val developer: Developer = Developer.GHOST_TOWN_GAMES // legacy enum key; display metadata corrected to SMG Studio / DevM Games
 
     override val gameId: String = "moving_out_2"
 
@@ -96,13 +94,9 @@ class MovingOut2Compiler : GameCompiler {
     }
 
     override fun compileAndPrepare(context: Context, dataDir: File, onProgress: (String) -> Unit): Boolean {
-        Log.i(TAG, "Menjalankan tahapan kompilasi pipeline Moving Out 2...")
-        onProgress("Memeriksa dependensi physics joint multiplayer, arcade chaos & co-op delivery...")
-        try {
-            Thread.sleep(150) // Simulasi penataan pipeline shader
-        } catch (ignored: InterruptedException) {}
-        onProgress("Menyiapkan shader translasi physics joint multiplayer, arcade chaos & co-op delivery...")
-        return true
+        Log.w(TAG, "No native recompilation/preparation pipeline is implemented for Moving Out 2.")
+        onProgress("Native preparation is unavailable. Runtime compatibility must be configured and validated separately.")
+        return false
     }
 
     override fun launchGame(context: Context, dataDir: File) {

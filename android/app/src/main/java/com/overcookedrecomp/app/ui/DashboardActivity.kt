@@ -61,15 +61,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private enum class DashboardTab(val label: String) { GAMES("Games"), LIBRARY("Library"), RUNTIME("Runtime"), SETTINGS("Settings") }
-private data class DemoGame(val title: String, val initials: String, val genre: String, val lastPlayed: String, val readiness: String, val runtime: String, val colors: List<Color>)
+private enum class DashboardTab(val label: String) { GAMES("Moving Out 2"), LIBRARY("Game Files"), RUNTIME("Runtime"), SETTINGS("Settings") }
+private data class TargetGame(val title: String, val initials: String, val genre: String, val lastPlayed: String, val readiness: String, val runtime: String, val colors: List<Color>)
 private data class Notice(val id: Int, val title: String, val detail: String)
 
-private val demoGames = listOf(
-    DemoGame("Ember Circuit", "EC", "Arcade / DEMO", "Belum pernah", "Data belum dipilih", "Bookworm · pending", listOf(Color(0xFF315A60), Color(0xFF172A3A))),
-    DemoGame("Cloud Harbor", "CH", "Adventure / DEMO", "Kemarin · 18:42", "Data terdeteksi", "Bookworm · pending", listOf(Color(0xFF596A83), Color(0xFF29384D))),
-    DemoGame("Mosslight", "ML", "Puzzle / DEMO", "12 Nov 2026", "Belum diverifikasi", "Bookworm · pending", listOf(Color(0xFF486C58), Color(0xFF1B3834))),
-    DemoGame("Signal Drift", "SD", "Racing / DEMO", "Belum pernah", "Data belum dipilih", "Bookworm · pending", listOf(Color(0xFF80624A), Color(0xFF382D36)))
+private val targetGames = listOf(
+    TargetGame("Moving Out 2", "MO2", "UNITY IL2CPP / WINDOWS x64", "Belum dimainkan", "Belum divalidasi", "Runtime belum tersedia", listOf(Color(0xFFCE8D45), Color(0xFF263B4C)))
 )
 
 class DashboardActivity : ComponentActivity() {
@@ -99,17 +96,18 @@ private fun ConsoleDashboard() {
     var uiScale by remember { mutableFloatStateOf(1f) }
     var uiSounds by remember { mutableStateOf(false) }
     var controlsMap by remember { mutableStateOf("Default · Gamepad") }
-    var libraryUri by remember { mutableStateOf(context.getSharedPreferences("ui-preview", Context.MODE_PRIVATE).getString("library_uri", null)) }
+    var libraryUri by remember { mutableStateOf(context.getSharedPreferences("moving-out-2", Context.MODE_PRIVATE).getString("game_folder_uri", null)) }
+    var mo2Validation by remember { mutableStateOf(MovingOut2InstallationValidator.Report(false, false, "Folder game belum dipilih.", listOf("Pilih folder Moving Out 2"), emptyList())) }
     var timeText by remember { mutableStateOf("--:--") }
     var battery by remember { mutableIntStateOf(-1) }
     var thermal by remember { mutableStateOf("TERMAL: —") }
     var gate by remember { mutableStateOf(RuntimeLaunchGate.read(context)) }
     var notices by remember { mutableStateOf(listOf(
-        Notice(1, "MODE DEMO", "Konten contoh · tidak ada aset game"),
+        Notice(1, "MOVING OUT 2 ONLY", "Game khusus · runtime compatibility belum terverifikasi"),
         Notice(2, "RUNTIME PENDING", "Pemasangan belum tersedia")
     )) }
     var nextNoticeId by remember { mutableIntStateOf(3) }
-    val selected = demoGames[selectedIndex.coerceIn(0, demoGames.lastIndex)]
+    val selected = targetGames[selectedIndex.coerceIn(0, targetGames.lastIndex)].copy(readiness = mo2Validation.summary)
     val playState = PlayLaunchPolicy.resolve(gate.runtimeInstalled, gate.displaySelfTestPassed)
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -117,8 +115,10 @@ private fun ConsoleDashboard() {
                 context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             }
             libraryUri = uri.toString()
-            context.getSharedPreferences("ui-preview", Context.MODE_PRIVATE).edit().putString("library_uri", libraryUri).apply()
-            notices = (notices + Notice(nextNoticeId, "FOLDER TERSAMBUNG", "Akses folder tersimpan")).takeLast(2)
+            context.getSharedPreferences("moving-out-2", Context.MODE_PRIVATE).edit().putString("game_folder_uri", libraryUri).apply()
+            mo2Validation = MovingOut2InstallationValidator.validate(context, uri)
+val validationNotice = if (mo2Validation.detected) "File baseline Moving Out 2 terdeteksi; runtime belum teruji." else mo2Validation.summary
+notices = (notices + Notice(nextNoticeId, "VALIDASI FILE", validationNotice)).takeLast(2)
             nextNoticeId++
         }
     }
@@ -182,7 +182,7 @@ private fun ConsoleDashboard() {
                     Key.DirectionRight -> {
                         if (tabsFocused || activeTab != DashboardTab.GAMES) {
                             activeTab = DashboardTab.entries[(activeTab.ordinal + 1).coerceAtMost(DashboardTab.entries.lastIndex)]
-                        } else if (!detailsOpen) selectedIndex = (selectedIndex + 1).coerceAtMost(demoGames.lastIndex)
+                        } else if (!detailsOpen) selectedIndex = (selectedIndex + 1).coerceAtMost(targetGames.lastIndex)
                         true
                     }
                     Key.DirectionUp -> { tabsFocused = true; true }
@@ -228,6 +228,7 @@ private fun ConsoleDashboard() {
                     )
                     DashboardTab.LIBRARY -> LibraryScreen(
                         libraryUri = libraryUri,
+                        validation = mo2Validation,
                         onPick = { picker.launch(null) }
                     )
                     DashboardTab.RUNTIME -> RuntimeScreen(gate = gate)
@@ -269,18 +270,18 @@ private fun ConsoleDashboard() {
             }
         }
         if (searchOpen) {
-            val matches = demoGames.withIndex().filter { it.value.title.contains(searchQuery, ignoreCase = true) }
+            val matches = targetGames.withIndex().filter { it.value.title.contains(searchQuery, ignoreCase = true) }
             AlertDialog(
                 onDismissRequest = { searchOpen = false },
                 containerColor = C.Surface,
-                title = { Text("Cari game DEMO", color = C.TextPrimary) },
+                title = { Text("Moving Out 2", color = C.TextPrimary) },
                 text = {
                     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             singleLine = true,
-                            label = { Text("Nama game") }
+                            label = { Text("Cari Moving Out 2") }
                         )
                         Spacer(Modifier.height(8.dp))
                         matches.forEach { match ->
@@ -293,7 +294,7 @@ private fun ConsoleDashboard() {
                                 Text(match.value.title, color = C.TextPrimary)
                             }
                         }
-                        if (matches.isEmpty()) Text("Tidak ada game DEMO yang cocok.", color = C.TextMuted, fontSize = 11.sp)
+                        if (matches.isEmpty()) Text("Moving Out 2 tidak ditemukan.", color = C.TextMuted, fontSize = 11.sp)
                     }
                 },
                 confirmButton = { TextButton(onClick = { searchOpen = false }) { Text("TUTUP") } }
@@ -304,7 +305,7 @@ private fun ConsoleDashboard() {
                 onDismissRequest = { contextMenuOpen = false },
                 containerColor = C.Surface,
                 title = { Text("Menu · ${selected.title}", color = C.TextPrimary) },
-                text = { Text("DEMO · Detail game, pilih folder data, atau lihat status runtime.", color = C.TextSecondary) },
+                text = { Text("Moving Out 2 · Verifikasi game, folder data, dan kesiapan runtime.", color = C.TextSecondary) },
                 confirmButton = {
                     TextButton(onClick = { contextMenuOpen = false; detailsOpen = true }) { Text("DETAIL") }
                 },
@@ -333,7 +334,7 @@ private fun TopBar(
                 Text("GT", color = C.Storm, fontWeight = FontWeight.Black, fontSize = 15.sp)
             }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("GHOST TOWN", color = C.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
+                Text("MOVING OUT 2", color = C.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
                 Text("PROFIL LOKAL  ·  ${if (runtimeReady) "RUNTIME: SIAP" else "RUNTIME: BELUM TERPASANG"}", color = if (runtimeReady) C.Accent else C.Warning, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
             }
         }
@@ -388,17 +389,17 @@ private fun GamesHome(
     onAddGame: () -> Unit,
     onRuntime: () -> Unit,
     onSearch: () -> Unit,
-    selected: DemoGame,
+    selected: TargetGame,
     onDetails: () -> Unit
 ) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("YOUR LIBRARY  /  DEMO", color = C.Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-                    Text("Pilih petualangan berikutnya.", color = C.TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+                    Text("DEDICATED GAME  /  MOVING OUT 2", color = C.Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                    Text("Windows PC game · Android ARM64 target", color = C.TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                 }
-                Text("4 GAME CONTOH", color = C.TextMuted, fontSize = 10.sp, letterSpacing = 1.sp)
+                Text("GAME-SPECIFIC RUNTIME", color = C.TextMuted, fontSize = 10.sp, letterSpacing = 1.sp)
             }
             Spacer(Modifier.height(16.dp))
             Row(
@@ -406,7 +407,7 @@ private fun GamesHome(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                demoGames.forEachIndexed { index, game ->
+                targetGames.forEachIndexed { index, game ->
                     GameCard(
                         game = game,
                         selected = selectedIndex == index,
@@ -414,7 +415,7 @@ private fun GamesHome(
                         onLongClick = { onLongSelect(index) }
                     )
                 }
-                UtilityCard("＋", "Tambah game", "Pilih folder data", onAddGame)
+                UtilityCard("＋", "Import Moving Out 2", "Pilih folder game", onAddGame)
                 UtilityCard("◈", "Runtime", "Komponen & unduhan", onRuntime)
             }
         }
@@ -436,7 +437,7 @@ private fun GamesHome(
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onSearch, modifier = Modifier.heightIn(min = 48.dp)) { Text("CARI  Y", color = C.TextSecondary, fontSize = 10.sp) }
                 Button(onClick = onDetails, colors = ButtonDefaults.buttonColors(containerColor = C.Accent, contentColor = C.Storm), modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("DETAIL GAME  →", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Text("DETAIL MOVING OUT 2  →", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         }
@@ -445,7 +446,7 @@ private fun GamesHome(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun GameCard(game: DemoGame, selected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun GameCard(game: TargetGame, selected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     val width = if (selected) 252.dp else 174.dp
     val height = if (selected) 188.dp else 148.dp
     val animatedWidth by androidx.compose.animation.core.animateDpAsState(targetValue = width, animationSpec = tween(GhostTownSpace.FocusDuration), label = "card-width")
@@ -472,7 +473,7 @@ private fun GameCard(game: DemoGame, selected: Boolean, onClick: () -> Unit, onL
             drawPath(path, Color.Black.copy(alpha = 0.22f))
         }
         Column(Modifier.align(Alignment.TopStart).padding(16.dp)) {
-            Text("DEMO", color = Color.White.copy(alpha = 0.75f), fontSize = 9.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+            Text("MOVING OUT 2", color = Color.White.copy(alpha = 0.75f), fontSize = 9.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             Text(game.initials, color = Color.White.copy(alpha = if (selected) 0.96f else 0.72f), fontSize = if (selected) 48.sp else 34.sp, fontWeight = FontWeight.Black, letterSpacing = (-2).sp)
             Text(game.title, color = Color.White, fontSize = if (selected) 15.sp else 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -533,30 +534,30 @@ private fun BottomHints(label: String = "A PILIH    /    B KEMBALI    /    MENU 
         Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 34.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("GHOST TOWN RECOMP   ·   UI PREVIEW", color = C.TextMuted, fontSize = 9.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
+        Text("MOVING OUT 2 ANDROID   ·   COMPATIBILITY BUILD", color = C.TextMuted, fontSize = 9.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
         Text(label, color = C.TextSecondary, fontSize = 9.sp, letterSpacing = 0.7.sp)
     }
 }
 
 @Composable
 private fun GameDetailsSheet(
-    game: DemoGame,
+    game: TargetGame,
     state: PlayLaunchState,
     runtimeInstalled: Boolean,
     displayPassed: Boolean,
     onClose: () -> Unit
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp).padding(bottom = 30.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("DETAIL GAME  /  DEMO", color = C.Accent, fontSize = 10.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold)
+        Text("GAME PROFILE  /  MOVING OUT 2", color = C.Accent, fontSize = 10.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold)
         Text(game.title, color = C.TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         Text("Kartu ini memakai artwork abstrak buatan sendiri. Tidak ada file game atau aset komersial yang disertakan.", color = C.TextSecondary, fontSize = 12.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            StatBlock("DATA GAME", "Belum dipilih")
+            StatBlock("DATA GAME", game.readiness)
             StatBlock("RUNTIME", if (runtimeInstalled) "Terdeteksi" else "Belum terpasang")
             StatBlock("DISPLAY SELF-TEST", if (displayPassed) "Lolos" else "Belum lolos")
         }
         val reason = when (state) {
-            PlayLaunchState.READY -> "Gate terpenuhi, tetapi peluncuran game tetap dinonaktifkan pada UI Preview."
+            PlayLaunchState.READY -> "Runtime/display gate terdeteksi, tetapi integrasi launch game belum tersedia."
             PlayLaunchState.BLOCKED_RUNTIME -> "Runtime belum terpasang."
             PlayLaunchState.BLOCKED_DISPLAY -> "Display belum lolos tes."
             PlayLaunchState.PROCESSING -> "Memeriksa kesiapan..."
@@ -585,15 +586,15 @@ private fun GameDetailsSheet(
             }
             Button(
                 onClick = { },
-                enabled = state == PlayLaunchState.READY,
+                enabled = false,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = C.Accent, contentColor = C.Storm,
                     disabledContainerColor = C.SurfaceElevated, disabledContentColor = C.TextMuted
                 ),
                 modifier = Modifier.heightIn(min = 48.dp)
-            ) { Text("PLAY", fontWeight = FontWeight.Bold) }
+            ) { Text("PLAY  ·  BELUM TERSEDIA", fontWeight = FontWeight.Bold) }
         }
-        Text("Preview build: Play tidak menjalankan proses game.", color = C.TextMuted, fontSize = 10.sp)
+        Text("Status UI tidak membuktikan game dapat berjalan. Launch dinonaktifkan sampai runtime terintegrasi.", color = C.TextMuted, fontSize = 10.sp)
         TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) { Text("TUTUP") }
     }
 }
@@ -630,7 +631,7 @@ private fun RuntimeRow(label: String, status: String, ready: Boolean) {
 }
 
 @Composable
-private fun LibraryScreen(libraryUri: String?, onPick: () -> Unit) {
+private fun LibraryScreen(libraryUri: String?, validation: MovingOut2InstallationValidator.Report, onPick: () -> Unit) {
     val context = LocalContext.current
     val folderName = libraryUri?.let { uri -> runCatching { DocumentFile.fromTreeUri(context, android.net.Uri.parse(uri))?.name }.getOrNull() ?: uri } ?: "Belum ada folder yang dipilih"
     Column(Modifier.fillMaxSize().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -644,7 +645,9 @@ private fun LibraryScreen(libraryUri: String?, onPick: () -> Unit) {
             Text("PILIH LOKASI DATA", color = C.TextSecondary, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Bold)
             Text(folderName, color = C.TextPrimary, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Button(onClick = onPick, modifier = Modifier.heightIn(min = 52.dp)) { Text("PILIH FOLDER  ·  SAF") }
-            Text("Akses folder disimpan melalui Storage Access Framework. Preview tidak menyalin atau mendistribusikan data game.", color = C.TextMuted, fontSize = 11.sp)
+            Text(validation.summary, color = if (validation.detected) C.Accent else C.Warning, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+if (validation.missing.isNotEmpty()) Text("Missing: " + validation.missing.joinToString(", "), color = C.TextMuted, fontSize = 10.sp)
+Text("Pemeriksaan file bersifat read-only. File game tidak dieksekusi, disalin, atau didistribusikan oleh validator.", color = C.TextMuted, fontSize = 11.sp)
         }
     }
 }

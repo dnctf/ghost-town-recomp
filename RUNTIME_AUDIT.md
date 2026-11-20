@@ -1,34 +1,26 @@
+## Project overview and runtime integration status update (2026-11-20)
 
-
-## Project overview and runtime integration status update (2026-11-19)
-
-README was refreshed to describe the app's purpose, intended architecture, implementation foundations and roadmap. This documentation update does not claim game playability or a first-frame result.
-
-
-### Project identity
-
-Ghost Town Recomp is experimental Android ARM64 launcher/runtime research focused on game-oriented Android sessions for user-provided Windows PC games. Initial candidates are Overcooked! 2 and Moving Out 2. The goals are installation inspection, compatibility profiles, runtime orchestration, graphics presentation, input/audio, lifecycle and diagnostics while keeping compatibility/desktop components internal.
-
+The Moving Out 2 continuation added a first-frame gate to the platform-independent lifecycle controller and expanded the compatibility research documents. This is a source-level correctness improvement only; it does not claim game playability.
 
 ### Integration status
 
 | Area | Status | Remaining gap |
 |---|---|---|
-| Android build foundation | CI evidence exists | Recheck newest branch workflow before claiming current-green status |
+| Android build foundation | CI workflow triggered for PR #11; pending at last check | Wait for completed run and inspect logs |
 | Game validation | Partial | File checks are not runtime compatibility proof |
 | SAF/catalog | Partial | Persisted URI, scanner and catalog integration need verification |
 | Profiles | Partial | JSON/schema exist; runtime validation/resolution not integrated |
-| Runtime driver | Blocked | Persistent game launch and process supervision not proven |
+| Runtime driver | Blocked | Persistent Wine/Box64 game launch and process supervision not proven |
 | Graphics | Blocked | Vulkan/native surface does not prove Wine/DXVK game presentation |
-| First frame | Blocked | Renderer-confirmed event absent |
-| Input/audio | Partial | Native scaffolding exists; game bridge unverified |
+| First-frame state semantics | Implemented, tests updated | Real renderer callback is not yet wired to `confirmFirstFramePresented()` |
+| Input/audio | Partial | Android UI/native scaffolding exists; Wine guest bridge unverified |
 | Diagnostics | Partial | Correlation ID, unified event bus and export incomplete |
 | Device gameplay | Not verified | No repeatable device gameplay evidence |
 
 ### First-frame policy
 
-Keep graphics milestones distinct: `GPU_INITIALIZED`, `SWAPCHAIN_CREATED`, `SURFACE_ATTACHED`, and `FIRST_FRAME_PRESENTED`. The controller must not transition to `RUNNING` based only on a Boolean launch result. First-frame evidence must originate from the actual renderer/session path, not a native clear-frame test.
+Keep graphics milestones distinct: `GPU_INITIALIZED`, `SWAPCHAIN_CREATED`, `SURFACE_ATTACHED`, and `FIRST_FRAME_PRESENTED`. The controller now transitions from `STARTING_SESSION` to `WAITING_FOR_FIRST_FRAME`; only an explicit call to `confirmFirstFramePresented()` can transition it to `RUNNING`. The method must be called only by the actual game renderer after presenting its first frame, never by surface attachment or a host-side clear-frame test.
 
 ### Scope of this update
 
-Documentation only: README, runtime status document, and audit notes. No runtime code was changed and no build/device test was run in this documentation update.
+Source-level change: `GameSessionStateMachine`, `GameRuntimeController`, and their JVM regression tests. Research documentation was expanded. No local Gradle/NDK build, APK build, Windows launch, Android device test, or game session was run in this continuation.
