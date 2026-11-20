@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "game_id": "moving-out-2",
+  "game_id": "moving_out_2",
   "display_name": "Moving Out 2",
   "status": "untested",
   "resolution": {
@@ -34,10 +34,15 @@
     "fps_cap": 60
   },
   "detection": {
-    "unity_backend": "unknown",
+    "unity_backend": "il2cpp",
     "graphics_apis": [
       "unknown"
     ],
-    "evidence": []
+    "evidence": [
+      "Windows x86_64 / PE32+ executable",
+      "Unity IL2CPP build; global-metadata.dat identified as metadata version 29",
+      "Game version baseline 1.2.274; Unity 2021.3.16f1 baseline",
+      "User-provided file evidence: mo2.exe, GameAssembly.dll, UnityPlayer.dll, baselib.dll, BuildInfo.json"
+    ]
   }
 }
