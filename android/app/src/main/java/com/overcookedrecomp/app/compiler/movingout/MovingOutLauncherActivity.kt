@@ -1,284 +1,93 @@
 package com.overcookedrecomp.app.compiler.movingout
 
-import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.os.Bundle
-import android.util.DisplayMetrics
 import android.view.Gravity
-import android.view.View
-import android.view.ViewGroup
-import android.view.WindowManager
 import android.widget.Button
-import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ProgressBar
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
-import com.overcookedrecomp.app.R
-import com.overcookedrecomp.app.compiler.core.CompilerRegistry
-import com.overcookedrecomp.app.compiler.core.Developer
-import com.overcookedrecomp.app.compiler.core.VerificationStatus
 import java.io.File
 
 /**
- * Activity UI Launcher untuk developer "Ghost Town Games / Team17" dan game "Moving Out" & "Moving Out 2".
- * Menyediakan kontrol kompilasi asset pipeline, physics alignment, dan peluncur game.
+ * Moving Out 2-only status screen.
+ * It intentionally does not claim compilation, runtime readiness, or launch success.
  */
 class MovingOutLauncherActivity : AppCompatActivity() {
-
     companion object {
         const val EXTRA_DATA_DIR = "EXTRA_DATA_DIR"
         const val EXTRA_GAME_TITLE = "EXTRA_GAME_TITLE"
-        private const val TAG = "MovingOutLauncher"
+        private const val TAG = "MovingOut2Status"
     }
 
-    private lateinit var statusText: TextView
-    private lateinit var progressBar: ProgressBar
-    private lateinit var compileBtn: Button
-    private lateinit var launchBtn: Button
-
     private var gameDataDir: File? = null
-    private var compiler: com.overcookedrecomp.app.compiler.core.GameCompiler = MovingOutCompiler()
-    private var gameTitleDisplay: String = "Moving Out"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        gameDataDir = intent.getStringExtra(EXTRA_DATA_DIR)?.let(::File)
+            ?: getExternalFilesDir(null)?.let { File(it, "MovingOut2_Data") }
 
-        val titleExtra = intent.getStringExtra(EXTRA_GAME_TITLE)
-        if (titleExtra != null && (titleExtra.contains("2") || titleExtra.contains("II"))) {
-            compiler = MovingOut2Compiler()
-            gameTitleDisplay = "Moving Out 2"
-        } else {
-            compiler = MovingOutCompiler()
-            gameTitleDisplay = "Moving Out"
-        }
-
-        val dataDirPath = intent.getStringExtra(EXTRA_DATA_DIR)
-        gameDataDir = if (dataDirPath != null) File(dataDirPath) else getExternalFilesDir(null)?.let { File(it, compiler.defaultFolderName) }
-
-        val root = createLayout()
-        setContentView(root)
-
-        refreshStatus()
-    }
-
-    private fun createLayout(): View {
-        val scrollView = ScrollView(this).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            setBackgroundColor(Color.parseColor("#001824"))
-            isFillViewport = true
-        }
-
-        val container = LinearLayout(this).apply {
+        val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 36, 48, 48)
-            gravity = Gravity.CENTER_HORIZONTAL
-        }
-
-        // Header Developer Ghost Town Games
-        val devBadge = TextView(this).apply {
-            text = "🚚 GHOST TOWN GAMES / TEAM17 • LAUNCHER"
-            textSize = 12f
-            setTextColor(Color.parseColor("#06D6A0"))
-            typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 8)
+            setPadding(32, 28, 32, 28)
+            setBackgroundColor(Color.rgb(17, 31, 43))
         }
-        container.addView(devBadge)
-
-        // Game Title
-        val titleView = TextView(this).apply {
-            text = "📦 $gameTitleDisplay Recomp"
-            textSize = 24f
-            setTextColor(Color.parseColor("#00A8E8"))
+        val title = TextView(this).apply {
+            text = "MOVING OUT 2"
+            textSize = 26f
             typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.rgb(246, 199, 107))
             gravity = Gravity.CENTER
         }
-        container.addView(titleView)
-
-        val subTitle = TextView(this).apply {
-            text = "Kompilasi & Launcher Game Fisika Pindahan Rumah PC ke Android (Snapdragon Vulkan)"
-            textSize = 13f
-            setTextColor(Color.parseColor("#CCCCCC"))
-            gravity = Gravity.CENTER
-            setPadding(0, 8, 0, 24)
-        }
-        container.addView(subTitle)
-
-        // Card Info & Status
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = createCardDrawable("#003459", "#007EA7")
-            setPadding(32, 24, 32, 24)
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        }
-
-        val cardTitle = TextView(this).apply {
-            text = "Status Berkas Game PC"
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        card.addView(cardTitle)
-
-        statusText = TextView(this).apply {
-            text = "Memeriksa status instalasi..."
-            textSize = 13f
-            setTextColor(Color.parseColor("#E0E0E0"))
-            setPadding(0, 8, 0, 16)
-        }
-        card.addView(statusText)
-
-        progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-            isIndeterminate = true
-            visibility = View.GONE
-        }
-        card.addView(progressBar)
-
-        container.addView(card)
-
-        // Action Buttons
-        val spacer = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 24)
-        }
-        container.addView(spacer)
-
-        compileBtn = Button(this).apply {
-            text = "⚙️ Kompilasi & Persiapkan Asset Moving Out"
+        root.addView(title)
+        val subtitle = TextView(this).apply {
+            text = "Dedicated Android compatibility session"
             textSize = 14f
-            setTextColor(Color.WHITE)
-            background = createButtonDrawable("#007EA7")
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 12, 0, 12)
-            }
-            setOnClickListener { runCompilation() }
-        }
-        container.addView(compileBtn)
-
-        launchBtn = Button(this).apply {
-            text = "🎮 Mulai Moving Out"
-            textSize = 16f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.WHITE)
-            background = createButtonDrawable("#06D6A0")
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 8, 0, 12)
-            }
-            setOnClickListener {
-                val dir = gameDataDir
-                if (dir != null && dir.exists()) {
-                    Toast.makeText(this@MovingOutLauncherActivity, "Memulai Moving Out Engine...", Toast.LENGTH_SHORT).show()
-                    finish()
-                } else {
-                    Toast.makeText(this@MovingOutLauncherActivity, "Data Moving Out belum tersedia.", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-        container.addView(launchBtn)
-
-        val backBtn = Button(this).apply {
-            text = "⬅️ Kembali ke Menu Multi-Developer"
-            textSize = 13f
-            setTextColor(Color.parseColor("#CCCCCC"))
-            background = createButtonDrawable("#002233")
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+            setTextColor(Color.LTGRAY
             )
+            gravity = Gravity.CENTER
+            setPadding(0, 12, 0, 20)
+        }
+        root.addView(subtitle)
+
+        val dataDir = gameDataDir
+        val hasUnityCore = dataDir?.let { dir ->
+            listOf("globalgamemanagers", "data.unity3d", "level0").any { File(dir, it).isFile }
+        } ?: false
+        val hasIl2CppMetadata = dataDir?.let { File(it, "il2cpp_data/Metadata/global-metadata.dat").isFile } ?: false
+        val status = TextView(this).apply {
+            text = buildString {
+                append("Game data path: ")
+                append(dataDir?.absolutePath ?: "not selected")
+                append("\n\nUnity core files: ")
+                append(if (hasUnityCore) "detected" else "not detected")
+                append("\nIL2CPP metadata: ")
+                append(if (hasIl2CppMetadata) "detected" else "not detected")
+                append("\n\nRuntime compatibility: NOT VERIFIED")
+                append("\nGame boot / first frame / gameplay: NOT VERIFIED")
+            }
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setPadding(20, 18, 20, 18)
+            setBackgroundColor(Color.rgb(38, 57, 73))
+        }
+        root.addView(status)
+
+        val launch = Button(this).apply {
+            text = "Runtime belum tersedia — launch dinonaktifkan"
+            isEnabled = false
+            setPadding(8, 16, 8, 16)
+        }
+        root.addView(launch)
+
+        val back = Button(this).apply {
+            text = "Kembali"
             setOnClickListener { finish() }
         }
-        container.addView(backBtn)
-
-        scrollView.addView(container)
-        return scrollView
-    }
-
-    private fun refreshStatus() {
-        val baseDir = getExternalFilesDir(null) ?: return
-        val status = compiler.verifyInstallation(baseDir)
-
-        when (status) {
-            is VerificationStatus.Ready -> {
-                statusText.text = "✅ Status: Siap Dimainkan\nBackend: ${status.backendType}\nLokasi: ${status.targetDir.name}"
-                statusText.setTextColor(Color.parseColor("#06D6A0"))
-                compileBtn.isEnabled = true
-                launchBtn.isEnabled = true
-                launchBtn.alpha = 1.0f
-            }
-            is VerificationStatus.NotInstalled -> {
-                statusText.text = "❌ Status: Belum Terpasang\nHarap salin folder '${status.expectedFolder}' dari game PC Anda ke direktori aplikasi."
-                statusText.setTextColor(Color.parseColor("#E71D36"))
-                compileBtn.isEnabled = false
-                launchBtn.isEnabled = false
-                launchBtn.alpha = 0.5f
-            }
-            is VerificationStatus.Corrupted -> {
-                statusText.text = "⚠️ Status: Berkas Tidak Lengkap\n${status.message}"
-                statusText.setTextColor(Color.parseColor("#FFD166"))
-                compileBtn.isEnabled = false
-                launchBtn.isEnabled = false
-                launchBtn.alpha = 0.5f
-            }
-        }
-    }
-
-    private fun runCompilation() {
-        val dir = gameDataDir ?: return
-        progressBar.visibility = View.VISIBLE
-        compileBtn.isEnabled = false
-
-        Thread {
-            compiler.compileAndPrepare(this, dir) { msg ->
-                runOnUiThread {
-                    statusText.text = "⚡ $msg"
-                }
-            }
-            runOnUiThread {
-                progressBar.visibility = View.GONE
-                compileBtn.isEnabled = true
-                Toast.makeText(this, "Kompilasi asset Moving Out selesai!", Toast.LENGTH_SHORT).show()
-                refreshStatus()
-            }
-        }.start()
-    }
-
-    private fun createButtonDrawable(hexColor: String): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(Color.parseColor(hexColor))
-            cornerRadius = 14f
-        }
-    }
-
-    private fun createCardDrawable(bgHex: String, borderHex: String): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(Color.parseColor(bgHex))
-            cornerRadius = 18f
-            setStroke(2, Color.parseColor(borderHex))
-        }
+        root.addView(back)
+        setContentView(root)
     }
 }
