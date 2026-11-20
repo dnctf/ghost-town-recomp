@@ -102,7 +102,7 @@ private fun ConsoleDashboard() {
     var thermal by remember { mutableStateOf("TERMAL: —") }
     var gate by remember { mutableStateOf(RuntimeLaunchGate.read(context)) }
     var notices by remember { mutableStateOf(listOf(
-        Notice(1, "MODE DEMO", "Konten contoh · tidak ada aset game"),
+        Notice(1, "MOVING OUT 2 ONLY", "Game khusus · runtime compatibility belum terverifikasi"),
         Notice(2, "RUNTIME PENDING", "Pemasangan belum tersedia")
     )) }
     var nextNoticeId by remember { mutableIntStateOf(3) }
@@ -469,7 +469,7 @@ private fun GameCard(game: TargetGame, selected: Boolean, onClick: () -> Unit, o
             drawPath(path, Color.Black.copy(alpha = 0.22f))
         }
         Column(Modifier.align(Alignment.TopStart).padding(16.dp)) {
-            Text("DEMO", color = Color.White.copy(alpha = 0.75f), fontSize = 9.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+            Text("MOVING OUT 2", color = Color.White.copy(alpha = 0.75f), fontSize = 9.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             Text(game.initials, color = Color.White.copy(alpha = if (selected) 0.96f else 0.72f), fontSize = if (selected) 48.sp else 34.sp, fontWeight = FontWeight.Black, letterSpacing = (-2).sp)
             Text(game.title, color = Color.White, fontSize = if (selected) 15.sp else 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -537,14 +537,14 @@ private fun BottomHints(label: String = "A PILIH    /    B KEMBALI    /    MENU 
 
 @Composable
 private fun GameDetailsSheet(
-    game: DemoGame,
+    game: TargetGame,
     state: PlayLaunchState,
     runtimeInstalled: Boolean,
     displayPassed: Boolean,
     onClose: () -> Unit
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp).padding(bottom = 30.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("DETAIL GAME  /  DEMO", color = C.Accent, fontSize = 10.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold)
+        Text("GAME PROFILE  /  MOVING OUT 2", color = C.Accent, fontSize = 10.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold)
         Text(game.title, color = C.TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         Text("Kartu ini memakai artwork abstrak buatan sendiri. Tidak ada file game atau aset komersial yang disertakan.", color = C.TextSecondary, fontSize = 12.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
