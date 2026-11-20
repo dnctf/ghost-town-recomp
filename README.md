@@ -71,8 +71,9 @@ A component's presence in the repository or runtime pack is not evidence that it
 ## Research and audit documents
 
 - MOVING_OUT_2_ONLY_SCOPE.md: migration decisions, audit/removal policy, and dedicated target acceptance gates.
-- RUNTIME_AUDIT.md: current runtime integration gaps.
-- docs/: architecture and runtime research; historical documents must be clearly marked as superseded where they still describe Overcooked! 2.
+- MOVING_OUT_2_COMPATIBILITY_AUDIT.md: initial source-level findings and ordered refactor plan.
+- RUNTIME_AUDIT.md: historical runtime integration gaps; reconcile with Moving Out 2-only scope.
+- docs/: architecture and runtime research; Overcooked! 2 documents are historical inputs and not active requirements.
 
 ## Build and CI
 
